@@ -1,0 +1,53 @@
+# ======================
+# Python
+# ======================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+.env
+.env.*
+venv/
+.venv/
+
+# ======================
+# FastAPI / Uvicorn
+# ======================
+*.log
+
+# ======================
+# Flutter / Dart
+# ======================
+**/.dart_tool/
+**/build/
+**/.packages
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.metadata
+
+# ======================
+# Docker
+# ======================
+**/.dockerignore
+
+# ======================
+# Supabase
+# ======================
+.supabase/
+
+# ======================
+# IDE
+# ======================
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# ======================
+# Node (if ever used)
+# ======================
+node_modules/
