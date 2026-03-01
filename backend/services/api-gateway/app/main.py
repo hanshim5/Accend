@@ -1,3 +1,16 @@
+"""
+API Gateway (BFF - Backend For Frontend)
+
+Purpose:
+- Single public entry point for mobile app.
+- Validate authentication.
+- Route requests to appropriate microservices.
+- Aggregate or orchestrate multi-service flows.
+
+Architecture:
+Flutter → Gateway → Internal Services
+"""
+
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 import httpx
@@ -6,83 +19,181 @@ from app.config import settings
 from app.auth import verify_supabase_jwt
 from app.supabase_client import supabase
 
+
+# Create FastAPI app
 app = FastAPI(title="api-gateway")
 
 
+# -----------------------------------
+# Health Check
+# -----------------------------------
+
 @app.get("/health")
 def health():
+    """
+    Simple readiness check.
+    Used by docker-compose and monitoring.
+    """
     return {"ok": True, "service": "api-gateway"}
 
+# -----------------------------------
+# Username Availability Check
+# -----------------------------------
 
-# ---------- username helper ----------
 @app.get("/profile/username-available")
 def username_available(username: str):
+    """
+    Check if a username already exists.
+
+    Used by:
+    - Account creation screen before signup.
+
+    Flow:
+    1. Normalize username (lowercase + strip).
+    2. Query profiles table.
+    3. Return availability boolean.
+    """
+
     u = username.strip().lower()
+
     if not u:
         raise HTTPException(status_code=400, detail="username required")
 
-    res = supabase().table("profiles").select("id").eq("username", u).limit(1).execute()
+    # Query Supabase directly (lightweight read)
+    res = (
+        supabase()
+        .table("profiles")
+        .select("id")
+        .eq("username", u)
+        .limit(1)
+        .execute()
+    )
+
     taken = bool(res.data)
-    return {"username": u, "available": not taken}
 
+    return {
+        "username": u,
+        "available": not taken,
+    }
 
-# ---------- Proxy to courses-service ----------
+# -----------------------------------
+# Proxy: GET /courses
+# -----------------------------------
+
 @app.get("/courses")
-async def proxy_list_courses(authorization: str | None = Header(default=None)):
+async def proxy_list_courses(
+    authorization: str | None = Header(default=None)
+):
+    """
+    Forward GET /courses to courses-service.
+
+    Steps:
+    1. Validate JWT.
+    2. Extract user_id.
+    3. Call courses-service with X-User-Id header.
+    4. Return response.
+    """
+
     user_id = verify_supabase_jwt(authorization)
+
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.get(
             f"{settings.COURSES_SERVICE_URL}/courses",
             headers={"X-User-Id": user_id},
         )
-        return r.json()
 
+        return r.json()
+    
+# -----------------------------------
+# Proxy: POST /courses
+# -----------------------------------
 
 @app.post("/courses")
 async def proxy_create_course(
     body: dict,
     authorization: str | None = Header(default=None),
 ):
+    """
+    Forward course creation to courses-service.
+
+    Gateway responsibilities:
+    - Validate JWT
+    - Attach X-User-Id
+    - Forward body
+    """
+
     user_id = verify_supabase_jwt(authorization)
+
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.post(
             f"{settings.COURSES_SERVICE_URL}/courses",
             headers={"X-User-Id": user_id},
             json=body,
         )
+
         return r.json()
+    
+# -----------------------------------
+# AI Course Generation
+# -----------------------------------
 
-
-# ---------- generate course ----------
 class GenerateReq(BaseModel):
+    """
+    Request schema for generating a course.
+    """
     prompt: str = Field(min_length=1, max_length=5000)
+
 
 @app.post("/ai/generate-course")
 async def generate_course(
     req: GenerateReq,
     authorization: str | None = Header(default=None),
 ):
+    """
+    Orchestrated flow:
+
+    1. Validate JWT (identify user).
+    2. Call AI service to generate structure.
+    3. Call courses-service to persist generated course.
+    4. Return combined response to Flutter.
+
+    This is orchestration logic.
+    This is why Gateway exists.
+    """
+
+    # Step 1: Verify identity
     user_id = verify_supabase_jwt(authorization)
 
     async with httpx.AsyncClient(timeout=30) as client:
-        # 1) Ask AI service for generated structure (stubbed)
+
+        # Step 2: Call AI service
         ai_resp = await client.post(
             f"{settings.AI_COURSE_GEN_SERVICE_URL}/generate-course",
             json={"prompt": req.prompt},
         )
+
         if ai_resp.status_code >= 400:
-            raise HTTPException(status_code=ai_resp.status_code, detail=ai_resp.text)
+            raise HTTPException(
+                status_code=ai_resp.status_code,
+                detail=ai_resp.text,
+            )
+
         ai_data = ai_resp.json()
 
-        # 2) Store generated course in courses-service
+        # Step 3: Persist in courses-service
         course_resp = await client.post(
             f"{settings.COURSES_SERVICE_URL}/courses",
             headers={"X-User-Id": user_id},
             json={"title": ai_data["title"]},
         )
-        if course_resp.status_code >= 400:
-            raise HTTPException(status_code=course_resp.status_code, detail=course_resp.text)
 
+        if course_resp.status_code >= 400:
+            raise HTTPException(
+                status_code=course_resp.status_code,
+                detail=course_resp.text,
+            )
+
+        # Step 4: Return aggregated response
         return {
             "course": course_resp.json(),
             "ai": ai_data,
