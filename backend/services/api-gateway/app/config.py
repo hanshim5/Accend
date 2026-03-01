@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_SERVICE_ROLE_KEY: str
     SUPABASE_JWT_SECRET: str
+    SUPABASE_JWKS_URL: str
+    SUPABASE_JWT_ISSUER: str
 
     # Internal service URLs (docker-compose injects these)
     COURSES_SERVICE_URL: str
