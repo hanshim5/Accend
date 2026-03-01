@@ -17,7 +17,9 @@ import httpx
 
 from app.config import settings
 from app.auth import verify_supabase_jwt
-from app.supabase_client import supabase
+
+from httpx import HTTPStatusError
+from app.supabase_client import supabase_select_one
 
 
 # Create FastAPI app
@@ -41,7 +43,7 @@ def health():
 # -----------------------------------
 
 @app.get("/profile/username-available")
-def username_available(username: str):
+async def username_available(username: str):
     """
     Check if a username already exists.
 
@@ -50,7 +52,7 @@ def username_available(username: str):
 
     Flow:
     1. Normalize username (lowercase + strip).
-    2. Query profiles table.
+    2. Query profiles table via Supabase PostgREST.
     3. Return availability boolean.
     """
 
@@ -59,50 +61,22 @@ def username_available(username: str):
     if not u:
         raise HTTPException(status_code=400, detail="username required")
 
-    # Query Supabase directly (lightweight read)
-    res = (
-        supabase()
-        .table("profiles")
-        .select("id")
-        .eq("username", u)
-        .limit(1)
-        .execute()
-    )
+    try:
+        rows = await supabase_select_one(
+            table="profiles",
+            select="id",
+            filters={"username": f"eq.{u}"},
+        )
+    except HTTPStatusError:
+        # If Supabase is down/misconfigured, treat as bad gateway.
+        raise HTTPException(status_code=502, detail="Supabase query failed")
 
-    taken = bool(res.data)
+    taken = len(rows) > 0
 
     return {
         "username": u,
         "available": not taken,
     }
-
-# -----------------------------------
-# Proxy: GET /courses
-# -----------------------------------
-
-@app.get("/courses")
-async def proxy_list_courses(
-    authorization: str | None = Header(default=None)
-):
-    """
-    Forward GET /courses to courses-service.
-
-    Steps:
-    1. Validate JWT.
-    2. Extract user_id.
-    3. Call courses-service with X-User-Id header.
-    4. Return response.
-    """
-
-    user_id = verify_supabase_jwt(authorization)
-
-    async with httpx.AsyncClient(timeout=15) as client:
-        r = await client.get(
-            f"{settings.COURSES_SERVICE_URL}/courses",
-            headers={"X-User-Id": user_id},
-        )
-
-        return r.json()
     
 # -----------------------------------
 # Proxy: POST /courses
@@ -129,6 +103,33 @@ async def proxy_create_course(
             f"{settings.COURSES_SERVICE_URL}/courses",
             headers={"X-User-Id": user_id},
             json=body,
+        )
+
+        return r.json()
+    
+# -----------------------------------
+# Proxy: GET /courses
+# -----------------------------------
+
+@app.get("/courses")
+async def proxy_list_courses(
+    authorization: str | None = Header(default=None)
+):
+    """
+    Forward GET /courses to courses-service.
+
+    Steps:
+    1. Validate JWT.
+    2. Extract user_id.
+    3. Call courses-service with X-User-Id header.
+    4. Return response.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{settings.COURSES_SERVICE_URL}/courses",
+            headers={"X-User-Id": user_id},
         )
 
         return r.json()
