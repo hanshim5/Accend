@@ -1,0 +1,35 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "mobile_interface",
+            "cwd": "apps\\mobile_interface",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "mobile_interface (profile mode)",
+            "cwd": "apps\\mobile_interface",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "mobile_interface (release mode)",
+            "cwd": "apps\\mobile_interface",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+            "name": "Flutter (lib\\onboarding\\pages\\skill_assess.dart.dart)",
+            "type": "dart",
+            "request": "launch",
+            "cwd": "apps\\mobile_interface",
+            "program": "lib\\onboarding\\pages\\skill_assess.dart.dart"
+        }
+    ]
+}
