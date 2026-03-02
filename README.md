@@ -86,6 +86,8 @@ Accend is currently under active development.
 Features and architecture may evolve as the product grows.
 
 ## Repo Structure
+
+```
 ACCEND/
 ├── apps/
 │   └── mobile_interface/
@@ -141,3 +143,4 @@ ACCEND/
 │   └── scripts/
 │
 └── README.md
+```
