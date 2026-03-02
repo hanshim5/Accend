@@ -1,0 +1,15 @@
+# Docker Compose definition for the pronunciation-feedback microservice.
+# Run from this directory with: docker compose up --build
+
+services:
+  # Single service: the FastAPI app that calls Azure Speech for pronunciation assessment.
+  pronunciation-feedback:
+    # Build the image using the Dockerfile in the current directory.
+    build: .
+    # Expose the app on host port 8000; the container listens on 8000 (see Dockerfile CMD).
+    ports:
+      - "8000:8000"
+    # Load environment variables from .env in this directory. Required for
+    # AZURE_SPEECH_KEY and AZURE_SPEECH_REGION so the app can call Azure Speech.
+    env_file:
+      - .env

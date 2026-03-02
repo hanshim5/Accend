@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'social.dart';
 import 'profile.dart';
+import 'package:mobile_interface/src/common/widgets/bottom_nav_bar.dart';
 
 void main() => runApp(const MyApp());
 
@@ -43,29 +44,9 @@ class _MainShellState extends State<MainShell> {
         index: _selectedIndex,
         children: _pages,
       ),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: BottomNavBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-
-        indicatorColor: const Color.fromARGB(255, 78, 169, 18).withValues(alpha: 0.2),
-
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.group_outlined),
-            selectedIcon: Icon(Icons.group),
-            label: 'Social',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
       ),
     );
   }
