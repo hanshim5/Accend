@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class SoloPracticePage extends StatefulWidget {
   const SoloPracticePage({super.key});
@@ -9,13 +10,31 @@ class SoloPracticePage extends StatefulWidget {
 
 class _SoloPracticePageState extends State<SoloPracticePage> {
   int _micStateIndex = 0; // 0 = mic, 1 = recording, 2 = play
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  // Note: audioplayers' AssetSource is effectively relative to the `assets/` bundle prefix.
+  // With `pubspec.yaml` declaring `assets/audio/testaudio.wav`, pass `audio/testaudio.wav` here.
+  static const String _sampleAudioAsset = 'audio/testaudio.wav';
 
-  void _onMicPressed() {
-    setState(() {
-      if (_micStateIndex < 2) {
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onMicPressed() async {
+    if (_micStateIndex < 2) {
+      setState(() {
         _micStateIndex += 1;
+      });
+    } else {
+      // In play state: play bundled sample audio asset
+      try {
+        await _audioPlayer.stop();
+        await _audioPlayer.play(AssetSource(_sampleAudioAsset));
+      } catch (_) {
+        // Swallow errors for now; real handling can be added later.
       }
-    });
+    }
   }
 
   void _onRetryPressed() {
@@ -81,23 +100,29 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
             // Middle section: prompt box and text to repeat
             Expanded(
               child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    // Placeholder for prompt box
-                    SizedBox(
-                      height: 120,
-                      width: 280,
-                      child: Card(
-                        child: Center(
-                          child: Text('Folks, this is fantastic!'),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      // Placeholder for prompt box
+                      SizedBox(
+                        height: 120,
+                        width: 280,
+                        child: Card(
+                          child: Center(
+                            child: Text(
+                              'The quick brown fox jumped over the lazy dog.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                    SizedBox(height: 16),
-                    Text('Record yourself using the microphone button below!'),
-                  ],
-                ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Record yourself using the microphone button below!',
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
               ),
             ),
             // Bottom section: controls (microphone button for now)
