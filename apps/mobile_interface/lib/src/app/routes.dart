@@ -1,20 +1,15 @@
 import 'package:flutter/material.dart';
+import '../features/onboarding/pages/onboarding_user_info_page.dart';
 
-/// Central route names + route table.
-/// We’ll add feature pages here as you implement them.
 class AppRoutes {
-  // Auth / onboarding
-  static const register = '/register';
+  static const onboardingUserInfo = '/onboarding/user-info';
+
+  // Keep these for later if you want:
   static const login = '/login';
   static const onboardingIntro = '/onboarding/intro';
-
-  // Later:
   static const courses = '/courses';
 
   static Map<String, WidgetBuilder> get table => {
-        // register: (_) => const RegisterPage(),
-        // login: (_) => const LoginPage(),
-        // onboardingIntro: (_) => const OnboardingIntroPage(),
-        // courses: (_) => const CoursesListPage(),
+        onboardingUserInfo: (_) => const OnboardingUserInfoPage(),
       };
 }

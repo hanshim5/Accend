@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'constants.dart';
 
-/// App theme wired to the design tokens.
-/// Common widgets should rely on this theme instead of hardcoding colors.
 class AppTheme {
   static ThemeData dark() {
     final base = ThemeData.dark(useMaterial3: true);
+
+    final headingFont = GoogleFonts.inter();
+    final bodyFont = GoogleFonts.publicSans();
 
     return base.copyWith(
       scaffoldBackgroundColor: AppColors.primaryBg,
@@ -18,74 +20,77 @@ class AppTheme {
         error: AppColors.failure,
       ),
 
-      // Typography:
-      // We'll set actual font families (Inter/Montserrat/Public Sans)
-      // once you add fonts (GoogleFonts or bundled assets).
-      textTheme: base.textTheme.copyWith(
-        headlineLarge: const TextStyle(
+      textTheme: TextTheme(
+        // Headings (Inter)
+        headlineLarge: headingFont.copyWith(
           color: AppColors.textPrimary,
-          fontWeight: FontWeight.w800,
           fontSize: 32,
-          height: 1.05,
-        ),
-        headlineMedium: const TextStyle(
-          color: AppColors.textPrimary,
           fontWeight: FontWeight.w800,
-          fontSize: 28,
           height: 1.05,
         ),
-        titleMedium: const TextStyle(
+        headlineMedium: headingFont.copyWith(
           color: AppColors.textPrimary,
+          fontSize: 28,
+          fontWeight: FontWeight.w800,
+          height: 1.05,
+        ),
+        titleMedium: headingFont.copyWith(
+          color: AppColors.textPrimary,
+          fontSize: 16,
           fontWeight: FontWeight.w700,
-          fontSize: 16,
         ),
-        bodyLarge: const TextStyle(
+
+        // Body (Public Sans)
+        bodyLarge: bodyFont.copyWith(
           color: AppColors.textPrimary,
-          fontWeight: FontWeight.w500,
           fontSize: 16,
-        ),
-        bodyMedium: const TextStyle(
-          color: AppColors.textSecondary,
           fontWeight: FontWeight.w500,
+        ),
+        bodyMedium: bodyFont.copyWith(
+          color: AppColors.textSecondary,
           fontSize: 14,
+          fontWeight: FontWeight.w500,
         ),
       ),
 
-      // Inputs (TextFields, Dropdowns, etc.)
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.inputFill,
-        hintStyle: const TextStyle(color: AppColors.textSecondary),
-        labelStyle: const TextStyle(color: AppColors.textSecondary),
-        errorStyle: const TextStyle(color: AppColors.failure, fontSize: 12),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 14,
+        hintStyle: bodyFont.copyWith(
+          color: AppColors.textSecondary,
+          fontSize: 14,
         ),
+        labelStyle: bodyFont.copyWith(
+          color: AppColors.textSecondary,
+          fontSize: 14,
+        ),
+        errorStyle: bodyFont.copyWith(
+          color: AppColors.failure,
+          fontSize: 12,
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadii.sm),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadii.sm),
-          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+          borderSide:
+              const BorderSide(color: AppColors.accent, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadii.sm),
-          borderSide: const BorderSide(color: AppColors.failure),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadii.sm),
-          borderSide: const BorderSide(color: AppColors.failure, width: 1.5),
+          borderSide:
+              const BorderSide(color: AppColors.failure),
         ),
       ),
 
-      // Buttons
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.action,
           foregroundColor: const Color(0xFF101828),
-          textStyle: const TextStyle(
+          textStyle: headingFont.copyWith(
             fontSize: 16,
             fontWeight: FontWeight.w800,
           ),
@@ -94,22 +99,6 @@ class AppTheme {
           ),
           padding: const EdgeInsets.symmetric(vertical: 16),
         ),
-      ),
-
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: AppColors.accent,
-          textStyle: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
-
-      dividerColor: AppColors.border,
-
-      iconTheme: const IconThemeData(color: AppColors.textSecondary),
-
-      snackBarTheme: const SnackBarThemeData(
-        backgroundColor: AppColors.surface,
-        contentTextStyle: TextStyle(color: AppColors.textPrimary),
       ),
     );
   }
