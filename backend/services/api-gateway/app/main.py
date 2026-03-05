@@ -11,7 +11,7 @@ Architecture:
 Flutter → Gateway → Internal Services
 """
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 import httpx
 
@@ -199,3 +199,41 @@ async def generate_course(
             "course": course_resp.json(),
             "ai": ai_data,
         }
+
+
+# -----------------------------------
+# Pronunciation Feedback (proxy to pronunciation-feedback service)
+# -----------------------------------
+
+
+@app.post("/pronunciation/assess")
+async def proxy_pronunciation_assess(
+    audio: UploadFile = File(..., description="WAV audio file (max 10 seconds)"),
+    reference_text: str = Form(..., description="Ground truth text the learner should say"),
+    authorization: str | None = Header(default=None),
+):
+    """
+    Forward pronunciation assessment to pronunciation-feedback service.
+
+    Gateway: validate JWT, forward multipart (audio + reference_text).
+    """
+    verify_supabase_jwt(authorization)
+
+    content = await audio.read()
+    filename = audio.filename or "audio.wav"
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(
+            f"{settings.PRONUNCIATION_FEEDBACK_SERVICE_URL}/assess",
+            files={"audio": (filename, content, "audio/wav")},
+            data={"reference_text": reference_text},
+        )
+
+    if r.status_code >= 400:
+        try:
+            detail = r.json()
+        except Exception:
+            detail = r.text
+        raise HTTPException(status_code=r.status_code, detail=detail)
+
+    return r.json()

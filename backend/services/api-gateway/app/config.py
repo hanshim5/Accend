@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     # Internal service URLs (docker-compose injects these)
     COURSES_SERVICE_URL: str
     AI_COURSE_GEN_SERVICE_URL: str
+    PRONUNCIATION_FEEDBACK_SERVICE_URL: str
 
 
 # Singleton settings object
