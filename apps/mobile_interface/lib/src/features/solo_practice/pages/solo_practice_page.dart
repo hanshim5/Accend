@@ -33,6 +33,143 @@ const List<String> _mockCards = [
 ];
 
 // ---------------------------------------------------------------------------
+// Mock pronunciation feedback (matches shape from pronunciation-feedback API)
+// ---------------------------------------------------------------------------
+class PronunciationFeedbackMock {
+  final double accuracyScore;
+  final double fluencyScore;
+  final double completenessScore;
+  final String? summary; // optional tip
+
+  const PronunciationFeedbackMock({
+    required this.accuracyScore,
+    required this.fluencyScore,
+    required this.completenessScore,
+    this.summary,
+  });
+}
+
+/// Returns mock feedback for the feedback card. Replace with real API call later.
+PronunciationFeedbackMock getMockFeedback() {
+  // Vary scores slightly so the card feels realistic.
+  final base = 70.0 + (DateTime.now().millisecond % 25);
+  return PronunciationFeedbackMock(
+    accuracyScore: base + (DateTime.now().second % 15),
+    fluencyScore: (base + 5).clamp(0.0, 100.0),
+    completenessScore: (base + 8).clamp(0.0, 100.0),
+    summary: 'Keep practicing the "th" sounds for even clearer speech.',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inline feedback card (shown on the page after Submit; explorable in future)
+// ---------------------------------------------------------------------------
+class _FeedbackCard extends StatelessWidget {
+  const _FeedbackCard({
+    required this.feedback,
+    required this.onNext,
+  });
+
+  final PronunciationFeedbackMock feedback;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final headingStyle = GoogleFonts.inter(
+      color: AppColors.textPrimary,
+      fontSize: 18,
+      fontWeight: FontWeight.w700,
+    );
+    final bodyStyle = GoogleFonts.publicSans(
+      color: AppColors.textSecondary,
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+    );
+    final scoreStyle = GoogleFonts.inter(
+      color: AppColors.accent,
+      fontSize: 20,
+      fontWeight: FontWeight.w700,
+    );
+
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(maxWidth: 360),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Pronunciation feedback', style: headingStyle),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _ScoreChip(label: 'Accuracy', score: feedback.accuracyScore, style: scoreStyle, bodyStyle: bodyStyle),
+              _ScoreChip(label: 'Fluency', score: feedback.fluencyScore, style: scoreStyle, bodyStyle: bodyStyle),
+              _ScoreChip(label: 'Complete', score: feedback.completenessScore, style: scoreStyle, bodyStyle: bodyStyle),
+            ],
+          ),
+          if (feedback.summary != null && feedback.summary!.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            Text(feedback.summary!, style: bodyStyle),
+          ],
+          const SizedBox(height: AppSpacing.lg),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: onNext,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.action,
+                foregroundColor: const Color(0xFF101828),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+              ),
+              child: Text(
+                'Next',
+                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF101828)).copyWith(inherit: false),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScoreChip extends StatelessWidget {
+  const _ScoreChip({
+    required this.label,
+    required this.score,
+    required this.style,
+    required this.bodyStyle,
+  });
+
+  final String label;
+  final double score;
+  final TextStyle style;
+  final TextStyle bodyStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: bodyStyle),
+        const SizedBox(height: 4),
+        Text('${score.round()}', style: style),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Widget
 // ---------------------------------------------------------------------------
 class SoloPracticePage extends StatefulWidget {
@@ -59,6 +196,9 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
   // Path to the bundled sample audio file (relative to the assets/ directory).
   // Used as a placeholder until real recorded audio is captured and stored.
   static const String _sampleAudioAsset = 'audio/testaudio.wav';
+
+  /// When non-null, the user has submitted and we show inline feedback (explorable later).
+  PronunciationFeedbackMock? _currentFeedback;
 
   // ---------------------------------------------------------------------------
   // Computed getters
@@ -124,28 +264,40 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
     });
   }
 
-  /// Advances to the next card and resets the mic state.
-  /// If the user is on the last card, shows a completion dialog instead.
+  /// On Submit: show inline feedback card (mock data). "Next" advances to next card.
   void _onSubmitPressed() {
+    setState(() {
+      _currentFeedback = getMockFeedback();
+    });
+  }
+
+  /// After user taps Next on feedback: clear feedback, go to next card or show completion.
+  void _advanceToNextCard() {
     if (_currentCardIndex < _totalCards - 1) {
-      // Move to the next card and reset the mic to idle.
       setState(() {
+        _currentFeedback = null;
         _currentCardIndex += 1;
         _micStateIndex = 0;
       });
     } else {
-      // All cards completed — show a completion dialog.
-      // TODO: replace with a proper results/summary screen.
-      showDialog(
+      setState(() {
+        _currentFeedback = null;
+        _micStateIndex = 0;
+      });
+      showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Lesson Complete! 🎉'),
-          content: const Text('You\'ve completed all 20 exercises. Great work!'),
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Text('Lesson Complete! 🎉', style: GoogleFonts.inter(color: AppColors.textPrimary)),
+          content: Text(
+            'You\'ve completed all $_totalCards exercises. Great work!',
+            style: GoogleFonts.publicSans(color: AppColors.textSecondary),
+          ),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop();   // Close dialog
-                Navigator.of(context).maybePop(); // Return to previous screen
+                Navigator.of(dialogContext).pop();
+                Navigator.of(context).maybePop();
               },
               child: const Text('Finish'),
             ),
@@ -177,8 +329,8 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Only show Retry / Submit buttons once a recording has been made (state 2).
-    final bool showRetrySubmit = _micStateIndex == 2;
+    // Show Retry / Submit only when recording is done (state 2) and not showing feedback.
+    final bool showRetrySubmit = _micStateIndex == 2 && _currentFeedback == null;
 
     // --- Text styles (defined here to keep build readable) ---
 
@@ -223,6 +375,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                     setState(() {
                       _currentCardIndex = 0;
                       _micStateIndex = 0;
+                      _currentFeedback = null;
                     });
                     Navigator.of(context).maybePop();
                   },
@@ -269,39 +422,54 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
             ),
 
             // -----------------------------------------------------------------
-            // MIDDLE SECTION — prompt card + instruction text
+            // MIDDLE SECTION — prompt card or inline feedback card (explorable)
             // -----------------------------------------------------------------
             Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Prompt card: displays the phrase the user should read aloud.
-                    // Styled to match the app's surface card design token.
-                    Container(
-                      width: 300,
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppRadii.lg),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Text(
-                        _currentCard,
-                        textAlign: TextAlign.center,
-                        style: promptStyle,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      child: Center(
+                        child: _currentFeedback == null
+                            ? Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Prompt card: phrase the user should read aloud.
+                                  Container(
+                                    width: 300,
+                                    padding: const EdgeInsets.all(AppSpacing.lg),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface,
+                                      borderRadius: BorderRadius.circular(AppRadii.lg),
+                                      border: Border.all(color: AppColors.border),
+                                    ),
+                                    child: Text(
+                                      _currentCard,
+                                      textAlign: TextAlign.center,
+                                      style: promptStyle,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  Text(
+                                    'Record yourself using the microphone button below!',
+                                    textAlign: TextAlign.center,
+                                    style: bodyStyle,
+                                  ),
+                                ],
+                              )
+                            : Padding(
+                                padding: const EdgeInsets.only(top: AppSpacing.md),
+                                child: _FeedbackCard(
+                                  feedback: _currentFeedback!,
+                                  onNext: _advanceToNextCard,
+                                ),
+                              ),
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.md),
-
-                    // Static instruction text — does not change between cards.
-                    Text(
-                      'Record yourself using the microphone button below!',
-                      textAlign: TextAlign.center,
-                      style: bodyStyle,
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
 
