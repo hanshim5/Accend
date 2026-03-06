@@ -1,7 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+
 import '../../../app/constants.dart';
+
+/// API gateway base URL. Use 10.0.2.2:8080 for Android emulator, localhost:8080 for iOS simulator.
+const String _gatewayBaseUrl = 'http://localhost:8080';
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -49,9 +57,8 @@ class PronunciationFeedbackMock {
   });
 }
 
-/// Returns mock feedback for the feedback card. Replace with real API call later.
+/// Returns mock feedback for the feedback card (fallback when API fails or is unused).
 PronunciationFeedbackMock getMockFeedback() {
-  // Vary scores slightly so the card feels realistic.
   final base = 70.0 + (DateTime.now().millisecond % 25);
   return PronunciationFeedbackMock(
     accuracyScore: base + (DateTime.now().second % 15),
@@ -59,6 +66,60 @@ PronunciationFeedbackMock getMockFeedback() {
     completenessScore: (base + 8).clamp(0.0, 100.0),
     summary: 'Keep practicing the "th" sounds for even clearer speech.',
   );
+}
+
+/// Calls the API gateway POST /pronunciation/assess with the given audio bytes and reference text.
+/// Returns feedback from the response, or null on error (caller can fall back to mock).
+/// [accessToken] Optional Supabase JWT; if null, gateway will return 401 until auth is wired.
+Future<PronunciationFeedbackMock?> fetchPronunciationFeedback({
+  required List<int> audioBytes,
+  required String referenceText,
+  String? accessToken,
+}) async {
+  final uri = Uri.parse('$_gatewayBaseUrl/pronunciation/assess');
+  final request = http.MultipartRequest('POST', uri);
+  request.fields['reference_text'] = referenceText;
+  request.files.add(http.MultipartFile.fromBytes(
+    'audio',
+    audioBytes,
+    filename: 'testaudio.wav',
+  ));
+  if (accessToken != null && accessToken.isNotEmpty) {
+    request.headers['Authorization'] = 'Bearer $accessToken';
+  }
+
+  try {
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode != 200) return null;
+    return _feedbackFromAssessmentJson(response.body);
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Parse Azure-style pronunciation assessment JSON into [PronunciationFeedbackMock].
+PronunciationFeedbackMock? _feedbackFromAssessmentJson(String body) {
+  try {
+    final map = jsonDecode(body) as Map<String, dynamic>;
+    final nbest = map['NBest'] as List<dynamic>?;
+    if (nbest == null || nbest.isEmpty) return null;
+    final first = nbest.first as Map<String, dynamic>;
+    final pron = first['PronunciationAssessment'] as Map<String, dynamic>?;
+    if (pron == null) return null;
+    final accuracy = (pron['AccuracyScore'] as num?)?.toDouble();
+    final fluency = (pron['FluencyScore'] as num?)?.toDouble();
+    final completeness = (pron['CompletenessScore'] as num?)?.toDouble();
+    if (accuracy == null || fluency == null || completeness == null) return null;
+    return PronunciationFeedbackMock(
+      accuracyScore: accuracy,
+      fluencyScore: fluency,
+      completenessScore: completeness,
+      summary: 'Keep practicing for even clearer speech.',
+    );
+  } catch (_) {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -264,10 +325,21 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
     });
   }
 
-  /// On Submit: show inline feedback card (mock data). "Next" advances to next card.
-  void _onSubmitPressed() {
+  /// On Submit: call pronunciation/assess with test audio + reference text, then show feedback card.
+  Future<void> _onSubmitPressed() async {
+    final audioBytes = await rootBundle.load('assets/audio/testaudio.wav');
+    final bytes = audioBytes.buffer.asUint8List();
+    final referenceText = 'The quick brown fox jumped over the lazy dog.';
+
+    final feedback = await fetchPronunciationFeedback(
+      audioBytes: bytes,
+      referenceText: referenceText,
+      accessToken: null, // TODO: pass Supabase session access token when auth is wired
+    );
+
+    if (!mounted) return;
     setState(() {
-      _currentFeedback = getMockFeedback();
+      _currentFeedback = feedback ?? getMockFeedback();
     });
   }
 
@@ -351,7 +423,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
     // Used for the main prompt text displayed on the practice card.
     final promptStyle = GoogleFonts.publicSans(
       color: AppColors.textPrimary,
-      fontSize: 16,
+      fontSize: 24,
       fontWeight: FontWeight.w500,
     );
 
@@ -439,16 +511,19 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                                   // Prompt card: phrase the user should read aloud.
                                   Container(
                                     width: 300,
+                                    height: 200,
                                     padding: const EdgeInsets.all(AppSpacing.lg),
                                     decoration: BoxDecoration(
                                       color: AppColors.surface,
                                       borderRadius: BorderRadius.circular(AppRadii.lg),
                                       border: Border.all(color: AppColors.border),
                                     ),
-                                    child: Text(
-                                      _currentCard,
-                                      textAlign: TextAlign.center,
-                                      style: promptStyle,
+                                    child: Center(
+                                      child: Text(
+                                        _currentCard,
+                                        textAlign: TextAlign.center,
+                                        style: promptStyle,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: AppSpacing.md),
