@@ -142,6 +142,17 @@ shared/ auth/ http/ logging.py
 
 ------------------------------------------------------------------------
 
+## Where to put credentials
+
+Put all secrets in **one file**: `backend/.env`.
+
+1. Copy the example:  
+   `cp .env.example .env`
+2. Edit `backend/.env` and set your real values (Supabase and Azure Speech).
+3. Never commit `.env` (it is in `.gitignore`).
+
+When you run `docker compose up` from `backend/`, Compose passes this `.env` to every service (api-gateway, pronunciation-feedback, etc.), so one file is enough.
+
 ## Environment Rules
 
 -   .env files are local only

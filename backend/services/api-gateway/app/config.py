@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     AI_COURSE_GEN_SERVICE_URL: str
     PRONUNCIATION_FEEDBACK_SERVICE_URL: str
 
+    # Dev only: set to "1" or "true" to allow POST /pronunciation/assess without JWT (e.g. before Flutter has Supabase Auth).
+    # Do not enable in production.
+    ALLOW_ANON_PRONUNCIATION_ASSESS: bool = True
+
 
 # Singleton settings object
 settings = Settings()

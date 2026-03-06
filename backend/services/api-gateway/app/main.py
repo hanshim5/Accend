@@ -215,9 +215,10 @@ async def proxy_pronunciation_assess(
     """
     Forward pronunciation assessment to pronunciation-feedback service.
 
-    Gateway: validate JWT, forward multipart (audio + reference_text).
+    Gateway: validate JWT (unless ALLOW_ANON_PRONUNCIATION_ASSESS is set for dev), forward multipart.
     """
-    verify_supabase_jwt(authorization)
+    if not getattr(settings, "ALLOW_ANON_PRONUNCIATION_ASSESS", False):
+        verify_supabase_jwt(authorization)
 
     content = await audio.read()
     filename = audio.filename or "audio.wav"
