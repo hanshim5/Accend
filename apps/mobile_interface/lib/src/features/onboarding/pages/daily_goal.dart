@@ -73,7 +73,7 @@ class _DailyGoalPageState extends State<DailyGoalPage> {
     debugPrint('DailyGoal payload: {daily_goal: $backend}');
     // Onboarding complete - for now just show a message
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Onboarding complete! Welcome to Ascension.')),
+      const SnackBar(content: Text('Onboarding complete! Welcome to Accend.')),
     );
   }
 
