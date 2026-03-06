@@ -1,8 +1,5 @@
-// onboarding_header.dart
 import 'package:flutter/material.dart';
 import '../../../app/constants.dart';
-import '../../../app/theme.dart';
-import 'package:google_fonts/google_fonts.dart'; //temporary
 
 /// Topbar (back button + step label + right label)
 class OnboardingTopBar extends StatelessWidget {
@@ -28,7 +25,6 @@ class OnboardingTopBar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Back button row
         SizedBox(
           height: 48,
           child: Align(
@@ -42,7 +38,6 @@ class OnboardingTopBar extends StatelessWidget {
           ),
         ),
 
-        // Step + right label row
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -104,71 +99,84 @@ class OnboardingProgressBar extends StatelessWidget {
   }
 }
 
-/// Question header (text on left + mountain icon on right + subheader)
+/// Question header
 class OnboardingQuestionHeader extends StatelessWidget {
   final IconData icon;
+
+  // 3-part header (like "What " + "accent" + " do you want?")
   final String leadingText;
   final String highlightedText;
+  final String trailingText;
+
   final String subheader;
 
-  // Figma icon box aspect ratio (width / height)
+  // colors per part
+  final Color? leadingColor;
+  final Color? highlightedColor;
+  final Color? trailingColor;
+
+  // Icon box aspect ratio (width / height)
   final double iconBoxAspectRatio;
-
-  // Space between text and icon
   final double gap;
-
-  // Glow sizing (smaller = tighter glow)
   final double glowBlur;
+
+  // Tighten icon spacing without editing every page
+  final double maxIconBoxWidth;
+  final double minIconBoxWidth;
 
   const OnboardingQuestionHeader({
     super.key,
     IconData? icon,
     required this.leadingText,
     required this.highlightedText,
+    this.trailingText = '',
     required this.subheader,
+    this.leadingColor,
+    this.highlightedColor,
+    this.trailingColor,
     this.iconBoxAspectRatio = 81.90 / 62.25,
     this.gap = AppSpacing.xs,
-    this.glowBlur = 10, // smaller glow
+    this.glowBlur = 10,
+    this.maxIconBoxWidth = 72,
+    this.minIconBoxWidth = 44,
   }) : icon = icon ?? Icons.landscape_outlined;
 
   @override
   Widget build(BuildContext context) {
-// Prefer theme headlineLarge if present, but force Inter w800 locally so we get a heavy weight.
-final baseHeading = Theme.of(context).textTheme.headlineLarge;
-final headingStyle = GoogleFonts.inter(
-  textStyle: baseHeading?.copyWith(
-        color: AppColors.textPrimary,
-        fontWeight: FontWeight.w800,
-      ) ??
-      const TextStyle(fontSize: 40, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-);
+    final headingStyle = (Theme.of(context).textTheme.headlineLarge ??
+            const TextStyle(fontSize: 40))
+        .copyWith(
+      color: AppColors.textPrimary,
+      fontWeight: FontWeight.w800,
+    );
 
-    // Build the rich text spans
     final questionSpan = TextSpan(
       children: [
         TextSpan(
           text: leadingText,
           style: headingStyle.copyWith(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w800,   // << use 800
+            color: leadingColor ?? AppColors.textPrimary,
           ),
         ),
         TextSpan(
           text: highlightedText,
           style: headingStyle.copyWith(
-            color: AppColors.accent,
-            fontWeight: FontWeight.w800,   // << use 800
+            color: highlightedColor ?? AppColors.accent,
           ),
         ),
+        if (trailingText.isNotEmpty)
+          TextSpan(
+            text: trailingText,
+            style: headingStyle.copyWith(
+              color: trailingColor ?? AppColors.textPrimary,
+            ),
+          ),
       ],
     );
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Limit icon width so it doesn't squeeze text too much
-        const double maxIconBoxWidth = 96;
-
-        // First pass: estimate text height with a capped icon width
+        // 1) Measure with capped icon width so text doesn't get squeezed too much
         final double availableForText =
             (constraints.maxWidth - maxIconBoxWidth - gap)
                 .clamp(0, constraints.maxWidth);
@@ -179,14 +187,13 @@ final headingStyle = GoogleFonts.inter(
           maxLines: 10,
         )..layout(maxWidth: availableForText);
 
-        // Icon box height = FULL rendered question text height
         final double iconBoxHeight = textPainter.height;
 
-        // Icon box width uses the aspect ratio
-        final double iconBoxWidth =
-            (iconBoxHeight * iconBoxAspectRatio).clamp(56.0, maxIconBoxWidth);
+        // 2) Icon box width based on total text height
+        final double iconBoxWidth = (iconBoxHeight * iconBoxAspectRatio)
+            .clamp(minIconBoxWidth, maxIconBoxWidth);
 
-        // Second pass: re-measure text using the final icon box width
+        // 3) Final text width with actual icon width
         final double finalTextWidth =
             (constraints.maxWidth - iconBoxWidth - gap)
                 .clamp(0, constraints.maxWidth);
@@ -197,29 +204,23 @@ final headingStyle = GoogleFonts.inter(
           maxLines: 10,
         )..layout(maxWidth: finalTextWidth);
 
-        // Icon size fits inside the icon box
-        final double iconSize = finalPainter.height * 1.2;        
+        final double iconSize = finalPainter.height * 1.15;
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Row: question text + right icon box
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Left: text
                 SizedBox(
                   width: finalTextWidth,
                   child: RichText(text: questionSpan),
                 ),
-
                 SizedBox(width: gap),
-
-                // Right: icon box matches full text height
                 SizedBox(
                   width: iconBoxWidth,
                   height: finalPainter.height,
                   child: Center(
-                    // Icon with small glow using Icon.shadows
                     child: Icon(
                       icon,
                       size: iconSize,
@@ -236,10 +237,7 @@ final headingStyle = GoogleFonts.inter(
                 ),
               ],
             ),
-
             const SizedBox(height: AppSpacing.sm),
-
-            // Subheader
             Text(
               subheader,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(

@@ -1,26 +1,25 @@
-// skill_assess.dart
 import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
 import 'package:mobile_interface/src/app/constants.dart';
 import 'package:mobile_interface/src/app/theme.dart';
 
-void main() => runApp(const SkillAssessApp());
+// void main() => runApp(const SkillAssessApp());
 
-class SkillAssessApp extends StatelessWidget {
-  const SkillAssessApp({super.key});
+// class SkillAssessApp extends StatelessWidget {
+//   const SkillAssessApp({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: AppStrings.appName,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark(),
-      home: const Scaffold(
-        body: SafeArea(child: SkillAssessPage()),
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return MaterialApp(
+//       title: AppStrings.appName,
+//       debugShowCheckedModeBanner: false,
+//       theme: AppTheme.dark(),
+//       home: const Scaffold(
+//         body: SafeArea(child: SkillAssessPage()),
+//       ),
+//     );
+//   }
+// }
 
 enum SkillLevel { beginner, intermediate, advanced }
 
@@ -32,84 +31,86 @@ class SkillAssessPage extends StatefulWidget {
 }
 
 class _SkillAssessPageState extends State<SkillAssessPage> {
-  SkillLevel? _selectedLevel; // null
+  SkillLevel? _selectedLevel;
 
   void _selectLevel(SkillLevel level) {
-    setState(() {
-      _selectedLevel = level;
-    });
+    setState(() => _selectedLevel = level);
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.sm + 6,
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.sm + 6,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const OnboardingTopBar(
+              step: 1,
+              totalSteps: 5,
+              rightLabel: 'Skill Assessment',
+              showBack: false,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+
+            const OnboardingProgressBar(step: 1, totalSteps: 5),
+            const SizedBox(height: AppSpacing.xl),
+
+            const OnboardingQuestionHeader(
+              leadingText: 'What is your ',
+              highlightedText: 'current level?',
+              subheader: 'This helps us customize your learning path.',
+            ),
+            const SizedBox(height: AppSpacing.xl),
+
+            LevelCard(
+              tag: 'BEGINNER',
+              title: 'Newbie',
+              description: 'I know a few words or I am starting from scratch.',
+              isSelected: _selectedLevel == SkillLevel.beginner,
+              onTap: () => _selectLevel(SkillLevel.beginner),
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            LevelCard(
+              tag: 'INTERMEDIATE',
+              title: 'Conversationalist',
+              description:
+                  'I can hold basic conversations and understand common topics.',
+              isSelected: _selectedLevel == SkillLevel.intermediate,
+              onTap: () => _selectLevel(SkillLevel.intermediate),
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            LevelCard(
+              tag: 'ADVANCED',
+              title: 'Fluent Speaker',
+              description: 'I can speak fluently and understand complex topics.',
+              isSelected: _selectedLevel == SkillLevel.advanced,
+              onTap: () => _selectLevel(SkillLevel.advanced),
+            ),
+
+            // Push button to bottom
+            const Spacer(),
+
+            // ✅ "margin top" above the button
+            const SizedBox(height: 16),
+
+            SizedBox(
+              height: 56,
+              child: ElevatedButton(
+                onPressed: _selectedLevel == null ? null : () {},
+                child: const Text('Continue'),
+              ),
+            ),
+
+            // ✅ no extra bottom SizedBox needed; SafeArea handles it
+          ],
+        ),
       ),
-      children: [
-        const OnboardingTopBar(
-          step: 1,
-          totalSteps: 5,
-          rightLabel: 'Skill Assessment',
-          showBack: false,
-        ),
-        const SizedBox(height: AppSpacing.sm),
-
-        const OnboardingProgressBar(step: 1, totalSteps: 5),
-        const SizedBox(height: AppSpacing.xl),
-
-        const OnboardingQuestionHeader(
-          leadingText: 'What is your ',
-          highlightedText: 'current level?',
-          subheader: 'This helps us customize your learning path.',
-        ),
-        const SizedBox(height: AppSpacing.xl),
-
-        // Level cards (clickable)
-        LevelCard(
-          tag: 'BEGINNER',
-          title: 'Newbie',
-          description: 'I know a few words or I am starting from scratch.',
-          isSelected: _selectedLevel == SkillLevel.beginner,
-          onTap: () => _selectLevel(SkillLevel.beginner),
-        ),
-        const SizedBox(height: AppSpacing.md),
-
-        LevelCard(
-          tag: 'INTERMEDIATE',
-          title: 'Conversationalist',
-          description:
-              'I can hold basic conversations and understand common topics.',
-          isSelected: _selectedLevel == SkillLevel.intermediate,
-          onTap: () => _selectLevel(SkillLevel.intermediate),
-        ),
-        const SizedBox(height: AppSpacing.md),
-
-        LevelCard(
-          tag: 'ADVANCED',
-          title: 'Fluent Speaker',
-          description: 'I can speak fluently and understand complex topics.',
-          isSelected: _selectedLevel == SkillLevel.advanced,
-          onTap: () => _selectLevel(SkillLevel.advanced),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-
-        // Continue button (disabled until selected)
-        SizedBox(
-          height: 56,
-          child: ElevatedButton(
-            onPressed: _selectedLevel == null
-                ? null
-                : () {
-                    // TODO: Navigator.push(...) to next onboarding page
-                    // Use _selectedLevel here if needed
-                  },
-            child: const Text('Continue'),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-      ],
     );
   }
 }
@@ -153,7 +154,6 @@ class LevelCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // tag pill
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -176,10 +176,13 @@ class LevelCard extends StatelessWidget {
 
                     Text(
                       title,
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      style: (Theme.of(context).textTheme.headlineMedium ??
+                              const TextStyle())
+                          .copyWith(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
 
@@ -187,14 +190,12 @@ class LevelCard extends StatelessWidget {
                       description,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                           ),
                     ),
                   ],
                 ),
               ),
-
-              // selection circle
               Container(
                 width: 36,
                 height: 36,
