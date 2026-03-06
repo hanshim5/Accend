@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
 import 'package:mobile_interface/src/app/constants.dart';
+import 'package:mobile_interface/src/app/routes.dart';
 import 'package:mobile_interface/src/app/theme.dart';
 
 // void main() => runApp(const LearningGoalApp());
@@ -69,7 +70,7 @@ class _LearningGoalPageState extends State<LearningGoalPage> {
     if (goal == null) return;
 
     debugPrint('LearningGoal payload: {learning_goal: $goal}');
-    // TODO: Navigator.push(...) to next onboarding page
+    Navigator.pushNamed(context, AppRoutes.onboardingAccentSelection);
   }
 
   @override

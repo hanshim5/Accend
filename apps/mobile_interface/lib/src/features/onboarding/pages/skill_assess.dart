@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
 import 'package:mobile_interface/src/app/constants.dart';
+import 'package:mobile_interface/src/app/routes.dart';
 import 'package:mobile_interface/src/app/theme.dart';
 
 // void main() => runApp(const SkillAssessApp());
@@ -102,7 +103,9 @@ class _SkillAssessPageState extends State<SkillAssessPage> {
             SizedBox(
               height: 56,
               child: ElevatedButton(
-                onPressed: _selectedLevel == null ? null : () {},
+                onPressed: _selectedLevel == null ? null : () {
+                  Navigator.pushNamed(context, AppRoutes.onboardingLearningGoal);
+                },
                 child: const Text('Continue'),
               ),
             ),

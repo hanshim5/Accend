@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
 import 'package:mobile_interface/src/app/constants.dart';
+import 'package:mobile_interface/src/app/routes.dart';
 import 'package:mobile_interface/src/app/theme.dart';
 
 // void main() => runApp(const AccentSelectionApp());
@@ -75,7 +76,7 @@ class _AccentSelectionPageState extends State<AccentSelectionPage> {
     };
 
     debugPrint('AccentSelection payload: {accent: $backend}');
-    // TODO: Navigator.push(...) to next onboarding page
+    Navigator.pushNamed(context, AppRoutes.onboardingFeedbackTone);
   }
 
   @override

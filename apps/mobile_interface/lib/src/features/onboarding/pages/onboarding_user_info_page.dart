@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/constants.dart';
+import '../../../app/routes.dart';
 import '../../../common/services/api_client.dart';
 import '../../../common/services/auth_service.dart';
 import '../../../common/widgets/primary_button.dart';
@@ -66,44 +67,44 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
       final fullName = _fullName.text.trim();
       final nativeLanguage = _nativeLanguage ?? '';
 
-      // 1) Username availability via gateway -> profile-service
-      final check = await _api.getJson(
-        '/profile/username-available',
-        query: {'username': username},
-      );
+      // COMMENTED OUT HERE!!!: Username availability check
+      // final check = await _api.getJson(
+      //   '/profile/username-available',
+      //   query: {'username': username},
+      // );
+      //
+      // final available = check['available'] == true;
+      // if (!available) {
+      //   setState(() {
+      //     _c.usernameErr = 'Username is taken';
+      //   });
+      //   return;
+      // }
 
-      final available = check['available'] == true;
-      if (!available) {
-        setState(() {
-          _c.usernameErr = 'Username is taken';
-        });
-        return;
-      }
+      // COMMENTED OUT: Supabase Auth signup
+      // await _auth.signUp(
+      //   email: email,
+      //   password: password,
+      // );
+      //
+      // final accessToken = _auth.accessToken;
+      // if (accessToken == null) {
+      //   throw Exception('Missing access token after signup.');
+      // }
 
-      // 2) Supabase Auth signup (credentials stored by Supabase Auth)
-      await _auth.signUp(
-        email: email,
-        password: password,
-      );
-
-      final accessToken = _auth.accessToken;
-      if (accessToken == null) {
-        throw Exception('Missing access token after signup.');
-      }
-
-      // 3) Initialize profile row via gateway (JWT verified -> X-User-Id forwarded)
-      await _api.postJson(
-        '/profile/init',
-        accessToken: accessToken,
-        body: {
-          'username': username,
-          'full_name': fullName,
-          'native_language': nativeLanguage,
-        },
-      );
+      // COMMENTED OUT: Initialize profile
+      // await _api.postJson(
+      //   '/profile/init',
+      //   accessToken: accessToken,
+      //   body: {
+      //     'username': username,
+      //     'full_name': fullName,
+      //     'native_language': nativeLanguage,
+      //   },
+      // );
 
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/onboarding-goals');
+      Navigator.pushReplacementNamed(context, AppRoutes.onboardingSkillAssess);
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

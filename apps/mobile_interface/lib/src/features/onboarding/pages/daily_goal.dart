@@ -3,25 +3,26 @@
 import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
 import 'package:mobile_interface/src/app/constants.dart';
+import 'package:mobile_interface/src/app/routes.dart';
 import 'package:mobile_interface/src/app/theme.dart';
 
-void main() => runApp(const DailyGoalApp());
+// void main() => runApp(const DailyGoalApp());
 
-class DailyGoalApp extends StatelessWidget {
-  const DailyGoalApp({super.key});
+// class DailyGoalApp extends StatelessWidget {
+//   const DailyGoalApp({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: AppStrings.appName,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark(),
-      home: const Scaffold(
-        body: SafeArea(child: DailyGoalPage()),
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return MaterialApp(
+//       title: AppStrings.appName,
+//       debugShowCheckedModeBanner: false,
+//       theme: AppTheme.dark(),
+//       home: const Scaffold(
+//         body: SafeArea(child: DailyGoalPage()),
+//       ),
+//     );
+//   }
+// }
 
 enum DailyGoalChoice { hiker, climber, summiter, mountaineer }
 
@@ -70,7 +71,10 @@ class _DailyGoalPageState extends State<DailyGoalPage> {
 
     final backend = _options.firstWhere((o) => o.value == sel).backendValue;
     debugPrint('DailyGoal payload: {daily_goal: $backend}');
-    // TODO: Navigator.push(...) to next onboarding page
+    // Onboarding complete - for now just show a message
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Onboarding complete! Welcome to Ascension.')),
+    );
   }
 
   @override

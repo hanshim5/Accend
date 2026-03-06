@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
 import 'package:mobile_interface/src/app/constants.dart';
+import 'package:mobile_interface/src/app/routes.dart';
 import 'package:mobile_interface/src/app/theme.dart';
 
 // void main() => runApp(const FeedbackToneApp());
@@ -66,7 +67,7 @@ class _FeedbackTonePageState extends State<FeedbackTonePage> {
 
     final backend = _options.firstWhere((o) => o.value == sel).backendValue;
     debugPrint('FeedbackTone payload: {feedback_tone: $backend}');
-    // TODO: Navigator.push(...) to next onboarding page
+    Navigator.pushNamed(context, AppRoutes.onboardingDailyGoal);
   }
 
   @override
