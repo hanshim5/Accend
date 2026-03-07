@@ -34,7 +34,7 @@ class MyApp extends StatelessWidget {
         title: AppStrings.appName,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark(),
-        initialRoute: AppRoutes.courses,,
+        initialRoute: AppRoutes.courses,
         routes: AppRoutes.table,
       ),
     );
