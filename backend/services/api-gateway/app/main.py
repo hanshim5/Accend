@@ -21,11 +21,24 @@ from app.auth import verify_supabase_jwt
 from httpx import HTTPStatusError
 from app.supabase_client import supabase_select_one
 
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # Create FastAPI app
 app = FastAPI(title="api-gateway")
 
+# Allow cross-origin requests from your web/dev origins.
+# settings.ALLOWED_ORIGINS should be a list of origins, e.g. ["http://localhost:5173"]
+# If not set, we allow a sensible dev list (localhost + 127.0.0.1) — change this for production.
 
+# DEV CORS: allow ANY localhost/127.0.0.1 port (flutter web port changes)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # -----------------------------------
 # Health Check
 # -----------------------------------
@@ -39,73 +52,57 @@ def health():
     return {"ok": True, "service": "api-gateway"}
 
 # -----------------------------------
-# Username Availability Check
+# Proxy: GET /profile/username-available  (PUBLIC)
 # -----------------------------------
 
 @app.get("/profile/username-available")
-async def username_available(username: str):
+async def proxy_username_available(username: str):
     """
-    Check if a username already exists.
+    Forward username availability to user-profile-service.
 
-    Used by:
-    - Account creation screen before signup.
-
-    Flow:
-    1. Normalize username (lowercase + strip).
-    2. Query profiles table via Supabase PostgREST.
-    3. Return availability boolean.
+    Public endpoint (pre-signup), so NO JWT required.
     """
-
-    u = username.strip().lower()
-
+    u = username.strip()
     if not u:
         raise HTTPException(status_code=400, detail="username required")
 
-    try:
-        rows = await supabase_select_one(
-            table="profiles",
-            select="id",
-            filters={"username": f"eq.{u}"},
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{settings.USER_PROFILE_SERVICE_URL}/username-available",
+            params={"username": u},
         )
-    except HTTPStatusError:
-        # If Supabase is down/misconfigured, treat as bad gateway.
-        raise HTTPException(status_code=502, detail="Supabase query failed")
 
-    taken = len(rows) > 0
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
 
-    return {
-        "username": u,
-        "available": not taken,
-    }
-    
+    return r.json()
+
 # -----------------------------------
-# Proxy: POST /courses
+# Proxy: POST /profile/init  (PROTECTED)
 # -----------------------------------
 
-@app.post("/courses")
-async def proxy_create_course(
+@app.post("/profile/init")
+async def proxy_profile_init(
     body: dict,
     authorization: str | None = Header(default=None),
 ):
     """
-    Forward course creation to courses-service.
-
-    Gateway responsibilities:
-    - Validate JWT
-    - Attach X-User-Id
-    - Forward body
+    Initialize profile row after signup/login.
+    Requires JWT (gateway validates), forwards X-User-Id.
     """
-
     user_id = verify_supabase_jwt(authorization)
 
-    async with httpx.AsyncClient(timeout=15) as client:
+    async with httpx.AsyncClient(timeout=10) as client:
         r = await client.post(
-            f"{settings.COURSES_SERVICE_URL}/courses",
+            f"{settings.USER_PROFILE_SERVICE_URL}/profiles/init",
             headers={"X-User-Id": user_id},
             json=body,
         )
 
-        return r.json()
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
     
 # -----------------------------------
 # Proxy: GET /courses

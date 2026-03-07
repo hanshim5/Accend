@@ -14,7 +14,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Load from .env and ignore unknown keys
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # Supabase credentials
@@ -27,7 +26,7 @@ class Settings(BaseSettings):
     # Internal service URLs (docker-compose injects these)
     COURSES_SERVICE_URL: str
     AI_COURSE_GEN_SERVICE_URL: str
+    USER_PROFILE_SERVICE_URL: str
 
 
-# Singleton settings object
 settings = Settings()

@@ -31,6 +31,10 @@ dependencies:
   flutter:
     sdk: flutter
   google_fonts: ^6.2.1
+  http: ^1.2.0
+  supabase_flutter: ^2.5.6
+  flutter_dotenv: ^5.1.0
+  provider: ^6.1.2
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -61,6 +65,8 @@ flutter:
 
   assets:
     - assets/audio/testaudio.wav
+    - assets/.env.web
+    - assets/.env.mobile
 
   # To add assets to your application, add an assets section, like this:
   # assets:
