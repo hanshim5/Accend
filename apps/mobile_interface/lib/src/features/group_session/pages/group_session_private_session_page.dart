@@ -3,6 +3,9 @@ import '../../../app/constants.dart';
 import '../../../common/widgets/primary_button.dart';
 import '../controllers/group_session_lobby_code_controller.dart';
 import '../widgets/widget1.dart';
+import '../../../app/routes.dart' as routes;
+import '../widgets/private_button.dart' as private_button;
+import '../../../common/widgets/bottom_nav_bar.dart' as bot_nav_bar;
 
 class GroupSessionPrivateSelectPage extends StatefulWidget {
   const GroupSessionPrivateSelectPage({super.key});
@@ -51,6 +54,8 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateSelectPage> 
   Widget build(BuildContext context) {
     final t = Theme.of(context);
 
+    int _selectedIndex = 1;
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -75,7 +80,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateSelectPage> 
                             text: TextSpan(
                               style: t.textTheme.headlineMedium,
                               children: [
-                                const TextSpan(text: 'Group Session '),
+                                const TextSpan(text: 'Private Sessions '),
                               ],
                             ),
                           ),
@@ -84,76 +89,57 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateSelectPage> 
                     ],
                   ),
 
+                  const SizedBox(height: 10),
+
                   Divider(
                     color: AppColors.border,
                     thickness: 5,
-                    indent: 0,
                   ),
 
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('Begin your journey to fluency', style: t.textTheme.bodyMedium),
+                  Spacer(),
+                  // const SizedBox(height: 30),
+
+                  private_button.PrivateButton(
+                    title: "Create Lobby", 
+                    subtitle: "Create or join with a code", 
+                    icon: Icons.add_circle_outline_rounded, 
+                    onTap: () {print('Create Private Lobby Pressed');},
+                    // onTap: () {Navigator.pushNamed(context, routes.AppRoutes.groupSessionPrivateSelect);} // leo TODO Need to make it actually do something later
                   ),
 
                   const SizedBox(height: 18),
 
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: [
-
-                          OnboardingLabeledField(
-                            label: 'Lobby Code',
-                            rightLabel: _c.lobbyCodeErr != null ? 'Cannot be empty' : null,
-                            rightLabelColor: AppColors.failure,
-                            child: TextField(
-                              controller: _lobbyCode,
-                              onChanged: (_) {
-                                if (_c.lobbyCodeErr != null) _validate();
-                              },
-                              decoration: InputDecoration(
-                                hintText: '@OHHOHOHOHOHOHOH',
-                                errorText: _c.lobbyCodeErr,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-
-
-                          const SizedBox(height: 18),
-
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('Already have an account? ', style: t.textTheme.bodyMedium),
-                              GestureDetector(
-                                onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Login page coming next')),
-                                  );
-                                },
-                                child: Text(
-                                  'Log in',
-                                  style: t.textTheme.bodyMedium?.copyWith(
-                                    color: AppColors.accent,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 14),
-
-                          PrimaryButton(
-                            text: 'Continue',
-                            loading: _submitting,
-                            onPressed: _onContinue,
-                          ),
-                        ],
+                  OnboardingLabeledField(
+                    label: 'Enter Lobby Code',
+                    rightLabel: _c.lobbyCodeErr != null ? 'Cannot be empty' : null,
+                    rightLabelColor: AppColors.failure,
+                    child: TextField(
+                      controller: _lobbyCode,
+                      onChanged: (_) {
+                        if (_c.lobbyCodeErr != null) _validate();
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 11223344',
+                        errorText: _c.lobbyCodeErr,
                       ),
                     ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  private_button.PrivateButton(
+                    title: "Join Lobby", 
+                    subtitle: "Create or join with a code", 
+                    icon: Icons.arrow_circle_right_outlined, 
+                    // onTap: () {Navigator.pushNamed(context, routes.AppRoutes.groupSessionPrivateSelect);} // leo TODO Need to make it actually do something later
+                    onTap: () {print('Join Private Lobby Pressed');},
+                  ),
+
+                  Spacer(),
+
+                  bot_nav_bar.BottomNavBar(
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected: (index) => setState(() => _selectedIndex = index),
                   ),
                 ],
               ),

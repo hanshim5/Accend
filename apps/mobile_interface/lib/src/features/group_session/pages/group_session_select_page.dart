@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../app/constants.dart';
+import '../../../app/routes.dart' as routes;
 import '../controllers/group_session_lobby_code_controller.dart';
 import '../widgets/public_button.dart' as public_button;
 import '../widgets/private_button.dart' as private_button;
@@ -110,7 +111,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionSelectPage> {
                     title: "Private Room", 
                     subtitle: "Create or join with a code", 
                     icon: Icons.lock, 
-                    onTap: () {print("Private room Pressed");} // leo TODO Need to make it actually do something later
+                    onTap: () {Navigator.pushNamed(context, routes.AppRoutes.groupSessionPrivateSelect);} // leo TODO Need to make it actually do something later
                   ),
 
                   Spacer(),
