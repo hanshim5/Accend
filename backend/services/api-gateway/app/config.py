@@ -14,7 +14,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Load from .env and ignore unknown keys
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # Supabase credentials
@@ -32,7 +31,7 @@ class Settings(BaseSettings):
     # Dev only: set to "1" or "true" to allow POST /pronunciation/assess without JWT (e.g. before Flutter has Supabase Auth).
     # Do not enable in production.
     ALLOW_ANON_PRONUNCIATION_ASSESS: bool = True
+    USER_PROFILE_SERVICE_URL: str
 
 
-# Singleton settings object
 settings = Settings()

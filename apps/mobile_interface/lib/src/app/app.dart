@@ -1,22 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import 'constants.dart';
 import 'routes.dart';
 import 'theme.dart';
+
+import 'package:mobile_interface/src/common/services/api_client.dart';
+import 'package:mobile_interface/src/common/services/auth_service.dart';
+
+import 'package:mobile_interface/src/features/courses/controllers/courses_controller.dart';
+
 import 'package:mobile_interface/src/common/widgets/bottom_nav_bar.dart';
 import 'package:mobile_interface/src/features/social/pages/social.dart';
-import'package:mobile_interface/src/features/public_profile/pages/profile.dart';  
+import 'package:mobile_interface/src/features/public_profile/pages/profile.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: AppStrings.appName,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark(),
-      initialRoute: AppRoutes.onboardingUserInfo,
-      routes: AppRoutes.table,
+    return MultiProvider(
+      providers: [
+        Provider<ApiClient>(create: (_) => ApiClient()),
+        Provider<AuthService>(create: (_) => AuthService()),
+        ChangeNotifierProvider<CoursesController>(
+          create: (ctx) => CoursesController(
+            api: ctx.read<ApiClient>(),
+            auth: ctx.read<AuthService>(),
+          ),
+        ),
+      ],
+      child: MaterialApp(
+        title: AppStrings.appName,
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.dark(),
+
+        initialRoute: AppRoutes.login,
+
+        routes: AppRoutes.table,
+      ),
     );
   }
 }
@@ -39,13 +61,11 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    // stack pages and show only the selected one
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
         children: _pages,
       ),
-      // use our reusable bottom nav bar and pass in the current index and a callback to update it
       bottomNavigationBar: BottomNavBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) => setState(() => _selectedIndex = index),
@@ -74,6 +94,13 @@ class _HomePageState extends State<HomePage> {
           children: [
             const Text('You have pushed the button this many times: +1'),
             Text('$_counter', style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamed(context, AppRoutes.courses);
+              },
+              child: const Text("Go to Courses"),
+            ),
           ],
         ),
       ),
