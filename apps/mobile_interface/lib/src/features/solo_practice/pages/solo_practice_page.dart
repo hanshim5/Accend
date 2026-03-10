@@ -8,7 +8,11 @@ import 'package:http/http.dart' as http;
 
 import '../../../app/constants.dart';
 
-/// API gateway base URL. Use 10.0.2.2:8080 for Android emulator, localhost:8080 for iOS simulator.
+/// API gateway base URL used for local development.
+///
+/// - On Android emulator the host machine is accessible via 10.0.2.2.
+/// - On iOS simulator you can use localhost directly.
+/// - In production this should be injected from configuration, not hard-coded.
 const String _gatewayBaseUrl = 'http://localhost:8080';
 
 // ---------------------------------------------------------------------------
@@ -16,7 +20,7 @@ const String _gatewayBaseUrl = 'http://localhost:8080';
 // ---------------------------------------------------------------------------
 // Temporary list of practice prompts used until real lesson data is wired in.
 // Each string is a phrase the user will be asked to read aloud.
-// Replace with a real data source (e.g. API response or lesson model) later.
+// TODO: Replace with a real data source (e.g. API response or lesson model).
 const List<String> _mockCards = [
   'The quick brown fox jumped over the lazy dog.',
   'She sells seashells by the seashore.',
@@ -44,18 +48,45 @@ const List<String> _mockCards = [
 // Pronunciation feedback model (matches pronunciation-feedback API)
 // ---------------------------------------------------------------------------
 
+/// Phoneme-level assessment for a single sound within a word.
+///
+/// Mirrors the `phonemes` array emitted by the pronunciation-feedback
+/// microservice: each entry has the phoneme `symbol` plus its `accuracy`.
+class PhonemeFeedback {
+  final String symbol;
+  final double? accuracy;
+
+  const PhonemeFeedback({
+    required this.symbol,
+    this.accuracy,
+  });
+}
+
+/// Word-level pronunciation assessment plus nested phonemes.
+///
+/// - [text]: surface form of the recognized word.
+/// - [accuracy]: Azure-style accuracy score in [0, 100].
+/// - [errorType]: Azure miscue classification (e.g. "Omission").
+/// - [phonemes]: ordered sequence of [PhonemeFeedback] for drill-down UI.
 class WordFeedback {
   final String text;
   final double? accuracy;
   final String? errorType;
+  final List<PhonemeFeedback> phonemes;
 
   const WordFeedback({
     required this.text,
     this.accuracy,
     this.errorType,
+    this.phonemes = const [],
   });
 }
 
+/// Top-level pronunciation feedback object consumed by the UI.
+///
+/// Despite the "Mock" suffix, this type is used both for:
+/// - Real JSON parsed from the pronunciation-feedback microservice.
+/// - Locally generated mock data when the API call fails or is unavailable.
 class PronunciationFeedbackMock {
   final double accuracyScore;
   final double fluencyScore;
@@ -75,8 +106,17 @@ class PronunciationFeedbackMock {
 }
 
 /// Returns mock feedback for the feedback card (fallback when API fails or is unused).
+///
+/// This keeps the solo practice flow interactive when:
+/// - The gateway / pronunciation-feedback service is not running.
+/// - The network request fails for any reason.
+///
+/// The mock uses [referenceText] to:
+/// - Generate per-word "scores" with mild variation.
+/// - Generate per-phoneme "scores" by splitting each word into characters.
 PronunciationFeedbackMock getMockFeedback(String referenceText) {
   final base = 70.0 + (DateTime.now().millisecond % 25);
+  // Split text on whitespace to approximate word tokens for the mock.
   final rawTokens = referenceText.split(RegExp(r'\s+'));
   final tokens = <String>[];
   for (final token in rawTokens) {
@@ -96,13 +136,32 @@ PronunciationFeedbackMock getMockFeedback(String referenceText) {
       tokens.add(cleaned);
     }
   }
+  // Convert cleaned tokens into mock [WordFeedback] entries (with phonemes)
+  // so the UI behaves similarly to real assessments.
   final words = <WordFeedback>[];
   for (var i = 0; i < tokens.length; i++) {
     final jitter = (i * 7) % 25;
     final score = (base + jitter).clamp(40.0, 100.0);
-    words.add(WordFeedback(text: tokens[i], accuracy: score));
+    // Simple mock phoneme breakdown: split word into characters so the
+    // phoneme dialog has something to display even without real API data.
+    final phonemes = <PhonemeFeedback>[];
+    final word = tokens[i];
+    for (var j = 0; j < word.length; j++) {
+      final pJitter = ((i + 1) * (j + 3) * 5) % 25;
+      final pScore = (base + pJitter).clamp(40.0, 100.0);
+      phonemes.add(PhonemeFeedback(symbol: word[j], accuracy: pScore.toDouble()));
+    }
+    words.add(
+      WordFeedback(
+        text: word,
+        accuracy: score.toDouble(),
+        phonemes: phonemes,
+      ),
+    );
   }
 
+  // Aggregate mock scores; these are intentionally "reasonable" so the UI
+  // looks believable but should not be treated as real assessment data.
   return PronunciationFeedbackMock(
     accuracyScore: base + (DateTime.now().second % 15),
     fluencyScore: (base + 5).clamp(0.0, 100.0),
@@ -113,14 +172,22 @@ PronunciationFeedbackMock getMockFeedback(String referenceText) {
   );
 }
 
-/// Calls the API gateway POST /pronunciation/assess with the given audio bytes and reference text.
-/// Returns feedback from the response, or null on error (caller can fall back to mock).
-/// [accessToken] Optional Supabase JWT; if null, gateway will return 401 until auth is wired.
+/// Calls the API gateway `POST /pronunciation/assess` with the given audio
+/// bytes and reference text.
+///
+/// Returns:
+/// - Parsed [PronunciationFeedbackMock] (using real JSON) on success.
+/// - `null` on any error (network / non-200 / parsing), allowing caller to
+///   fall back to [getMockFeedback].
+///
+/// [accessToken] is a Supabase JWT; when null and the gateway does not allow
+/// anonymous access, the call will 401.
 Future<PronunciationFeedbackMock?> fetchPronunciationFeedback({
   required List<int> audioBytes,
   required String referenceText,
   String? accessToken,
 }) async {
+  // Gateway route that proxies to pronunciation-feedback microservice.
   final uri = Uri.parse('$_gatewayBaseUrl/pronunciation/assess');
   final request = http.MultipartRequest('POST', uri);
   request.fields['reference_text'] = referenceText;
@@ -143,7 +210,21 @@ Future<PronunciationFeedbackMock?> fetchPronunciationFeedback({
   }
 }
 
-/// Parse Azure-style pronunciation assessment JSON into [PronunciationFeedbackMock].
+/// Parse pronunciation-feedback JSON into [PronunciationFeedbackMock].
+///
+/// Expects the cleaned microservice payload:
+/// {
+///   "summary": { accuracy, fluency, completeness, pronScore },
+///   "words": [
+///     {
+///       "text": "...",
+///       "accuracy": ...,
+///       "errorType": "...",
+///       "phonemes": [{ "symbol": "th", "accuracy": ... }, ...]
+///     },
+///     ...
+///   ]
+/// }
 PronunciationFeedbackMock? _feedbackFromAssessmentJson(String body) {
   try {
     final map = jsonDecode(body) as Map<String, dynamic>;
@@ -163,11 +244,28 @@ PronunciationFeedbackMock? _feedbackFromAssessmentJson(String body) {
       if (text.isEmpty) continue;
       final accuracyVal = (item['accuracy'] as num?)?.toDouble();
       final errorType = item['errorType'] as String?;
+
+      final phonemesJson = item['phonemes'] as List<dynamic>? ?? const [];
+      final phonemes = <PhonemeFeedback>[];
+      for (final p in phonemesJson) {
+        if (p is! Map<String, dynamic>) continue;
+        final symbol = (p['symbol'] as String?) ?? '';
+        if (symbol.isEmpty) continue;
+        final pAccuracy = (p['accuracy'] as num?)?.toDouble();
+        phonemes.add(
+          PhonemeFeedback(
+            symbol: symbol,
+            accuracy: pAccuracy,
+          ),
+        );
+      }
+
       words.add(
         WordFeedback(
           text: text,
           accuracy: accuracyVal,
           errorType: errorType,
+          phonemes: phonemes,
         ),
       );
     }
@@ -216,11 +314,70 @@ class _FeedbackCard extends StatelessWidget {
       fontWeight: FontWeight.w700,
     );
 
+    // Map a word-level accuracy score into a semantic color:
+    // - >= 85 → success green (very good)
+    // - >= 60 → action orange (needs some work)
+    // - else  → failure red (poor)
     Color _wordColor(double? accuracy) {
-      if (accuracy == null) return AppColors.failure;
+      if (accuracy == null) return AppColors.textPrimary;
       if (accuracy >= 85) return AppColors.success; // green
       if (accuracy >= 60) return AppColors.action; // yellow / orange
       return AppColors.failure; // red
+    }
+
+    // Same thresholds as [_wordColor], but used for individual phonemes so
+    // users can see which sounds inside a word are strong vs weak.
+    Color _phonemeColor(double? accuracy) {
+      if (accuracy == null) return AppColors.textPrimary;
+      if (accuracy >= 85) return AppColors.success;
+      if (accuracy >= 60) return AppColors.action;
+      return AppColors.failure;
+    }
+
+    /// Show a popup listing phonemes for a given [word], in the order they
+    /// were returned by the microservice. Each phoneme is color-coded based
+    /// on its accuracy score to visually guide practice.
+    void _showPhonemeDialog(WordFeedback word) {
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: Text(
+              word.text,
+              style: headingStyle,
+            ),
+            content: word.phonemes.isEmpty
+                ? Text(
+                    'No phoneme data available for this word.',
+                    style: bodyStyle,
+                  )
+                : Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final p in word.phonemes)
+                        Chip(
+                          label: Text(
+                            p.symbol,
+                            style: bodyStyle.copyWith(
+                              color: _phonemeColor(p.accuracy),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          backgroundColor: AppColors.inputFill,
+                        ),
+                    ],
+                  ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      );
     }
 
     return Container(
@@ -236,8 +393,41 @@ class _FeedbackCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Pronunciation feedback', style: headingStyle),
+          Text(
+            'Pronunciation feedback',
+            style: headingStyle.copyWith(fontSize: 22),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Tap any word to see its phoneme-level feedback.',
+            style: bodyStyle.copyWith(fontSize: 12),
+          ),
           const SizedBox(height: AppSpacing.md),
+          if (feedback.words.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final w in feedback.words)
+                  ActionChip(
+                    onPressed: () => _showPhonemeDialog(w),
+                    backgroundColor: AppColors.inputFill,
+                    shape: StadiumBorder(
+                      side: BorderSide(color: AppColors.border),
+                    ),
+                    label: Text(
+                      w.text,
+                      style: bodyStyle.copyWith(
+                        color: _wordColor(w.accuracy),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: AppSpacing.sm),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -246,29 +436,6 @@ class _FeedbackCard extends StatelessWidget {
               _ScoreChip(label: 'Complete', score: feedback.completenessScore, style: scoreStyle, bodyStyle: bodyStyle),
             ],
           ),
-          if (feedback.summary != null && feedback.summary!.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            Text(feedback.summary!, style: bodyStyle),
-          ],
-          if (feedback.words.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.lg),
-            Text('Sentence breakdown', style: headingStyle),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                for (final w in feedback.words)
-                  Text(
-                    w.text,
-                    style: bodyStyle.copyWith(
-                      color: _wordColor(w.accuracy),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-              ],
-            ),
-          ],
           const SizedBox(height: AppSpacing.lg),
           SizedBox(
             width: double.infinity,
@@ -312,9 +479,15 @@ class _ScoreChip extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: bodyStyle),
-        const SizedBox(height: 4),
-        Text('${score.round()}', style: style),
+        Text(
+          label,
+          style: bodyStyle.copyWith(fontSize: 12),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '${score.round()}',
+          style: style.copyWith(fontSize: 14),
+        ),
       ],
     );
   }
@@ -491,7 +664,9 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Show Retry / Submit only when recording is done (state 2) and not showing feedback.
+    // Show Retry / Submit only when recording is done (state 2) and not
+    // currently showing feedback (to keep the flow linear: record → submit
+    // → inspect feedback → next).
     final bool showRetrySubmit = _micStateIndex == 2 && _currentFeedback == null;
 
     // --- Text styles (defined here to keep build readable) ---
