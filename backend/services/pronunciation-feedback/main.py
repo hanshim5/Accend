@@ -4,12 +4,22 @@ Pronunciation feedback microservice.
 Uses Azure Speech Services (scripted pronunciation assessment) to score a learner's
 audio against reference text. Accepts WAV uploads and reference text; returns the
 full Azure pronunciation assessment JSON (scores, words, phonemes, etc.).
+
+TODO:
+- clean the json for easy processing
+words: [{ text, wordScore, errorType, phonemes: [{ph, score}] }]
+- color code word based off of wordScore
+- cache JSON output temporarily so we can keep results of the newest assessment
+- 
 """
+#future ideas as note to self: when user selects a word, have it play the audio of only the word so they can hear how it sounds.
+
 
 import json
 import tempfile
 import wave
 from pathlib import Path
+from pprint import pprint
 
 import azure.cognitiveservices.speech as speechsdk
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -19,6 +29,71 @@ from pydantic_settings import BaseSettings
 MAX_AUDIO_DURATION_SECONDS = 10
 # Locale used for Azure Speech; scripted assessment is en-US only for this service.
 LOCALE = "en-US"
+
+
+def _clean_pronunciation_result(raw: dict) -> dict:
+    """
+    Transform the raw Azure pronunciation JSON into a compact, easy-to-consume
+    structure focused on word- and phoneme-level scores.
+
+    Output format:
+    {
+        "summary": {
+            "accuracy": float | None,
+            "fluency": float | None,
+            "completeness": float | None,
+            "pronScore": float | None,
+        },
+        "words": [
+            {
+                "text": str,
+                "accuracy": float | None,
+                "errorType": str | None,
+                "phonemes": [
+                    {
+                        "symbol": str,
+                        "accuracy": float | None,
+                    },
+                    ...
+                ],
+            },
+            ...
+        ],
+    }
+    """
+    nbest = (raw or {}).get("NBest") or []
+    best = nbest[0] if nbest else {}
+
+    pa = best.get("PronunciationAssessment") or {}
+    summary = {
+        "accuracy": pa.get("AccuracyScore"),
+        "fluency": pa.get("FluencyScore"),
+        "completeness": pa.get("CompletenessScore"),
+        "pronScore": pa.get("PronScore"),
+    }
+
+    words_clean = []
+    for w in best.get("Words") or []:
+        w_pa = w.get("PronunciationAssessment") or {}
+        phonemes_clean = []
+        for p in w.get("Phonemes") or []:
+            p_pa = p.get("PronunciationAssessment") or {}
+            phonemes_clean.append(
+                {
+                    "symbol": p.get("Phoneme"),
+                    "accuracy": p_pa.get("AccuracyScore"),
+                }
+            )
+        words_clean.append(
+            {
+                "text": w.get("Word"),
+                "accuracy": w_pa.get("AccuracyScore"),
+                "errorType": w_pa.get("ErrorType"),
+                "phonemes": phonemes_clean,
+            }
+        )
+
+    return {"summary": summary, "words": words_clean}
 
 
 class Settings(BaseSettings):
@@ -61,7 +136,8 @@ def run_pronunciation_assessment(audio_path: Path, reference_text: str) -> dict:
 
     Configures the Speech SDK with credentials, creates a recognizer with
     pronunciation assessment (reference text, 0-100 grading, phoneme-level detail),
-    runs recognize_once(), and returns the full JSON result from Azure.
+    runs recognize_once(), and returns a cleaned JSON payload focused on
+    word- and phoneme-level scores.
     """
     speech_config = speechsdk.SpeechConfig(
         subscription=settings.azure_speech_key,
@@ -97,7 +173,9 @@ def run_pronunciation_assessment(audio_path: Path, reference_text: str) -> dict:
     json_str = result.properties.get(
         speechsdk.PropertyId.SpeechServiceResponse_JsonResult, "{}"
     )
-    return json.loads(json_str)
+    raw = json.loads(json_str)
+    pprint(raw)
+    return _clean_pronunciation_result(raw)
 
 
 @app.get("/")
@@ -121,8 +199,9 @@ async def assess(
     Assess pronunciation of uploaded audio against reference text.
 
     Validates: reference_text non-empty, audio is WAV, duration <= 10s, Azure
-    config present. Writes upload to a temp file, runs Azure assessment, returns
-    the full Azure JSON (AccuracyScore, FluencyScore, Words, Phonemes, etc.).
+    config present. Writes upload to a temp file, runs Azure assessment, and
+    returns a compact JSON payload with overall scores plus per-word scores and
+    phoneme accuracies.
     """
     if not reference_text or not reference_text.strip():
         raise HTTPException(status_code=400, detail="reference_text is required")
