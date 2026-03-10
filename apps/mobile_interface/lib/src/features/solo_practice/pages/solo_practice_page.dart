@@ -41,30 +41,75 @@ const List<String> _mockCards = [
 ];
 
 // ---------------------------------------------------------------------------
-// Mock pronunciation feedback (matches shape from pronunciation-feedback API)
+// Pronunciation feedback model (matches pronunciation-feedback API)
 // ---------------------------------------------------------------------------
+
+class WordFeedback {
+  final String text;
+  final double? accuracy;
+  final String? errorType;
+
+  const WordFeedback({
+    required this.text,
+    this.accuracy,
+    this.errorType,
+  });
+}
+
 class PronunciationFeedbackMock {
   final double accuracyScore;
   final double fluencyScore;
   final double completenessScore;
+  final double? pronScore;
   final String? summary; // optional tip
+  final List<WordFeedback> words;
 
   const PronunciationFeedbackMock({
     required this.accuracyScore,
     required this.fluencyScore,
     required this.completenessScore,
+    this.pronScore,
     this.summary,
+    this.words = const [],
   });
 }
 
 /// Returns mock feedback for the feedback card (fallback when API fails or is unused).
-PronunciationFeedbackMock getMockFeedback() {
+PronunciationFeedbackMock getMockFeedback(String referenceText) {
   final base = 70.0 + (DateTime.now().millisecond % 25);
+  final rawTokens = referenceText.split(RegExp(r'\s+'));
+  final tokens = <String>[];
+  for (final token in rawTokens) {
+    final buffer = StringBuffer();
+    for (var i = 0; i < token.length; i++) {
+      final ch = token[i];
+      final isLetterOrDigit =
+          (ch.codeUnitAt(0) >= 48 && ch.codeUnitAt(0) <= 57) || // 0-9
+          (ch.codeUnitAt(0) >= 65 && ch.codeUnitAt(0) <= 90) || // A-Z
+          (ch.codeUnitAt(0) >= 97 && ch.codeUnitAt(0) <= 122); // a-z
+      if (isLetterOrDigit || ch == '\'') {
+        buffer.write(ch);
+      }
+    }
+    final cleaned = buffer.toString();
+    if (cleaned.isNotEmpty) {
+      tokens.add(cleaned);
+    }
+  }
+  final words = <WordFeedback>[];
+  for (var i = 0; i < tokens.length; i++) {
+    final jitter = (i * 7) % 25;
+    final score = (base + jitter).clamp(40.0, 100.0);
+    words.add(WordFeedback(text: tokens[i], accuracy: score));
+  }
+
   return PronunciationFeedbackMock(
     accuracyScore: base + (DateTime.now().second % 15),
     fluencyScore: (base + 5).clamp(0.0, 100.0),
     completenessScore: (base + 8).clamp(0.0, 100.0),
+    pronScore: (base + 10).clamp(0.0, 100.0),
     summary: 'Keep practicing the "th" sounds for even clearer speech.',
+    words: words,
   );
 }
 
@@ -102,20 +147,39 @@ Future<PronunciationFeedbackMock?> fetchPronunciationFeedback({
 PronunciationFeedbackMock? _feedbackFromAssessmentJson(String body) {
   try {
     final map = jsonDecode(body) as Map<String, dynamic>;
-    final nbest = map['NBest'] as List<dynamic>?;
-    if (nbest == null || nbest.isEmpty) return null;
-    final first = nbest.first as Map<String, dynamic>;
-    final pron = first['PronunciationAssessment'] as Map<String, dynamic>?;
-    if (pron == null) return null;
-    final accuracy = (pron['AccuracyScore'] as num?)?.toDouble();
-    final fluency = (pron['FluencyScore'] as num?)?.toDouble();
-    final completeness = (pron['CompletenessScore'] as num?)?.toDouble();
+    final summary = map['summary'] as Map<String, dynamic>?;
+    if (summary == null) return null;
+
+    final accuracy = (summary['accuracy'] as num?)?.toDouble();
+    final fluency = (summary['fluency'] as num?)?.toDouble();
+    final completeness = (summary['completeness'] as num?)?.toDouble();
+    final pronScore = (summary['pronScore'] as num?)?.toDouble();
+
+    final wordsJson = map['words'] as List<dynamic>? ?? const [];
+    final words = <WordFeedback>[];
+    for (final item in wordsJson) {
+      if (item is! Map<String, dynamic>) continue;
+      final text = (item['text'] as String?) ?? '';
+      if (text.isEmpty) continue;
+      final accuracyVal = (item['accuracy'] as num?)?.toDouble();
+      final errorType = item['errorType'] as String?;
+      words.add(
+        WordFeedback(
+          text: text,
+          accuracy: accuracyVal,
+          errorType: errorType,
+        ),
+      );
+    }
+
     if (accuracy == null || fluency == null || completeness == null) return null;
     return PronunciationFeedbackMock(
       accuracyScore: accuracy,
       fluencyScore: fluency,
       completenessScore: completeness,
+      pronScore: pronScore,
       summary: 'Keep practicing for even clearer speech.',
+      words: words,
     );
   } catch (_) {
     return null;
@@ -152,6 +216,13 @@ class _FeedbackCard extends StatelessWidget {
       fontWeight: FontWeight.w700,
     );
 
+    Color _wordColor(double? accuracy) {
+      if (accuracy == null) return AppColors.failure;
+      if (accuracy >= 85) return AppColors.success; // green
+      if (accuracy >= 60) return AppColors.action; // yellow / orange
+      return AppColors.failure; // red
+    }
+
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(maxWidth: 360),
@@ -178,6 +249,25 @@ class _FeedbackCard extends StatelessWidget {
           if (feedback.summary != null && feedback.summary!.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
             Text(feedback.summary!, style: bodyStyle),
+          ],
+          if (feedback.words.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Text('Sentence breakdown', style: headingStyle),
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final w in feedback.words)
+                  Text(
+                    w.text,
+                    style: bodyStyle.copyWith(
+                      color: _wordColor(w.accuracy),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
+            ),
           ],
           const SizedBox(height: AppSpacing.lg),
           SizedBox(
@@ -329,7 +419,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
   Future<void> _onSubmitPressed() async {
     final audioBytes = await rootBundle.load('assets/audio/testaudio.wav');
     final bytes = audioBytes.buffer.asUint8List();
-    final referenceText = 'The quick brown fox jumped over the lazy dog.';
+    final referenceText = _currentCard;
 
     final feedback = await fetchPronunciationFeedback(
       audioBytes: bytes,
@@ -339,7 +429,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
 
     if (!mounted) return;
     setState(() {
-      _currentFeedback = feedback ?? getMockFeedback();
+      _currentFeedback = feedback ?? getMockFeedback(referenceText);
     });
   }
 
