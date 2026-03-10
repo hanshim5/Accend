@@ -6,11 +6,12 @@ audio against reference text. Accepts WAV uploads and reference text; returns th
 full Azure pronunciation assessment JSON (scores, words, phonemes, etc.).
 
 TODO:
-- clean the json for easy processing
+- [X] clean the json for easy processing
 words: [{ text, wordScore, errorType, phonemes: [{ph, score}] }]
-- color code word based off of wordScore
-- cache JSON output temporarily so we can keep results of the newest assessment
-- 
+- [] color code word based off of wordScore
+- [] cache JSON output temporarily so we can keep results of the newest assessment
+- [] create error handling/pop up in dart page
+- [] map phoneme to 
 """
 #future ideas as note to self: when user selects a word, have it play the audio of only the word so they can hear how it sounds.
 
@@ -155,6 +156,7 @@ def run_pronunciation_assessment(audio_path: Path, reference_text: str) -> dict:
         granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme,
         enable_miscue=True,
     )
+    pronunciation_config.phoneme_alphabet = "IPA"
     pronunciation_config.apply_to(speech_recognizer)
 
     result = speech_recognizer.recognize_once()

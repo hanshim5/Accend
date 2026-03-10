@@ -399,7 +399,7 @@ class _FeedbackCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Tap any word to see its phoneme-level feedback.',
+            "Tap any word below to see your phoneme-level feedback!",
             style: bodyStyle.copyWith(fontSize: 12),
           ),
           const SizedBox(height: AppSpacing.md),
