@@ -14,9 +14,21 @@ Later:
 """
 
 from app.repositories.supabase_course_repo import SupabaseCourseRepo
+from app.repositories.supabase_lesson_repo import SupabaseLessonRepo
 from app.services.course_service import CourseService
+from app.services.lesson_service import LessonService
+
+def get_course_service() -> CourseService:
+    return CourseService(repo=SupabaseCourseRepo())
+
+
+def get_lesson_service() -> LessonService:
+    return LessonService(repo=SupabaseLessonRepo())
 
 
 def get_course_service() -> CourseService:
     """FastAPI dependency that returns a ready-to-use CourseService."""
     return CourseService(repo=SupabaseCourseRepo())
+
+def get_lesson_service() -> LessonService:
+    return LessonService(repo=SupabaseLessonRepo())
