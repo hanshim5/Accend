@@ -1,6 +1,6 @@
 # pronunciation-feedback
 
-Pronunciation assessment microservice using Azure Speech (scripted assessment, en-US). Client sends WAV audio and reference text; service returns the full Azure pronunciation assessment JSON.
+Pronunciation assessment microservice using Azure Speech (scripted assessment, `en-US`). Client sends WAV audio and reference text; service returns a compact JSON payload with overall scores plus per-word and per-phoneme accuracy.
 
 ## Config
 
@@ -11,15 +11,32 @@ Copy `env.example` to `.env` and set:
 
 ## API
 
-- **POST /assess** – Form: `audio` (WAV file, max 10s), `reference_text` (ground truth). Returns full Azure pronunciation assessment JSON.
+- **POST /assess** – Form: `audio` (WAV file, max 10s), `reference_text` (ground truth). Returns:
+  - `summary`: overall scores (accuracy/fluency/completeness/pronScore)
+  - `words[]`: per-word accuracy + `phonemes[]` accuracy
 - **GET /health** – Health check
+- **GET /** – Service info
 - **GET /docs** – OpenAPI docs
+
+## Gateway integration
+
+In the full backend stack, mobile clients should call the API Gateway (not this service directly):
+
+- **POST (Gateway) /pronunciation/assess** → proxies to **POST /assess**
 
 ## Run locally
 
 ```bash
 pip install -r requirements.txt
 uvicorn main:app --reload
+```
+
+Example request (direct to this service):
+
+```bash
+curl -X POST "http://localhost:8000/assess" \
+  -F "audio=@path/to/audio.wav" \
+  -F "reference_text=Hello world"
 ```
 
 ## Run with Docker
