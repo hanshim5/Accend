@@ -67,7 +67,6 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
       final fullName = _fullName.text.trim();
       final nativeLanguage = _nativeLanguage ?? '';
 
-      // COMMENTED OUT HERE!!!: Username availability check
       final check = await _api.getJson(
         '/profile/username-available',
         query: {'username': username},
@@ -81,7 +80,6 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
         return;
       }
 
-      // COMMENTED OUT: Supabase Auth signup
       await _auth.signUp(
         email: email,
         password: password,
@@ -92,7 +90,6 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
         throw Exception('Missing access token after signup.');
       }
 
-      // COMMENTED OUT: Initialize profile
       await _api.postJson(
         '/profile/init',
         accessToken: accessToken,

@@ -4,25 +4,8 @@ import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
 import 'package:mobile_interface/src/app/constants.dart';
 import 'package:mobile_interface/src/app/routes.dart';
-import 'package:mobile_interface/src/app/theme.dart';
-
-// void main() => runApp(const AccentSelectionApp());
-
-// class AccentSelectionApp extends StatelessWidget {
-//   const AccentSelectionApp({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: AppStrings.appName,
-//       debugShowCheckedModeBanner: false,
-//       theme: AppTheme.dark(),
-//       home: const Scaffold(
-//         body: SafeArea(child: AccentSelectionPage()),
-//       ),
-//     );
-//   }
-// }
+import 'package:provider/provider.dart';
+import 'package:mobile_interface/src/features/onboarding/controllers/onboarding_controller.dart';
 
 enum AccentChoice { californian, british, southern, australian }
 
@@ -62,20 +45,22 @@ class _AccentSelectionPageState extends State<AccentSelectionPage> {
     ),
   ];
 
-  void _select(AccentChoice v) => setState(() => _selected = v);
-
-  void _onContinue() {
-    final sel = _selected;
-    if (sel == null) return;
-
-    final backend = switch (sel) {
+  void _select(AccentChoice v) {
+    setState(() => _selected = v);
+    final onboardingController = context.read<OnboardingController>();
+    final backend = switch (v) {
       AccentChoice.californian => 'californian',
       AccentChoice.british => 'british',
       AccentChoice.southern => 'southern',
       AccentChoice.australian => 'australian',
     };
+    onboardingController.setAccent(backend);
+  }
 
-    debugPrint('AccentSelection payload: {accent: $backend}');
+  void _onContinue() {
+    final sel = _selected;
+    if (sel == null) return;
+    // The value is already set in the controller
     Navigator.pushNamed(context, AppRoutes.onboardingFeedbackTone);
   }
 

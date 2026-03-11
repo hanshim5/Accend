@@ -1,26 +1,9 @@
 import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
+import 'package:provider/provider.dart';
 import 'package:mobile_interface/src/app/constants.dart';
 import 'package:mobile_interface/src/app/routes.dart';
-import 'package:mobile_interface/src/app/theme.dart';
-
-// void main() => runApp(const SkillAssessApp());
-
-// class SkillAssessApp extends StatelessWidget {
-//   const SkillAssessApp({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: AppStrings.appName,
-//       debugShowCheckedModeBanner: false,
-//       theme: AppTheme.dark(),
-//       home: const Scaffold(
-//         body: SafeArea(child: SkillAssessPage()),
-//       ),
-//     );
-//   }
-// }
+import 'package:mobile_interface/src/features/onboarding/controllers/onboarding_controller.dart';
 
 enum SkillLevel { beginner, intermediate, advanced }
 
@@ -36,6 +19,20 @@ class _SkillAssessPageState extends State<SkillAssessPage> {
 
   void _selectLevel(SkillLevel level) {
     setState(() => _selectedLevel = level);
+    final onboardingController = context.read<OnboardingController>();
+    final backend = switch (level) {
+      SkillLevel.beginner => 'beginner',
+      SkillLevel.intermediate => 'intermediate',
+      SkillLevel.advanced => 'advanced',
+    };
+    onboardingController.setSkillAssess(backend);
+  }
+
+  void _onContinue() {
+    final sel = _selectedLevel;
+    if (sel == null) return;
+    // The value is already set in the controller
+    Navigator.pushNamed(context, AppRoutes.onboardingLearningGoal);
   }
 
   @override
@@ -53,7 +50,7 @@ class _SkillAssessPageState extends State<SkillAssessPage> {
               step: 1,
               totalSteps: 5,
               rightLabel: 'Skill Assessment',
-              showBack: false,
+              showBack: true,
             ),
             const SizedBox(height: AppSpacing.sm),
 
@@ -103,9 +100,7 @@ class _SkillAssessPageState extends State<SkillAssessPage> {
             SizedBox(
               height: 56,
               child: ElevatedButton(
-                onPressed: _selectedLevel == null ? null : () {
-                  Navigator.pushNamed(context, AppRoutes.onboardingLearningGoal);
-                },
+                onPressed: _selectedLevel == null ? null : _onContinue,
                 child: const Text('Continue'),
               ),
             ),

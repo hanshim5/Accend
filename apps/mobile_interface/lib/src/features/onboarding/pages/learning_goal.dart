@@ -2,27 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
+import 'package:provider/provider.dart';
 import 'package:mobile_interface/src/app/constants.dart';
 import 'package:mobile_interface/src/app/routes.dart';
-import 'package:mobile_interface/src/app/theme.dart';
+import 'package:mobile_interface/src/features/onboarding/controllers/onboarding_controller.dart';
 
-// void main() => runApp(const LearningGoalApp());
-
-// class LearningGoalApp extends StatelessWidget {
-//   const LearningGoalApp({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: AppStrings.appName,
-//       debugShowCheckedModeBanner: false,
-//       theme: AppTheme.dark(),
-//       home: const Scaffold(
-//         body: SafeArea(child: LearningGoalPage()),
-//       ),
-//     );
-//   }
-// }
 
 class LearningGoalPage extends StatefulWidget {
   const LearningGoalPage({super.key});
@@ -57,7 +41,11 @@ class _LearningGoalPageState extends State<LearningGoalPage> {
     ),
   ];
 
-  void _onSelect(int idx) => setState(() => _selectedIndex = idx);
+  void _onSelect(int idx) {
+    setState(() => _selectedIndex = idx);
+    final onboardingController = context.read<OnboardingController>();
+    onboardingController.setLearningGoal(_options[idx].backendValue);
+  }
 
   String? get _selectedGoalBackendValue {
     final idx = _selectedIndex;
@@ -68,7 +56,7 @@ class _LearningGoalPageState extends State<LearningGoalPage> {
   void _onContinue() {
     final goal = _selectedGoalBackendValue;
     if (goal == null) return;
-
+    // The value is already set in the controller
     debugPrint('LearningGoal payload: {learning_goal: $goal}');
     Navigator.pushNamed(context, AppRoutes.onboardingAccentSelection);
   }

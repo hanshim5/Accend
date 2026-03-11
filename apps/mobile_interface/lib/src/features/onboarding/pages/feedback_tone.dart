@@ -4,25 +4,9 @@ import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
 import 'package:mobile_interface/src/app/constants.dart';
 import 'package:mobile_interface/src/app/routes.dart';
-import 'package:mobile_interface/src/app/theme.dart';
+import 'package:provider/provider.dart';
+import 'package:mobile_interface/src/features/onboarding/controllers/onboarding_controller.dart';
 
-// void main() => runApp(const FeedbackToneApp());
-
-// class FeedbackToneApp extends StatelessWidget {
-//   const FeedbackToneApp({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: AppStrings.appName,
-//       debugShowCheckedModeBanner: false,
-//       theme: AppTheme.dark(),
-//       home: const Scaffold(
-//         body: SafeArea(child: FeedbackTonePage()),
-//       ),
-//     );
-//   }
-// }
 
 enum FeedbackToneChoice { passionate, supportive, neutral, strict }
 
@@ -59,14 +43,22 @@ class _FeedbackTonePageState extends State<FeedbackTonePage> {
     ),
   ];
 
-  void _select(FeedbackToneChoice v) => setState(() => _selected = v);
+  void _select(FeedbackToneChoice v) {
+    setState(() => _selected = v);
+    final onboardingController = context.read<OnboardingController>();
+    final backend = switch (v) {
+      FeedbackToneChoice.passionate => 'passionate',
+      FeedbackToneChoice.supportive => 'supportive',
+      FeedbackToneChoice.neutral => 'neutral',
+      FeedbackToneChoice.strict => 'strict',
+    };
+    onboardingController.setFeedbackTone(backend);
+  }
 
   void _onContinue() {
     final sel = _selected;
     if (sel == null) return;
-
-    final backend = _options.firstWhere((o) => o.value == sel).backendValue;
-    debugPrint('FeedbackTone payload: {feedback_tone: $backend}');
+    // The value is already set in the controller
     Navigator.pushNamed(context, AppRoutes.onboardingDailyGoal);
   }
 

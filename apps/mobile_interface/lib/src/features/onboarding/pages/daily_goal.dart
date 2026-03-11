@@ -4,25 +4,9 @@ import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
 import 'package:mobile_interface/src/app/constants.dart';
 import 'package:mobile_interface/src/app/routes.dart';
-import 'package:mobile_interface/src/app/theme.dart';
+import 'package:provider/provider.dart';
+import 'package:mobile_interface/src/features/onboarding/controllers/onboarding_controller.dart';
 
-// void main() => runApp(const DailyGoalApp());
-
-// class DailyGoalApp extends StatelessWidget {
-//   const DailyGoalApp({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: AppStrings.appName,
-//       debugShowCheckedModeBanner: false,
-//       theme: AppTheme.dark(),
-//       home: const Scaffold(
-//         body: SafeArea(child: DailyGoalPage()),
-//       ),
-//     );
-//   }
-// }
 
 enum DailyGoalChoice { hiker, climber, summiter, mountaineer }
 
@@ -63,19 +47,43 @@ class _DailyGoalPageState extends State<DailyGoalPage> {
     ),
   ];
 
-  void _select(DailyGoalChoice v) => setState(() => _selected = v);
+  void _select(DailyGoalChoice v) {
+    setState(() => _selected = v);
+    final onboardingController = context.read<OnboardingController>();
+    final backend = switch (v) {
+      DailyGoalChoice.hiker => 'hiker',
+      DailyGoalChoice.climber => 'climber',
+      DailyGoalChoice.summiter => 'summiter',
+      DailyGoalChoice.mountaineer => 'mountaineer',
+    };
+    onboardingController.setDailyPace(backend);
+  }
 
-  void _onContinue() {
+  void _onContinue() async {
     final sel = _selected;
     if (sel == null) return;
-
-    final backend = _options.firstWhere((o) => o.value == sel).backendValue;
-    debugPrint('DailyGoal payload: {daily_goal: $backend}');
-    // Onboarding complete - for now just show a message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Onboarding complete! Welcome to Accend.')),
-    );
+    debugPrint('DailyGoal: Continue pressed, selected=$sel');
+    final onboardingController = context.read<OnboardingController>();
+    try {
+      debugPrint('DailyGoal: Calling saveAll()');
+      await onboardingController.saveAll();
+      debugPrint('DailyGoal: saveAll() completed');
+      if (!mounted) return;
+      Navigator.pushNamed(context, AppRoutes.onboardingComplete);
+      debugPrint('DailyGoal: Navigated to onboardingComplete');
+    } catch (e, st) {
+      debugPrint('DailyGoal: Error in saveAll: $e\n$st');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save onboarding: $e')),
+      );
+    }
   }
+
+  // At the end of onboarding, call this to save all answers:
+  // final onboardingController = context.read<OnboardingController>();
+  // await onboardingController.saveAll();
+  // You can do this in the last onboarding page's _onContinue or after a review step.
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +142,12 @@ class _DailyGoalPageState extends State<DailyGoalPage> {
           SizedBox(
             height: 56,
             child: ElevatedButton(
-              onPressed: _selected == null ? null : _onContinue,
+              onPressed: _selected == null
+                  ? null
+                  : () {
+                      debugPrint('DailyGoal: Continue button pressed');
+                      _onContinue();
+                    },
               child: const Text('Continue'),
             ),
           ),
