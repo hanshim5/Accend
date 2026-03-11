@@ -1,3 +1,7 @@
+"""
+lesson_service.py
+"""
+
 from uuid import UUID
 from app.repositories.lesson_repo import LessonRepo
 from app.schemas.lesson_schema import LessonCreate, LessonWithItemsOut, LessonOut

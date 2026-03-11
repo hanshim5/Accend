@@ -1,4 +1,6 @@
 """
+course_schema.py
+
 Pydantic schemas for request/response shapes.
 
 Purpose:

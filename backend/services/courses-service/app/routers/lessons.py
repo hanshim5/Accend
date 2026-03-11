@@ -1,3 +1,7 @@
+"""
+lessons.py
+"""
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from uuid import UUID
 

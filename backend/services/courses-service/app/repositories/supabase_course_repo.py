@@ -1,4 +1,6 @@
 """
+supabase_course_repo.py
+
 Supabase implementation of CourseRepo.
 
 Purpose:

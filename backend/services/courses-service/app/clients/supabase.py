@@ -1,4 +1,6 @@
 """
+supabase.py
+
 Supabase REST client (PostgREST) factory.
 
 Purpose:
