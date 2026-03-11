@@ -4,7 +4,17 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 class Microphone extends StatefulWidget {
-  const Microphone({super.key});
+  const Microphone({
+    super.key,
+    this.onRecordingStarted,
+    this.onRecordingStopped,
+  });
+
+  /// Called after a successful transition into the recording state.
+  final VoidCallback? onRecordingStarted;
+
+  /// Called after recording stops with the final file path (if available).
+  final ValueChanged<String>? onRecordingStopped;
 
   @override
   State<Microphone> createState() => _MicrophoneState();
@@ -14,7 +24,6 @@ class _MicrophoneState extends State<Microphone> {
   final AudioRecorder _recorder = AudioRecorder();
   bool _isRecording = false;
   bool _busy = false;
-  String? _lastPath;
 
   @override
   void dispose() {
@@ -39,11 +48,11 @@ class _MicrophoneState extends State<Microphone> {
         if (!mounted) return;
         setState(() {
           _isRecording = false;
-          _lastPath = path;
         });
 
-        // Example: debug print
-        // debugPrint('Saved recording at: $path');
+        if (path != null && path.isNotEmpty) {
+          widget.onRecordingStopped?.call(path);
+        }
         return;
       }
 
@@ -71,6 +80,7 @@ class _MicrophoneState extends State<Microphone> {
       setState(() {
         _isRecording = true;
       });
+      widget.onRecordingStarted?.call();
     } finally {
       _busy = false;
     }

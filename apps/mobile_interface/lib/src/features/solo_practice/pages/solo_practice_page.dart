@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'dart:io';
+
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/constants.dart';
+import '../../../common/widgets/microphone.dart';
 import '../controllers/solo_practice_controller.dart';
 import '../widgets/feedback_card.dart';
 
@@ -20,7 +22,13 @@ class SoloPracticePage extends StatefulWidget {
 class _SoloPracticePageState extends State<SoloPracticePage> {
   late final SoloPracticeController _controller;
   final AudioPlayer _audioPlayer = AudioPlayer();
-  static const String _sampleAudioAsset = 'audio/testaudio.wav';
+  String? _recordingPath;
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -29,53 +37,49 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
   }
 
   // ---------------------------------------------------------------------------
-  // Lifecycle
-  // ---------------------------------------------------------------------------
-
-  @override
-  void dispose() {
-    // Always dispose the AudioPlayer when the widget leaves the tree to free
-    // the underlying platform audio resources.
-    _audioPlayer.dispose();
-    super.dispose();
-  }
-
-  // ---------------------------------------------------------------------------
   // Event handlers
   // ---------------------------------------------------------------------------
 
-  /// Called when the circular mic button is tapped.
-  ///
-  /// State machine:
-  ///   0 → 1  : Start recording (UI only for now)
-  ///   1 → 2  : Stop recording, enter playback-ready state
-  ///   2 → 2  : Already in playback state — play the sample audio asset
-  Future<void> _onMicPressed() async {
-    if (_controller.micStateIndex < 2) {
-      setState(() => _controller.advanceMicState());
-    } else {
-      // In playback state: stop any currently playing audio, then play
-      // the bundled sample asset as a stand-in for the user's recording.
-      try {
-        await _audioPlayer.stop();
-        await _audioPlayer.play(AssetSource(_sampleAudioAsset));
-      } catch (_) {
-        // Silently swallow errors for now.
-        // TODO: surface playback errors to the user in a future iteration.
-      }
-    }
+  /// Called when the microphone widget transitions into recording.
+  void _onRecordingStarted() {
+    // Starting a new recording should discard any previous cached audio.
+    _clearRecording();
+    setState(() => _controller.advanceMicState());
+  }
+
+  /// Called when the microphone widget finishes recording and provides a file path.
+  void _onRecordingStopped(String path) {
+    setState(() {
+      _recordingPath = path;
+      _controller.advanceMicState();
+    });
   }
 
   /// Resets the mic state back to idle (0) so the user can re-record
   /// without advancing to the next card.
   void _onRetryPressed() {
+    _clearRecording();
     setState(() => _controller.retry());
   }
 
   /// On Submit: load audio, call controller to fetch feedback and set state, then rebuild.
   Future<void> _onSubmitPressed() async {
-    final audioBytes = await rootBundle.load('assets/audio/testaudio.wav');
-    final bytes = audioBytes.buffer.asUint8List();
+    if (_recordingPath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please record audio before submitting.')),
+      );
+      return;
+    }
+
+    final file = File(_recordingPath!);
+    if (!await file.exists()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Recorded audio file is unavailable. Please try again.')),
+      );
+      return;
+    }
+
+    final bytes = await file.readAsBytes();
     final referenceText = _controller.currentCard;
 
     await _controller.submit(
@@ -90,6 +94,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
 
   /// After user taps Next on feedback: clear feedback, go to next card or show completion.
   void _advanceToNextCard() {
+    _clearRecording();
     final hasMore = _controller.advanceToNextCard();
     setState(() {});
     if (!hasMore) {
@@ -114,6 +119,33 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
         ),
       );
     }
+  }
+
+  /// Play the cached recording, if available.
+  Future<void> _playRecording() async {
+    if (_recordingPath == null) {
+      return;
+    }
+    final file = File(_recordingPath!);
+    if (!await file.exists()) {
+      return;
+    }
+    try {
+      await _audioPlayer.stop();
+      await _audioPlayer.play(DeviceFileSource(_recordingPath!));
+    } catch (_) {
+      // Ignore playback errors for now.
+    }
+  }
+
+  /// Delete the cached recording file (if present) and clear the path.
+  void _clearRecording() {
+    final path = _recordingPath;
+    _recordingPath = null;
+    if (path == null) return;
+    final file = File(path);
+    // Best-effort delete; ignore failures.
+    file.delete().ignore();
   }
 
   // ---------------------------------------------------------------------------
@@ -318,24 +350,17 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                         ),
                       ],
                     ),
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        // Background: red while recording, accent otherwise.
-                        backgroundColor: _controller.micStateIndex == 1
-                            ? AppColors.surface
-                            : AppColors.accent,
-                        foregroundColor: AppColors.primaryBg,
-                        shape: const CircleBorder(),
-                        padding: EdgeInsets.zero,
-                        alignment: Alignment.center,
-                      ),
-                      onPressed: _onMicPressed,
-                      child: Icon(
-                        _controller.currentMicIcon,
-                        size: 56,
-                        color: _controller.micStateIndex == 1 ? AppColors.failure : AppColors.primaryBg,
-                      ),
-                    ),
+                    alignment: Alignment.center,
+                    child: _controller.micStateIndex == 2
+                        ? IconButton(
+                            iconSize: 56,
+                            icon: const Icon(Icons.play_arrow, color: AppColors.primaryBg),
+                            onPressed: _playRecording,
+                          )
+                        : Microphone(
+                            onRecordingStarted: _onRecordingStarted,
+                            onRecordingStopped: _onRecordingStopped,
+                          ),
                   ),
 
                   // Submit button — only visible in playback state (2).
