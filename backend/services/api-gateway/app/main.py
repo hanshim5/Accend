@@ -130,7 +130,9 @@ async def proxy_list_courses(
             f"{settings.COURSES_SERVICE_URL}/courses",
             headers={"X-User-Id": user_id},
         )
-
+        if r.status_code >= 400:
+            raise HTTPException(status_code=r.status_code, detail=r.text)
+        
         return r.json()
     
 # -----------------------------------
