@@ -22,6 +22,8 @@ from typing import List
 
 from ..schemas.generate_schema import Lesson, LessonItem
 
+from google import genai
+from google.genai import types
 
 # -------------------------
 # Stub (fallback)
@@ -136,8 +138,6 @@ def _validate_and_normalize(payload: dict) -> dict:
 
 
 def _gemini_generate(prompt: str) -> dict:
-    from google import genai
-    from google.genai import types
 
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -184,7 +184,6 @@ Here is your invalid output:
         text2 = _strip_code_fences((getattr(resp2, "text", "") or "").strip())
         data = json.loads(text2)
 
-    data["title"] = f"[GEMINI] {data.get('title','')}"
     return _validate_and_normalize(data)
 
 
