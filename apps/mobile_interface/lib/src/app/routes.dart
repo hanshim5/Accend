@@ -11,6 +11,7 @@ import '../features/onboarding/pages/accent_selection.dart';
 import '../features/onboarding/pages/onboarding_complete.dart';
 
 import '../features/courses/pages/courses_list_page.dart';
+import '../features/social/pages/social_debug_page.dart';
 
 class AppRoutes {
   static const login = '/login';
@@ -26,6 +27,7 @@ class AppRoutes {
   // Keep these for later if you want:
   static const onboardingIntro = '/onboarding/intro';
   static const courses = '/courses';
+  static const socialDebug = '/social/debug';
 
   static Map<String, WidgetBuilder> get table => {
         login: (_) => const LoginPage(),
@@ -39,5 +41,6 @@ class AppRoutes {
         onboardingComplete: (_) => const OnboardingCompletePage(),
 
         courses: (_) => const CoursesListPage(),
+        socialDebug: (_) => const SocialDebugPage(),
       };
 }

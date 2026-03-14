@@ -8,6 +8,7 @@ import 'theme.dart';
 import 'package:mobile_interface/src/common/services/api_client.dart';
 import 'package:mobile_interface/src/common/services/auth_service.dart';
 import 'package:mobile_interface/src/features/onboarding/controllers/onboarding_controller.dart';
+import 'package:mobile_interface/src/features/social/controllers/social_controller.dart';
 
 import 'package:mobile_interface/src/features/courses/controllers/courses_controller.dart';
 
@@ -32,6 +33,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<OnboardingController>(
           create: (ctx) => OnboardingController(),
+        ),
+        ChangeNotifierProvider<SocialController>(
+          create: (_) => SocialController(),
         ),
       ],
       child: MaterialApp(
