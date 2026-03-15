@@ -245,6 +245,23 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
 
+                  const SizedBox(height: 14),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: OutlinedButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.pushNamed(context, AppRoutes.socialDebug),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.action),
+                        foregroundColor: AppColors.action,
+                      ),
+                      child: const Text('Go to Social (Debug)'),
+                    ),
+                  ),
+
                   const SizedBox(height: 10),
 
                   // Logged-in hint
