@@ -19,6 +19,7 @@ class DailyGoalPage extends StatefulWidget {
 
 class _DailyGoalPageState extends State<DailyGoalPage> {
   DailyGoalChoice? _selected;
+  bool _syncedFromController = false;
 
   final List<_DailyGoalOption> _options = const [
     _DailyGoalOption(
@@ -46,6 +47,23 @@ class _DailyGoalPageState extends State<DailyGoalPage> {
       backendValue: 'mountaineer',
     ),
   ];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_syncedFromController) return;
+    _syncedFromController = true;
+    final value = context.read<OnboardingController>().data.dailyPace;
+    if (value == null) return;
+    final choice = switch (value) {
+      'hiker' => DailyGoalChoice.hiker,
+      'climber' => DailyGoalChoice.climber,
+      'summiter' => DailyGoalChoice.summiter,
+      'mountaineer' => DailyGoalChoice.mountaineer,
+      _ => null,
+    };
+    if (choice != null) setState(() => _selected = choice);
+  }
 
   void _select(DailyGoalChoice v) {
     setState(() => _selected = v);
@@ -80,26 +98,31 @@ class _DailyGoalPageState extends State<DailyGoalPage> {
     }
   }
 
-  // At the end of onboarding, call this to save all answers:
-  // final onboardingController = context.read<OnboardingController>();
-  // await onboardingController.saveAll();
-  // You can do this in the last onboarding page's _onContinue or after a review step.
+  Future<void> _onBack() async {
+    await context.read<OnboardingController>().saveProgress();
+    if (!mounted) return;
+    Navigator.maybePop(context);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.sm + 6,
-      ),
-      child: Column(
+    return Scaffold(
+      backgroundColor: AppColors.primaryBg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm + 6,
+          ),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const OnboardingTopBar(
+          OnboardingTopBar(
             step: 5,
             totalSteps: 5,
             rightLabel: 'Daily Goal',
             showBack: true,
+            onBack: _onBack,
           ),
           const SizedBox(height: AppSpacing.sm),
 
@@ -119,7 +142,6 @@ class _DailyGoalPageState extends State<DailyGoalPage> {
 
           Expanded(
             child: ListView.separated(
-              physics: const NeverScrollableScrollPhysics(),
               padding: EdgeInsets.zero,
               itemCount: _options.length,
               separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -152,6 +174,8 @@ class _DailyGoalPageState extends State<DailyGoalPage> {
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

@@ -18,6 +18,7 @@ class AccentSelectionPage extends StatefulWidget {
 
 class _AccentSelectionPageState extends State<AccentSelectionPage> {
   AccentChoice? _selected;
+  bool _syncedFromController = false;
 
   final List<_AccentOption> _options = const [
     _AccentOption(
@@ -45,6 +46,23 @@ class _AccentSelectionPageState extends State<AccentSelectionPage> {
     ),
   ];
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_syncedFromController) return;
+    _syncedFromController = true;
+    final value = context.read<OnboardingController>().data.accent;
+    if (value == null) return;
+    final choice = switch (value) {
+      'californian' => AccentChoice.californian,
+      'british' => AccentChoice.british,
+      'southern' => AccentChoice.southern,
+      'australian' => AccentChoice.australian,
+      _ => null,
+    };
+    if (choice != null) setState(() => _selected = choice);
+  }
+
   void _select(AccentChoice v) {
     setState(() => _selected = v);
     final onboardingController = context.read<OnboardingController>();
@@ -64,21 +82,31 @@ class _AccentSelectionPageState extends State<AccentSelectionPage> {
     Navigator.pushNamed(context, AppRoutes.onboardingFeedbackTone);
   }
 
+  Future<void> _onBack() async {
+    await context.read<OnboardingController>().saveProgress();
+    if (!mounted) return;
+    Navigator.maybePop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.sm + 6,
-      ),
-      child: Column(
+    return Scaffold(
+      backgroundColor: AppColors.primaryBg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm + 6,
+          ),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const OnboardingTopBar(
+          OnboardingTopBar(
             step: 3,
             totalSteps: 5,
             rightLabel: 'Accent Selection',
             showBack: true,
+            onBack: _onBack,
           ),
           const SizedBox(height: AppSpacing.sm),
           const OnboardingProgressBar(step: 3, totalSteps: 5),
@@ -97,7 +125,6 @@ class _AccentSelectionPageState extends State<AccentSelectionPage> {
 
           Expanded(
             child: ListView.separated(
-              physics: const NeverScrollableScrollPhysics(),
               padding: EdgeInsets.zero,
               itemCount: _options.length,
               separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -126,6 +153,8 @@ class _AccentSelectionPageState extends State<AccentSelectionPage> {
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

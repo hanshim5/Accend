@@ -19,6 +19,7 @@ class FeedbackTonePage extends StatefulWidget {
 
 class _FeedbackTonePageState extends State<FeedbackTonePage> {
   FeedbackToneChoice? _selected;
+  bool _syncedFromController = false;
 
   final List<_ToneOption> _options = const [
     _ToneOption(
@@ -43,6 +44,23 @@ class _FeedbackTonePageState extends State<FeedbackTonePage> {
     ),
   ];
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_syncedFromController) return;
+    _syncedFromController = true;
+    final value = context.read<OnboardingController>().data.feedbackTone;
+    if (value == null) return;
+    final choice = switch (value) {
+      'passionate' => FeedbackToneChoice.passionate,
+      'supportive' => FeedbackToneChoice.supportive,
+      'neutral' => FeedbackToneChoice.neutral,
+      'strict' => FeedbackToneChoice.strict,
+      _ => null,
+    };
+    if (choice != null) setState(() => _selected = choice);
+  }
+
   void _select(FeedbackToneChoice v) {
     setState(() => _selected = v);
     final onboardingController = context.read<OnboardingController>();
@@ -62,21 +80,31 @@ class _FeedbackTonePageState extends State<FeedbackTonePage> {
     Navigator.pushNamed(context, AppRoutes.onboardingDailyGoal);
   }
 
+  Future<void> _onBack() async {
+    await context.read<OnboardingController>().saveProgress();
+    if (!mounted) return;
+    Navigator.maybePop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.sm + 6,
-      ),
-      child: Column(
+    return Scaffold(
+      backgroundColor: AppColors.primaryBg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm + 6,
+          ),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const OnboardingTopBar(
+          OnboardingTopBar(
             step: 4,
             totalSteps: 5,
             rightLabel: 'Feedback Tone',
             showBack: true,
+            onBack: _onBack,
           ),
           const SizedBox(height: AppSpacing.sm),
 
@@ -96,7 +124,6 @@ class _FeedbackTonePageState extends State<FeedbackTonePage> {
 
           Expanded(
             child: ListView.separated(
-              physics: const NeverScrollableScrollPhysics(),
               padding: EdgeInsets.zero,
               itemCount: _options.length,
               separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -123,6 +150,8 @@ class _FeedbackTonePageState extends State<FeedbackTonePage> {
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

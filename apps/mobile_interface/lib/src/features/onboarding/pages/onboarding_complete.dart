@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_interface/src/app/routes.dart';
+
+import '../../../app/constants.dart';
 
 class OnboardingCompletePage extends StatelessWidget {
   const OnboardingCompletePage({super.key});
@@ -7,11 +8,13 @@ class OnboardingCompletePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.primaryBg,
       body: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(32.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
                 'All set!',

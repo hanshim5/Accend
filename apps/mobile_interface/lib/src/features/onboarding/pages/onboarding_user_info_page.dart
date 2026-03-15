@@ -122,6 +122,7 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
     final t = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: AppColors.primaryBg,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

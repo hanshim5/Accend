@@ -16,6 +16,23 @@ class SkillAssessPage extends StatefulWidget {
 
 class _SkillAssessPageState extends State<SkillAssessPage> {
   SkillLevel? _selectedLevel;
+  bool _syncedFromController = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_syncedFromController) return;
+    _syncedFromController = true;
+    final value = context.read<OnboardingController>().data.skillAssess;
+    if (value == null) return;
+    final level = switch (value) {
+      'beginner' => SkillLevel.beginner,
+      'intermediate' => SkillLevel.intermediate,
+      'advanced' => SkillLevel.advanced,
+      _ => null,
+    };
+    if (level != null) setState(() => _selectedLevel = level);
+  }
 
   void _selectLevel(SkillLevel level) {
     setState(() => _selectedLevel = level);
@@ -35,66 +52,80 @@ class _SkillAssessPageState extends State<SkillAssessPage> {
     Navigator.pushNamed(context, AppRoutes.onboardingLearningGoal);
   }
 
+  Future<void> _onBack() async {
+    await context.read<OnboardingController>().saveProgress();
+    if (!mounted) return;
+    Navigator.maybePop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.sm + 6,
-        ),
-        child: Column(
+    return Scaffold(
+      backgroundColor: AppColors.primaryBg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm + 6,
+          ),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const OnboardingTopBar(
+            OnboardingTopBar(
               step: 1,
               totalSteps: 5,
               rightLabel: 'Skill Assessment',
               showBack: true,
+              onBack: _onBack,
             ),
             const SizedBox(height: AppSpacing.sm),
 
             const OnboardingProgressBar(step: 1, totalSteps: 5),
             const SizedBox(height: AppSpacing.xl),
 
-            const OnboardingQuestionHeader(
-              leadingText: 'What is your ',
-              highlightedText: 'current level?',
-              subheader: 'This helps us customize your learning path.',
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const OnboardingQuestionHeader(
+                      leadingText: 'What is your ',
+                      highlightedText: 'current level?',
+                      subheader: 'This helps us customize your learning path.',
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+
+                    LevelCard(
+                      tag: 'BEGINNER',
+                      title: 'Newbie',
+                      description: 'I know a few words or I am starting from scratch.',
+                      isSelected: _selectedLevel == SkillLevel.beginner,
+                      onTap: () => _selectLevel(SkillLevel.beginner),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+
+                    LevelCard(
+                      tag: 'INTERMEDIATE',
+                      title: 'Conversationalist',
+                      description:
+                          'I can hold basic conversations and understand common topics.',
+                      isSelected: _selectedLevel == SkillLevel.intermediate,
+                      onTap: () => _selectLevel(SkillLevel.intermediate),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+
+                    LevelCard(
+                      tag: 'ADVANCED',
+                      title: 'Fluent Speaker',
+                      description: 'I can speak fluently and understand complex topics.',
+                      isSelected: _selectedLevel == SkillLevel.advanced,
+                      onTap: () => _selectLevel(SkillLevel.advanced),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: AppSpacing.xl),
 
-            LevelCard(
-              tag: 'BEGINNER',
-              title: 'Newbie',
-              description: 'I know a few words or I am starting from scratch.',
-              isSelected: _selectedLevel == SkillLevel.beginner,
-              onTap: () => _selectLevel(SkillLevel.beginner),
-            ),
-            const SizedBox(height: AppSpacing.md),
-
-            LevelCard(
-              tag: 'INTERMEDIATE',
-              title: 'Conversationalist',
-              description:
-                  'I can hold basic conversations and understand common topics.',
-              isSelected: _selectedLevel == SkillLevel.intermediate,
-              onTap: () => _selectLevel(SkillLevel.intermediate),
-            ),
-            const SizedBox(height: AppSpacing.md),
-
-            LevelCard(
-              tag: 'ADVANCED',
-              title: 'Fluent Speaker',
-              description: 'I can speak fluently and understand complex topics.',
-              isSelected: _selectedLevel == SkillLevel.advanced,
-              onTap: () => _selectLevel(SkillLevel.advanced),
-            ),
-
-            // Push button to bottom
-            const Spacer(),
-
-            // ✅ "margin top" above the button
             const SizedBox(height: 16),
 
             SizedBox(
@@ -104,11 +135,10 @@ class _SkillAssessPageState extends State<SkillAssessPage> {
                 child: const Text('Continue'),
               ),
             ),
-
-            // ✅ no extra bottom SizedBox needed; SafeArea handles it
           ],
         ),
       ),
+    ),
     );
   }
 }
