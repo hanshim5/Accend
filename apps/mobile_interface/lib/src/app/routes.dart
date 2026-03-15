@@ -8,8 +8,10 @@ import '../features/onboarding/pages/daily_goal.dart';
 import '../features/onboarding/pages/feedback_tone.dart';
 import '../features/onboarding/pages/skill_assess.dart';
 import '../features/onboarding/pages/accent_selection.dart';
+import '../features/onboarding/pages/onboarding_complete.dart';
 
 import '../features/courses/pages/courses_list_page.dart';
+import '../features/social/pages/social_debug_page.dart';
 
 class AppRoutes {
   static const login = '/login';
@@ -20,10 +22,12 @@ class AppRoutes {
   static const onboardingFeedbackTone = '/onboarding/feedback-tone';
   static const onboardingSkillAssess = '/onboarding/skill-assess';
   static const onboardingAccentSelection = '/onboarding/accent-selection';
+  static const onboardingComplete = '/onboarding/complete';
 
   // Keep these for later if you want:
   static const onboardingIntro = '/onboarding/intro';
   static const courses = '/courses';
+  static const socialDebug = '/social/debug';
 
   static Map<String, WidgetBuilder> get table => {
         login: (_) => const LoginPage(),
@@ -34,7 +38,9 @@ class AppRoutes {
         onboardingFeedbackTone: (_) => const FeedbackTonePage(),
         onboardingSkillAssess: (_) => const SkillAssessPage(),
         onboardingAccentSelection: (_) => const AccentSelectionPage(),
+        onboardingComplete: (_) => const OnboardingCompletePage(),
 
         courses: (_) => const CoursesListPage(),
+        socialDebug: (_) => const SocialDebugPage(),
       };
 }

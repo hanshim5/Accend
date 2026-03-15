@@ -4,25 +4,8 @@ import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
 import 'package:mobile_interface/src/app/constants.dart';
 import 'package:mobile_interface/src/app/routes.dart';
-import 'package:mobile_interface/src/app/theme.dart';
-
-// void main() => runApp(const AccentSelectionApp());
-
-// class AccentSelectionApp extends StatelessWidget {
-//   const AccentSelectionApp({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: AppStrings.appName,
-//       debugShowCheckedModeBanner: false,
-//       theme: AppTheme.dark(),
-//       home: const Scaffold(
-//         body: SafeArea(child: AccentSelectionPage()),
-//       ),
-//     );
-//   }
-// }
+import 'package:provider/provider.dart';
+import 'package:mobile_interface/src/features/onboarding/controllers/onboarding_controller.dart';
 
 enum AccentChoice { californian, british, southern, australian }
 
@@ -35,6 +18,7 @@ class AccentSelectionPage extends StatefulWidget {
 
 class _AccentSelectionPageState extends State<AccentSelectionPage> {
   AccentChoice? _selected;
+  bool _syncedFromController = false;
 
   final List<_AccentOption> _options = const [
     _AccentOption(
@@ -62,38 +46,67 @@ class _AccentSelectionPageState extends State<AccentSelectionPage> {
     ),
   ];
 
-  void _select(AccentChoice v) => setState(() => _selected = v);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_syncedFromController) return;
+    _syncedFromController = true;
+    final value = context.read<OnboardingController>().data.accent;
+    if (value == null) return;
+    final choice = switch (value) {
+      'californian' => AccentChoice.californian,
+      'british' => AccentChoice.british,
+      'southern' => AccentChoice.southern,
+      'australian' => AccentChoice.australian,
+      _ => null,
+    };
+    if (choice != null) setState(() => _selected = choice);
+  }
 
-  void _onContinue() {
-    final sel = _selected;
-    if (sel == null) return;
-
-    final backend = switch (sel) {
+  void _select(AccentChoice v) {
+    setState(() => _selected = v);
+    final onboardingController = context.read<OnboardingController>();
+    final backend = switch (v) {
       AccentChoice.californian => 'californian',
       AccentChoice.british => 'british',
       AccentChoice.southern => 'southern',
       AccentChoice.australian => 'australian',
     };
+    onboardingController.setAccent(backend);
+  }
 
-    debugPrint('AccentSelection payload: {accent: $backend}');
+  void _onContinue() {
+    final sel = _selected;
+    if (sel == null) return;
+    // The value is already set in the controller
     Navigator.pushNamed(context, AppRoutes.onboardingFeedbackTone);
+  }
+
+  Future<void> _onBack() async {
+    await context.read<OnboardingController>().saveProgress();
+    if (!mounted) return;
+    Navigator.maybePop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.sm + 6,
-      ),
-      child: Column(
+    return Scaffold(
+      backgroundColor: AppColors.primaryBg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm + 6,
+          ),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const OnboardingTopBar(
+          OnboardingTopBar(
             step: 3,
             totalSteps: 5,
             rightLabel: 'Accent Selection',
             showBack: true,
+            onBack: _onBack,
           ),
           const SizedBox(height: AppSpacing.sm),
           const OnboardingProgressBar(step: 3, totalSteps: 5),
@@ -112,7 +125,6 @@ class _AccentSelectionPageState extends State<AccentSelectionPage> {
 
           Expanded(
             child: ListView.separated(
-              physics: const NeverScrollableScrollPhysics(),
               padding: EdgeInsets.zero,
               itemCount: _options.length,
               separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -141,6 +153,8 @@ class _AccentSelectionPageState extends State<AccentSelectionPage> {
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }
