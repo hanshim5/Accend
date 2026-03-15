@@ -72,8 +72,5 @@ class BottomNavBar extends StatelessWidget {
         ],
       ),
     );
-        ],
-      ),
-    );
   }
 }
