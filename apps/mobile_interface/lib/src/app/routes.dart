@@ -11,7 +11,10 @@ import '../features/onboarding/pages/accent_selection.dart';
 import '../features/onboarding/pages/onboarding_complete.dart';
 
 import '../features/courses/pages/courses_list_page.dart';
+import '../features/home/pages/home.dart';
+import '../features/social/pages/social.dart';
 import '../features/social/pages/social_debug_page.dart';
+import '../features/public_profile/pages/profile.dart';
 
 class AppRoutes {
   static const login = '/login';
@@ -24,9 +27,12 @@ class AppRoutes {
   static const onboardingAccentSelection = '/onboarding/accent-selection';
   static const onboardingComplete = '/onboarding/complete';
 
-  // Keep these for later if you want:
   static const onboardingIntro = '/onboarding/intro';
+
   static const courses = '/courses';
+  static const home = '/home';
+  static const social = '/social';
+  static const profile = '/profile';
   static const socialDebug = '/social/debug';
 
   static Map<String, WidgetBuilder> get table => {
@@ -41,6 +47,9 @@ class AppRoutes {
         onboardingComplete: (_) => const OnboardingCompletePage(),
 
         courses: (_) => const CoursesListPage(),
+        home: (_) => const HomePage(),
+        social: (_) => const SocialPage(),
+        profile: (_) => const ProfilePage(),
         socialDebug: (_) => const SocialDebugPage(),
       };
 }

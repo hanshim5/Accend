@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_interface/src/app/constants.dart';
 
+import '../../../app/routes.dart';
+import '../../../common/widgets/bottom_nav_bar.dart';
+
 import 'followers.dart';
 import 'following.dart';
 
@@ -14,6 +17,19 @@ class SocialPage extends StatefulWidget {
 
 class _SocialPageState extends State<SocialPage> {
   int _selectedTab = 0;
+
+  void _onNavTap(int index) {
+    switch (index) {
+      case 0:
+        break;
+      case 1:
+        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+        break;
+      case 2:
+        Navigator.of(context).pushReplacementNamed(AppRoutes.profile);
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +103,10 @@ class _SocialPageState extends State<SocialPage> {
             ),
           ],
         ),
+      ),
+      bottomNavigationBar: BottomNavBar(
+        selectedIndex: 0,
+        onDestinationSelected: _onNavTap,
       ),
     );
   }

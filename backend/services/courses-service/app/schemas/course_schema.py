@@ -1,4 +1,6 @@
 """
+course_schema.py
+
 Pydantic schemas for request/response shapes.
 
 Purpose:
@@ -42,3 +44,6 @@ class CourseOut(BaseModel):
     user_id: UUID
     title: str
     created_at: datetime
+
+    progress_percent: int = 0
+    status: str = "not_started"

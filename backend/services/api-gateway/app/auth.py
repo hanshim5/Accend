@@ -1,4 +1,6 @@
 """
+auth.py
+
 JWT Verification Logic for Gateway
 
 Purpose:

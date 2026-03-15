@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../common/widgets/bottom_nav_bar.dart';
 import '../../../app/routes.dart';
 
-class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
 
   void _onNavTap(BuildContext context, int index) {
     switch (index) {
@@ -11,22 +11,22 @@ class ProfilePage extends StatelessWidget {
         Navigator.of(context).pushReplacementNamed(AppRoutes.social);
         break;
       case 1:
-        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-        break;
-      case 2:
         break; // already here
+      case 2:
+        Navigator.of(context).pushReplacementNamed(AppRoutes.profile);
+        break;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Profile")),
+      appBar: AppBar(title: const Text("Home")),
       body: const Center(
-        child: Text("This is the profile page!"),
+        child: Text("This is the home page!"),
       ),
       bottomNavigationBar: BottomNavBar(
-        selectedIndex: 2,
+        selectedIndex: 1,
         onDestinationSelected: (i) => _onNavTap(context, i),
       ),
     );

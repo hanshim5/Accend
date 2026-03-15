@@ -1,4 +1,6 @@
 """
+course_service.py
+
 Service layer (business logic).
 
 Purpose:

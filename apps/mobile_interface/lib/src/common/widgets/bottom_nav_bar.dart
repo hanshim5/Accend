@@ -1,12 +1,7 @@
-// lib/bottom_nav_bar.dart
 import 'package:flutter/material.dart';
 
-/// A reusable bottom navigation bar that wraps Flutter's [NavigationBar].
-/// - [selectedIndex] controls which destination is selected.
-/// - [onDestinationSelected] is called when the user taps a destination.
-/// - [indicatorColor] optionally overrides the default indicator color.
 class BottomNavBar extends StatelessWidget {
-  final int selectedIndex;
+  final int? selectedIndex;
   final ValueChanged<int> onDestinationSelected;
   final Color? indicatorColor;
   final Widget? overlay;
@@ -21,16 +16,16 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool nothingSelected = selectedIndex == null;
+
     return NavigationBarTheme(
       data: NavigationBarThemeData(
         backgroundColor: const Color(0xFF0F172A), // dark background
-        labelTextStyle:
-            WidgetStateProperty.resolveWith<TextStyle>((states) {
+        labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>((states) {
           return const TextStyle(color: Colors.grey);
         }),
-        iconTheme:
-            WidgetStateProperty.resolveWith<IconThemeData>((states) {
-          if (states.contains(WidgetState.selected)) {
+        iconTheme: WidgetStateProperty.resolveWith<IconThemeData>((states) {
+          if (!nothingSelected && states.contains(WidgetState.selected)) {
             return const IconThemeData(
               color: Color(0xFF06B6D4),
             ); // selected
@@ -45,7 +40,7 @@ class BottomNavBar extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           NavigationBar(
-            selectedIndex: selectedIndex,
+            selectedIndex: selectedIndex ?? 0,
             onDestinationSelected: onDestinationSelected,
             indicatorColor: Colors.transparent,
             destinations: const [
@@ -74,6 +69,9 @@ class BottomNavBar extends StatelessWidget {
                 child: overlay!,
               ),
             ),
+        ],
+      ),
+    );
         ],
       ),
     );
