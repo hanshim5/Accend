@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_interface/src/features/group_session/pages/group_session_select_page.dart';
+import 'package:mobile_interface/src/features/group_session/pages/group_session_private_select_page.dart';
 import 'package:provider/provider.dart';
 
 import 'constants.dart';
@@ -59,12 +61,14 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  int _selectedIndex = 1; // start on Home
+  int _selectedIndex = 3; // leo TODO start on Group Sessions 
 
   final _pages = const [
     SocialPage(),
     HomePage(),
     ProfilePage(),
+    GroupSessionSelectPage(),
+    GroupSessionPrivateSelectPage(),
   ];
 
   @override

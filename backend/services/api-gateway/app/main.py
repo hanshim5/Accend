@@ -349,3 +349,34 @@ async def proxy_pronunciation_assess(
         raise HTTPException(status_code=r.status_code, detail=detail)
 
     return r.json()
+
+
+# -----------------------------------
+# Group Session Service
+# -----------------------------------
+
+@app.get("/private_lobbies")
+async def proxy_get_private_lobby(
+    # lobby_id: int,
+    authorization: str | None = Header(default=None)
+):
+    """
+    Forward GET /courses to courses-service.
+
+    Steps:
+    1. Validate JWT.
+    2. Extract user_id.
+    3. Call courses-service with X-User-Id header.
+    4. Return response.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{settings.GROUP_SERVICE_URL}/private_lobby",
+            headers={"X-User-Id": user_id},
+        )
+        if r.status_code >= 400:
+            raise HTTPException(status_code=r.status_code, detail=r.text)
+        
+        return r.json()
