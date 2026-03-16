@@ -4,25 +4,9 @@ import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
 import 'package:mobile_interface/src/app/constants.dart';
 import 'package:mobile_interface/src/app/routes.dart';
-import 'package:mobile_interface/src/app/theme.dart';
+import 'package:provider/provider.dart';
+import 'package:mobile_interface/src/features/onboarding/controllers/onboarding_controller.dart';
 
-// void main() => runApp(const DailyGoalApp());
-
-// class DailyGoalApp extends StatelessWidget {
-//   const DailyGoalApp({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: AppStrings.appName,
-//       debugShowCheckedModeBanner: false,
-//       theme: AppTheme.dark(),
-//       home: const Scaffold(
-//         body: SafeArea(child: DailyGoalPage()),
-//       ),
-//     );
-//   }
-// }
 
 enum DailyGoalChoice { hiker, climber, summiter, mountaineer }
 
@@ -35,6 +19,7 @@ class DailyGoalPage extends StatefulWidget {
 
 class _DailyGoalPageState extends State<DailyGoalPage> {
   DailyGoalChoice? _selected;
+  bool _syncedFromController = false;
 
   final List<_DailyGoalOption> _options = const [
     _DailyGoalOption(
@@ -63,35 +48,81 @@ class _DailyGoalPageState extends State<DailyGoalPage> {
     ),
   ];
 
-  void _select(DailyGoalChoice v) => setState(() => _selected = v);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_syncedFromController) return;
+    _syncedFromController = true;
+    final value = context.read<OnboardingController>().data.dailyPace;
+    if (value == null) return;
+    final choice = switch (value) {
+      'hiker' => DailyGoalChoice.hiker,
+      'climber' => DailyGoalChoice.climber,
+      'summiter' => DailyGoalChoice.summiter,
+      'mountaineer' => DailyGoalChoice.mountaineer,
+      _ => null,
+    };
+    if (choice != null) setState(() => _selected = choice);
+  }
 
-  void _onContinue() {
+  void _select(DailyGoalChoice v) {
+    setState(() => _selected = v);
+    final onboardingController = context.read<OnboardingController>();
+    final backend = switch (v) {
+      DailyGoalChoice.hiker => 'hiker',
+      DailyGoalChoice.climber => 'climber',
+      DailyGoalChoice.summiter => 'summiter',
+      DailyGoalChoice.mountaineer => 'mountaineer',
+    };
+    onboardingController.setDailyPace(backend);
+  }
+
+  void _onContinue() async {
     final sel = _selected;
     if (sel == null) return;
+    debugPrint('DailyGoal: Continue pressed, selected=$sel');
+    final onboardingController = context.read<OnboardingController>();
+    try {
+      debugPrint('DailyGoal: Calling saveAll()');
+      await onboardingController.saveAll();
+      debugPrint('DailyGoal: saveAll() completed');
+      if (!mounted) return;
+      Navigator.pushNamed(context, AppRoutes.onboardingComplete);
+      debugPrint('DailyGoal: Navigated to onboardingComplete');
+    } catch (e, st) {
+      debugPrint('DailyGoal: Error in saveAll: $e\n$st');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save onboarding: $e')),
+      );
+    }
+  }
 
-    final backend = _options.firstWhere((o) => o.value == sel).backendValue;
-    debugPrint('DailyGoal payload: {daily_goal: $backend}');
-    // Onboarding complete - for now just show a message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Onboarding complete! Welcome to Accend.')),
-    );
+  Future<void> _onBack() async {
+    await context.read<OnboardingController>().saveProgress();
+    if (!mounted) return;
+    Navigator.maybePop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.sm + 6,
-      ),
-      child: Column(
+    return Scaffold(
+      backgroundColor: AppColors.primaryBg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm + 6,
+          ),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const OnboardingTopBar(
+          OnboardingTopBar(
             step: 5,
             totalSteps: 5,
             rightLabel: 'Daily Goal',
             showBack: true,
+            onBack: _onBack,
           ),
           const SizedBox(height: AppSpacing.sm),
 
@@ -111,7 +142,6 @@ class _DailyGoalPageState extends State<DailyGoalPage> {
 
           Expanded(
             child: ListView.separated(
-              physics: const NeverScrollableScrollPhysics(),
               padding: EdgeInsets.zero,
               itemCount: _options.length,
               separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -134,11 +164,18 @@ class _DailyGoalPageState extends State<DailyGoalPage> {
           SizedBox(
             height: 56,
             child: ElevatedButton(
-              onPressed: _selected == null ? null : _onContinue,
+              onPressed: _selected == null
+                  ? null
+                  : () {
+                      debugPrint('DailyGoal: Continue button pressed');
+                      _onContinue();
+                    },
               child: const Text('Continue'),
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

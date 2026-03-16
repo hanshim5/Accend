@@ -1,4 +1,6 @@
 """
+supabase_course_repo.py
+
 Supabase implementation of CourseRepo.
 
 Purpose:
@@ -32,7 +34,7 @@ class SupabaseCourseRepo:
         rows = rest_get(
             table="courses",
             params={
-                "select": "id,user_id,title,created_at",
+                "select": "id,user_id,title,created_at,progress_percent,status",
                 "user_id": f"eq.{str(user_id)}",
                 "order": "created_at.desc",
             },
@@ -49,10 +51,12 @@ class SupabaseCourseRepo:
             "title": data.title,
         }
 
-        row = rest_post(
+        rows = rest_post(
             table="courses",
             payload=payload,
-            select="id,user_id,title,created_at",
+            select="id,user_id,title,created_at,progress_percent,status",
         )
-
-        return CourseOut.model_validate(row)
+        if not rows:
+            raise RuntimeError("Supabase REST POST returned no row")
+        
+        return CourseOut.model_validate(rows[0])

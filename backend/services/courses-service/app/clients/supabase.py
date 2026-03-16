@@ -1,4 +1,6 @@
 """
+supabase.py
+
 Supabase REST client (PostgREST) factory.
 
 Purpose:
@@ -87,17 +89,16 @@ def rest_get(table: str, params: dict[str, str]) -> list[dict[str, Any]]:
     return data if isinstance(data, list) else []
 
 
-def rest_post(table: str, payload: dict[str, Any], select: str) -> dict[str, Any]:
+from typing import Any
+
+def rest_post(table: str, payload: dict[str, Any] | list[dict[str, Any]], select: str) -> list[dict[str, Any]]:
     """
-    INSERT a row via PostgREST and return the inserted row.
+    INSERT one or many rows via PostgREST and return inserted rows.
 
-    PostgREST pattern:
-    - POST /rest/v1/<table>
-    - body: JSON object
-    - Prefer: return=representation
-    - select=<columns> query param to choose returned columns
+    If payload is a dict -> inserts 1 row
+    If payload is a list of dicts -> bulk insert
 
-    Returns a single inserted row dict.
+    Returns a list of inserted row dicts (possibly length 1).
     """
     url = f"{settings.SUPABASE_URL}/rest/v1/{table}"
     client = get_http()
@@ -107,8 +108,22 @@ def rest_post(table: str, payload: dict[str, Any], select: str) -> dict[str, Any
         raise RuntimeError(f"Supabase REST POST failed ({resp.status_code}): {resp.text}")
 
     data = resp.json()
-    # PostgREST returns a list of inserted rows
-    if isinstance(data, list) and data:
-        return data[0]
+    return data if isinstance(data, list) else []
 
-    raise RuntimeError("Supabase REST POST returned no row")
+def rest_patch(table: str, match: dict[str, str], payload: dict[str, Any], select: str) -> list[dict[str, Any]]:
+    """
+    PATCH rows via PostgREST and return updated rows.
+
+    match example:
+      {"id": "eq.<uuid>"}
+    """
+    url = f"{settings.SUPABASE_URL}/rest/v1/{table}"
+    client = get_http()
+
+    params = {"select": select, **match}
+    resp = client.patch(url, headers=_headers(), params=params, json=payload)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Supabase REST PATCH failed ({resp.status_code}): {resp.text}")
+
+    data = resp.json()
+    return data if isinstance(data, list) else []

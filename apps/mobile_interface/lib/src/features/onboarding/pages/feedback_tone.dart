@@ -4,25 +4,9 @@ import 'package:flutter/material.dart';
 import 'onboarding_header.dart';
 import 'package:mobile_interface/src/app/constants.dart';
 import 'package:mobile_interface/src/app/routes.dart';
-import 'package:mobile_interface/src/app/theme.dart';
+import 'package:provider/provider.dart';
+import 'package:mobile_interface/src/features/onboarding/controllers/onboarding_controller.dart';
 
-// void main() => runApp(const FeedbackToneApp());
-
-// class FeedbackToneApp extends StatelessWidget {
-//   const FeedbackToneApp({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: AppStrings.appName,
-//       debugShowCheckedModeBanner: false,
-//       theme: AppTheme.dark(),
-//       home: const Scaffold(
-//         body: SafeArea(child: FeedbackTonePage()),
-//       ),
-//     );
-//   }
-// }
 
 enum FeedbackToneChoice { passionate, supportive, neutral, strict }
 
@@ -35,6 +19,7 @@ class FeedbackTonePage extends StatefulWidget {
 
 class _FeedbackTonePageState extends State<FeedbackTonePage> {
   FeedbackToneChoice? _selected;
+  bool _syncedFromController = false;
 
   final List<_ToneOption> _options = const [
     _ToneOption(
@@ -59,32 +44,67 @@ class _FeedbackTonePageState extends State<FeedbackTonePage> {
     ),
   ];
 
-  void _select(FeedbackToneChoice v) => setState(() => _selected = v);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_syncedFromController) return;
+    _syncedFromController = true;
+    final value = context.read<OnboardingController>().data.feedbackTone;
+    if (value == null) return;
+    final choice = switch (value) {
+      'passionate' => FeedbackToneChoice.passionate,
+      'supportive' => FeedbackToneChoice.supportive,
+      'neutral' => FeedbackToneChoice.neutral,
+      'strict' => FeedbackToneChoice.strict,
+      _ => null,
+    };
+    if (choice != null) setState(() => _selected = choice);
+  }
+
+  void _select(FeedbackToneChoice v) {
+    setState(() => _selected = v);
+    final onboardingController = context.read<OnboardingController>();
+    final backend = switch (v) {
+      FeedbackToneChoice.passionate => 'passionate',
+      FeedbackToneChoice.supportive => 'supportive',
+      FeedbackToneChoice.neutral => 'neutral',
+      FeedbackToneChoice.strict => 'strict',
+    };
+    onboardingController.setFeedbackTone(backend);
+  }
 
   void _onContinue() {
     final sel = _selected;
     if (sel == null) return;
-
-    final backend = _options.firstWhere((o) => o.value == sel).backendValue;
-    debugPrint('FeedbackTone payload: {feedback_tone: $backend}');
+    // The value is already set in the controller
     Navigator.pushNamed(context, AppRoutes.onboardingDailyGoal);
+  }
+
+  Future<void> _onBack() async {
+    await context.read<OnboardingController>().saveProgress();
+    if (!mounted) return;
+    Navigator.maybePop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.lg,
-        vertical: AppSpacing.sm + 6,
-      ),
-      child: Column(
+    return Scaffold(
+      backgroundColor: AppColors.primaryBg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm + 6,
+          ),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const OnboardingTopBar(
+          OnboardingTopBar(
             step: 4,
             totalSteps: 5,
             rightLabel: 'Feedback Tone',
             showBack: true,
+            onBack: _onBack,
           ),
           const SizedBox(height: AppSpacing.sm),
 
@@ -104,7 +124,6 @@ class _FeedbackTonePageState extends State<FeedbackTonePage> {
 
           Expanded(
             child: ListView.separated(
-              physics: const NeverScrollableScrollPhysics(),
               padding: EdgeInsets.zero,
               itemCount: _options.length,
               separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -131,6 +150,8 @@ class _FeedbackTonePageState extends State<FeedbackTonePage> {
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

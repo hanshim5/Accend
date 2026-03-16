@@ -1,4 +1,6 @@
 """
+main.py
+
 API Gateway (BFF - Backend For Frontend)
 
 Purpose:
@@ -128,8 +130,56 @@ async def proxy_list_courses(
             f"{settings.COURSES_SERVICE_URL}/courses",
             headers={"X-User-Id": user_id},
         )
-
+        if r.status_code >= 400:
+            raise HTTPException(status_code=r.status_code, detail=r.text)
+        
         return r.json()
+    
+# -----------------------------------
+# Proxy: GET /courses/{course_id}/lessons
+# -----------------------------------
+
+@app.get("/courses/{course_id}/lessons")
+async def proxy_list_lessons(
+    course_id: str,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{settings.COURSES_SERVICE_URL}/courses/{course_id}/lessons",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+# -----------------------------------
+# Proxy: POST /courses/{course_id}/lessons/{lesson_id}/complete
+# -----------------------------------
+
+@app.post("/courses/{course_id}/lessons/{lesson_id}/complete")
+async def proxy_complete_lesson(
+    course_id: str,
+    lesson_id: str,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.post(
+            f"{settings.COURSES_SERVICE_URL}/courses/{course_id}/lessons/{lesson_id}/complete",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
     
 # -----------------------------------
 # AI Course Generation
@@ -148,22 +198,18 @@ async def generate_course(
     authorization: str | None = Header(default=None),
 ):
     """
-    Orchestrated flow:
+    Orchestrated flow (updated):
 
-    1. Validate JWT (identify user).
-    2. Call AI service to generate structure.
-    3. Call courses-service to persist generated course.
-    4. Return combined response to Flutter.
-
-    This is orchestration logic.
-    This is why Gateway exists.
+    1. Validate JWT -> user_id
+    2. Call AI service to generate structure (title + lessons[])
+    3. Persist course row in courses-service
+    4. Persist curriculum (bulk lessons + items) in courses-service
+    5. Return course + persisted lessons + ai payload
     """
-
     # Step 1: Verify identity
     user_id = verify_supabase_jwt(authorization)
 
     async with httpx.AsyncClient(timeout=30) as client:
-
         # Step 2: Call AI service
         ai_resp = await client.post(
             f"{settings.AI_COURSE_GEN_SERVICE_URL}/generate-course",
@@ -178,11 +224,16 @@ async def generate_course(
 
         ai_data = ai_resp.json()
 
-        # Step 3: Persist in courses-service
+        # Minimal shape validation (gateway will normalize below)
+        if "title" not in ai_data:
+            raise HTTPException(status_code=502, detail="AI service returned no title")
+        # ai_data should ideally include "lessons" (list), but we'll tolerate variations and normalize
+
+        # Step 3: Persist course row
         course_resp = await client.post(
             f"{settings.COURSES_SERVICE_URL}/courses",
             headers={"X-User-Id": user_id},
-            json={"title": ai_data["title"]},
+            json={"title": ai_data.get("title", "Untitled Course")},
         )
 
         if course_resp.status_code >= 400:
@@ -191,12 +242,75 @@ async def generate_course(
                 detail=course_resp.text,
             )
 
-        # Step 4: Return aggregated response
+        course_row = course_resp.json()
+        course_id = course_row.get("id")
+        if not course_id:
+            raise HTTPException(status_code=502, detail="Courses service returned no id")
+
+        # Step 4: Build and persist curriculum payload (normalize AI output)
+        curriculum_payload = {"lessons": []}
+
+        # Accept either ai_data["lessons"] or ai_data["outline"] (legacy) and normalize items
+        raw_lessons = ai_data.get("lessons") or ai_data.get("outline") or []
+        for raw_l in raw_lessons:
+            # raw_l can be a string (lesson title) or dict { title, items }.
+            if isinstance(raw_l, str):
+                # If AI returned just titles in outline, create an empty lesson (skip later if no items)
+                lesson_title = raw_l
+                lesson_items = []
+            elif isinstance(raw_l, dict):
+                lesson_title = raw_l.get("title") or raw_l.get("lesson_title") or "Untitled lesson"
+                lesson_items = raw_l.get("items") or raw_l.get("phrases") or []
+            else:
+                continue
+
+            # Normalize items: accept list of strings or list of dicts with text/ipa/hint
+            normalized_items = []
+            for it in lesson_items:
+                if isinstance(it, str):
+                    normalized_items.append({"text": it})
+                elif isinstance(it, dict) and it.get("text"):
+                    normalized_items.append({
+                        "text": it["text"],
+                        "ipa": it.get("ipa"),
+                        "hint": it.get("hint"),
+                    })
+            # If the AI returned only lesson titles (no items), you might want to skip or keep empty.
+            # We skip lessons without items to avoid inserting empty lessons.
+            if not normalized_items:
+                # Defensive: skip lessons with no items
+                continue
+
+            curriculum_payload["lessons"].append({
+                "title": lesson_title,
+                "items": normalized_items,
+            })
+
+        # If there are lessons to persist, call the curriculum endpoint
+        if curriculum_payload["lessons"]:
+            curriculum_resp = await client.post(
+                f"{settings.COURSES_SERVICE_URL}/courses/{course_id}/curriculum",
+                headers={"X-User-Id": user_id},
+                json=curriculum_payload,
+            )
+
+            if curriculum_resp.status_code >= 400:
+                # Surface helpful debug info
+                raise HTTPException(
+                    status_code=curriculum_resp.status_code,
+                    detail={"courses_error": curriculum_resp.text, "ai_preview": ai_data},
+                )
+
+            curriculum_rows = curriculum_resp.json()
+        else:
+            curriculum_rows = []
+
+        # Step 5: Return aggregated response
         return {
-            "course": course_resp.json(),
+            "course": course_row,
+            "lessons": curriculum_rows,
             "ai": ai_data,
         }
-
 
 # -----------------------------------
 # Pronunciation Feedback (proxy to pronunciation-feedback service)

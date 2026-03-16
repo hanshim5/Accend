@@ -67,12 +67,11 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
       final fullName = _fullName.text.trim();
       final nativeLanguage = _nativeLanguage ?? '';
 
-      // COMMENTED OUT HERE!!!: Username availability check
       final check = await _api.getJson(
         '/profile/username-available',
         query: {'username': username},
       );
-      
+
       final available = check['available'] == true;
       if (!available) {
         setState(() {
@@ -81,18 +80,16 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
         return;
       }
 
-      // COMMENTED OUT: Supabase Auth signup
       await _auth.signUp(
         email: email,
         password: password,
       );
-      
+
       final accessToken = _auth.accessToken;
       if (accessToken == null) {
         throw Exception('Missing access token after signup.');
       }
 
-      // COMMENTED OUT: Initialize profile
       await _api.postJson(
         '/profile/init',
         accessToken: accessToken,
@@ -112,11 +109,25 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
       );
     } catch (e) {
       if (!mounted) return;
+
+      final msg = e.toString().toLowerCase();
+
+      if (msg.contains('user already registered') ||
+          msg.contains('email already registered') ||
+          msg.contains('user_already_exists')) {
+        setState(() {
+          _c.emailErr = 'An account with this email already exists';
+        });
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Signup failed: $e')),
       );
     } finally {
-      if (mounted) setState(() => _submitting = false);
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
     }
   }
 
@@ -125,6 +136,7 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
     final t = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: AppColors.primaryBg,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -231,8 +243,14 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
                                 hintText: '••••••••••••',
                                 errorText: _c.passwordErr,
                                 suffixIcon: IconButton(
-                                  onPressed: () => setState(() => _hidePassword = !_hidePassword),
-                                  icon: Icon(_hidePassword ? Icons.visibility_off : Icons.visibility),
+                                  onPressed: () => setState(
+                                    () => _hidePassword = !_hidePassword,
+                                  ),
+                                  icon: Icon(
+                                    _hidePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
                                 ),
                               ),
                             ),
@@ -268,11 +286,16 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text('Already have an account? ', style: t.textTheme.bodyMedium),
+                              Text(
+                                'Already have an account? ',
+                                style: t.textTheme.bodyMedium,
+                              ),
                               GestureDetector(
                                 onTap: () {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Login page coming next')),
+                                    const SnackBar(
+                                      content: Text('Login page coming next'),
+                                    ),
                                   );
                                 },
                                 child: Text(

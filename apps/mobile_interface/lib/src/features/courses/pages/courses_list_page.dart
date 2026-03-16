@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/constants.dart';
+import '../../../app/routes.dart';
+import '../../../common/widgets/bottom_nav_bar.dart';
+
 import '../controllers/courses_controller.dart';
 import '../models/course.dart';
 import '../widgets/course_card.dart';
-
-import '../../../app/routes.dart';
+import '../widgets/generate_course_popup.dart';
 
 class CoursesListPage extends StatefulWidget {
   const CoursesListPage({super.key});
@@ -24,6 +26,20 @@ class _CoursesListPageState extends State<CoursesListPage> {
     });
   }
 
+  void _onNavTap(int index) {
+    switch (index) {
+      case 0:
+        Navigator.of(context).pushReplacementNamed(AppRoutes.social);
+        break;
+      case 1:
+        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+        break;
+      case 2:
+        Navigator.of(context).pushReplacementNamed(AppRoutes.profile);
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctrl = context.watch<CoursesController>();
@@ -36,7 +52,8 @@ class _CoursesListPageState extends State<CoursesListPage> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pushReplacementNamed(AppRoutes.login),
+          onPressed: () =>
+              Navigator.of(context).pushReplacementNamed(AppRoutes.login),
         ),
         title: Text(
           "Courses",
@@ -47,17 +64,23 @@ class _CoursesListPageState extends State<CoursesListPage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_circle, color: AppColors.action, size: 28),
-            onPressed: () => _showCreateCourseStub(context),
+            icon: const Icon(
+              Icons.add_circle,
+              color: AppColors.action,
+              size: 28,
+            ),
+            onPressed: () => _openGenerateCoursePopup(context),
           ),
           const SizedBox(width: 6),
         ],
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm,
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.md,
+            0,
           ),
           child: Builder(
             builder: (_) {
@@ -74,7 +97,7 @@ class _CoursesListPageState extends State<CoursesListPage> {
 
               if (ctrl.courses.isEmpty) {
                 return _EmptyState(
-                  onCreate: () => _showCreateCourseStub(context),
+                  onCreate: () => _openGenerateCoursePopup(context),
                 );
               }
 
@@ -89,36 +112,24 @@ class _CoursesListPageState extends State<CoursesListPage> {
           ),
         ),
       ),
+      bottomNavigationBar: BottomNavBar(
+        selectedIndex: null,
+        onDestinationSelected: _onNavTap,
+      ),
     );
   }
 
-  void _showCreateCourseStub(BuildContext context) {
-    showDialog(
+  Future<void> _openGenerateCoursePopup(BuildContext context) async {
+    final ctrl = context.read<CoursesController>();
+
+    await showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: Text(
-          "Create Course",
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w800,
-              ),
-        ),
-        content: Text(
-          "This will become the Story 19 prompt popup (and later AI generation).",
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              "Close",
-              style: TextStyle(color: AppColors.accent),
-            ),
-          ),
-        ],
+      barrierDismissible: true,
+      builder: (_) => GenerateCoursePopup(
+        onGenerate: (prompt) async {
+          final ok = await ctrl.generateCourse(prompt);
+          return ok;
+        },
       ),
     );
   }
@@ -136,12 +147,13 @@ class _CoursesGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
       itemCount: courses.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: AppSpacing.md,
         mainAxisSpacing: AppSpacing.md,
-        childAspectRatio: 0.74, // closer to figma proportions
+        childAspectRatio: 0.74,
       ),
       itemBuilder: (context, i) {
         final course = courses[i];
@@ -166,7 +178,11 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.school_outlined, size: 44, color: AppColors.textSecondary),
+            const Icon(
+              Icons.school_outlined,
+              size: 44,
+              color: AppColors.textSecondary,
+            ),
             const SizedBox(height: AppSpacing.sm),
             Text(
               "No courses yet",

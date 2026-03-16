@@ -1,4 +1,6 @@
 """
+supabase_client.py
+
 Supabase Client (Gateway)
 
 Purpose:
