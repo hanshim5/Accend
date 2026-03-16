@@ -83,7 +83,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
                         text: TextSpan(
                           style: t.textTheme.headlineMedium,
                           children: [
-                            const TextSpan(text: ctrl.privateLobby[0]["lobby_id"]: String), // TOTALLY WRONG BUT IDK WHAT TO DO HERE TO JUSTMAKE IT DISPLAY THE LOBBY CODE
+                            const TextSpan(text: ctrl.privateLobby["lobby_id"]: String), // TOTALLY WRONG, BASICALLY PSEUDOCODE, BUT IDK WHAT TO DO HERE TO JUSTMAKE IT DISPLAY THE LOBBY CODE
                           ],
                         ),
                       );
