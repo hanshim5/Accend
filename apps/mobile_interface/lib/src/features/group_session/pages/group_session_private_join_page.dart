@@ -25,7 +25,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
   @override
   Widget build(BuildContext context) {
 
-    final ctrl = context.watch<GroupSessionController>();
+    // final ctrl = context.watch<GroupSessionController>();
     final t = Theme.of(context);
 
     int _selectedIndex = 1;

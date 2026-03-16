@@ -8,14 +8,14 @@ import '../../../app/routes.dart' as routes;
 import '../widgets/private_button.dart' as private_button;
 import '../../../common/widgets/bottom_nav_bar.dart' as bot_nav_bar;
 
-class GroupSessionPrivateJoinPage extends StatefulWidget {
-  const GroupSessionPrivateJoinPage({super.key});
+class GroupSessionActiveLobbyPage extends StatefulWidget {
+  const GroupSessionActiveLobbyPage({super.key});
 
   @override
-  State<GroupSessionPrivateJoinPage> createState() => _GroupSessionSelectPageState();
+  State<GroupSessionActiveLobbyPage> createState() => _GroupSessionActiveLobbyPageState();
 }
 
-class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
+class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPage> {
  
 
   final _lobbyCode = TextEditingController();
@@ -25,7 +25,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
   @override
   Widget build(BuildContext context) {
 
-    final ctrl = context.watch<GroupSessionController>();
+    // final ctrl = context.watch<GroupSessionController>();
     final t = Theme.of(context);
 
     int _selectedIndex = 1;
@@ -54,7 +54,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
                             text: TextSpan(
                               style: t.textTheme.headlineMedium,
                               children: [
-                                const TextSpan(text: '[TEMP ACTIVE SESSION PAGE]'),
+                                const TextSpan(text: '[TEMP PAGE]'),
                               ],
                             ),
                           ),
@@ -91,11 +91,6 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
                   // ),
 
                   Spacer(),
-
-                  bot_nav_bar.BottomNavBar(
-                    selectedIndex: _selectedIndex,
-                    onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-                  ),
                 ],
               ),
             ),

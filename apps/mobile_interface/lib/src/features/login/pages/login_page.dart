@@ -264,6 +264,23 @@ class _LoginPageState extends State<LoginPage> {
 
                   const SizedBox(height: 10),
 
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: OutlinedButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.pushNamed(context, AppRoutes.groupSessionActiveLobby),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.action),
+                        foregroundColor: AppColors.action,
+                      ),
+                      child: const Text('Go to Active Lobby (Debug)'),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
                   // Logged-in hint
                   if (isLoggedIn)
                     Text(
