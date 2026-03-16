@@ -161,6 +161,8 @@ def run_pronunciation_assessment(audio_path: Path, reference_text: str) -> dict:
         granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme,
         enable_miscue=True,
     )
+    # Request N-best spoken phonemes so we get NBestPhonemes (what the user said) per phoneme.
+    pronunciation_config.nbest_phoneme_count = 5
     # pronunciation_config.phoneme_alphabet = "IPA"
     pronunciation_config.apply_to(speech_recognizer)
 
