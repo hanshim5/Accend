@@ -89,7 +89,11 @@ class _MicrophoneState extends State<Microphone> {
 
       final path = await _nextFilePath();
       await _recorder.start(
-        const RecordConfig(encoder: AudioEncoder.wav),
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000, // 16 kHz is guaranteed on all Android devices/emulators
+          numChannels: 1,    // mono — also what Azure Speech SDK expects
+        ),
         path: path,
       );
 

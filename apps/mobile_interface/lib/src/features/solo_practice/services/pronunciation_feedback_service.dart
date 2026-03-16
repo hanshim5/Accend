@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -6,10 +7,11 @@ import '../models/pronunciation_feedback.dart';
 
 /// API gateway base URL used for local development.
 ///
-/// - On Android emulator the host machine is accessible via 10.0.2.2.
-/// - On iOS simulator you can use localhost directly.
+/// - Android emulator cannot reach `localhost`; the host machine is at 10.0.2.2.
+/// - iOS simulator and desktop can use localhost directly.
 /// - In production this should be injected from configuration, not hard-coded.
-const String _gatewayBaseUrl = 'http://localhost:8080';
+String get _gatewayBaseUrl =>
+    Platform.isAndroid ? 'http://10.0.2.2:8080' : 'http://localhost:8080';
 
 /// Returns mock feedback for the feedback card (fallback when API fails or is unused).
 ///
