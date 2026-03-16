@@ -54,7 +54,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
                             text: TextSpan(
                               style: t.textTheme.headlineMedium,
                               children: [
-                                const TextSpan(text: 'Join Lobby'),
+                                const TextSpan(text: '[TEMP ACTIVE SESSION PAGE]'),
                               ],
                             ),
                           ),
