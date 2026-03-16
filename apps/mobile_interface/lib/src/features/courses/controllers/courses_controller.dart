@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../../../common/services/api_client.dart';
 import '../../../common/services/auth_service.dart';
 import '../models/course.dart';
+import '../models/lesson.dart';
 
 class CoursesController extends ChangeNotifier {
   CoursesController({
@@ -87,4 +88,22 @@ class CoursesController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<List<Lesson>> fetchLessons(String courseId) async {
+    final token = _auth.accessToken;
+    if (token == null) {
+      throw Exception('User not authenticated');
+    }
+
+    final list = await _api.getList(
+      '/courses/$courseId/lessons',
+      accessToken: token,
+    );
+
+    return list
+        .cast<Map<String, dynamic>>()
+        .map((e) => Lesson.fromJson(e))
+        .toList();
+  }
+  
 }

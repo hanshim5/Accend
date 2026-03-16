@@ -15,6 +15,7 @@ import '../features/home/pages/home.dart';
 import '../features/social/pages/social.dart';
 import '../features/social/pages/social_debug_page.dart';
 import '../features/public_profile/pages/profile.dart';
+import '../features/solo_practice/pages/solo_practice_page.dart';
 
 class AppRoutes {
   static const login = '/login';
@@ -34,6 +35,7 @@ class AppRoutes {
   static const social = '/social';
   static const profile = '/profile';
   static const socialDebug = '/social/debug';
+  static const soloPractice = '/solo-practice';
 
   static Map<String, WidgetBuilder> get table => {
         login: (_) => const LoginPage(),
@@ -51,5 +53,6 @@ class AppRoutes {
         social: (_) => const SocialPage(),
         profile: (_) => const ProfilePage(),
         socialDebug: (_) => const SocialDebugPage(),
+        soloPractice: (_) => const SoloPracticePage(),
       };
 }
