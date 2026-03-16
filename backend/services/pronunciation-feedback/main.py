@@ -8,7 +8,7 @@ full Azure pronunciation assessment JSON (scores, words, phonemes, etc.).
 TODO:
 - [X] clean the json for easy processing
 words: [{ text, wordScore, errorType, phonemes: [{ph, score}] }]
-- [] color code word based off of wordScore
+- [X] color code word based off of wordScore
 - [] cache JSON output temporarily so we can keep results of the newest assessment
 - [] create error handling/pop up in dart page
 - [] map phoneme to 
@@ -54,6 +54,7 @@ def _clean_pronunciation_result(raw: dict) -> dict:
                     {
                         "symbol": str,
                         "accuracy": float | None,
+                        "user_said": str | None,
                     },
                     ...
                 ],
@@ -79,10 +80,14 @@ def _clean_pronunciation_result(raw: dict) -> dict:
         phonemes_clean = []
         for p in w.get("Phonemes") or []:
             p_pa = p.get("PronunciationAssessment") or {}
+            nbest_phonemes = p_pa.get("NBestPhonemes") or []
+            # Top entry in NBestPhonemes is what was detected (user said)
+            user_said = nbest_phonemes[0].get("Phoneme") if nbest_phonemes else None
             phonemes_clean.append(
                 {
                     "symbol": p.get("Phoneme"),
                     "accuracy": p_pa.get("AccuracyScore"),
+                    "user_said": user_said,
                 }
             )
         words_clean.append(
