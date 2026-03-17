@@ -110,6 +110,16 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
     setState(() => _isSubmitting = false);
   }
 
+  /// "Try Again" from the feedback card: clear feedback + recording and let
+  /// the user re-record the same item for a fresh grade.
+  void _onFeedbackRetry() {
+    _clearRecording();
+    setState(() {
+      _controller.setFeedback(null);
+      _controller.retry(); // mic back to idle (state 0)
+    });
+  }
+
   /// After user taps Next on feedback: clear feedback, go to next card or show completion.
   void _advanceToNextCard() {
     _clearRecording();
@@ -346,6 +356,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                                     padding: const EdgeInsets.only(top: AppSpacing.md),
                                     child: FeedbackCard(
                                       feedback: _controller.currentFeedback!,
+                                      onRetry: _onFeedbackRetry,
                                       onNext: _advanceToNextCard,
                                     ),
                                   ),

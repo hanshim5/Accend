@@ -10,10 +10,13 @@ class FeedbackCard extends StatelessWidget {
   const FeedbackCard({
     super.key,
     required this.feedback,
+    required this.onRetry,
     required this.onNext,
   });
 
   final PronunciationFeedbackMock feedback;
+  /// Re-record and regrade the same item from scratch.
+  final VoidCallback onRetry;
   final VoidCallback onNext;
 
   @override
@@ -209,23 +212,45 @@ class FeedbackCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: onNext,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.action,
-                foregroundColor: const Color(0xFF101828),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.md),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onRetry,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.surface,
+                    foregroundColor: AppColors.textPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                      side: const BorderSide(color: AppColors.border),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                  ),
+                  child: Text(
+                    'Try Again',
+                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary).copyWith(inherit: false),
+                  ),
                 ),
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
               ),
-              child: Text(
-                'Next',
-                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF101828)).copyWith(inherit: false),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: onNext,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.action,
+                    foregroundColor: const Color(0xFF101828),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadii.md),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                  ),
+                  child: Text(
+                    'Next',
+                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF101828)).copyWith(inherit: false),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),
