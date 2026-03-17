@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import '../../../app/routes.dart';
 import '../../../app/constants.dart';
 
 class OnboardingCompletePage extends StatelessWidget {
@@ -23,7 +23,7 @@ class OnboardingCompletePage extends StatelessWidget {
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: () {
-                  // Home page not implemented yet
+                  Navigator.of(context).pushNamed(AppRoutes.home);
                 },
                 child: const Text('Go to Home'),
               ),
