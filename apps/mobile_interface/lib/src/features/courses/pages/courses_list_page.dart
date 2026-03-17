@@ -120,8 +120,10 @@ class _CoursesListPageState extends State<CoursesListPage> {
                         lessons: lessons,
                         onStart: (lesson) {
                           Navigator.of(context).pop();
-                          Navigator.of(context)
-                              .pushNamed(AppRoutes.soloPractice);
+                          Navigator.of(context).pushNamed(
+                            AppRoutes.soloPractice,
+                            arguments: lesson,
+                          );
                         },
                       ),
                     );

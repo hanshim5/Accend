@@ -10,6 +10,7 @@ import '../features/onboarding/pages/skill_assess.dart';
 import '../features/onboarding/pages/accent_selection.dart';
 import '../features/onboarding/pages/onboarding_complete.dart';
 
+import '../features/courses/models/lesson.dart';
 import '../features/courses/pages/courses_list_page.dart';
 import '../features/home/pages/home.dart';
 import '../features/social/pages/social.dart';
@@ -53,6 +54,9 @@ class AppRoutes {
         social: (_) => const SocialPage(),
         profile: (_) => const ProfilePage(),
         socialDebug: (_) => const SocialDebugPage(),
-        soloPractice: (_) => const SoloPracticePage(),
+        soloPractice: (ctx) {
+          final lesson = ModalRoute.of(ctx)!.settings.arguments as Lesson?;
+          return SoloPracticePage(lesson: lesson);
+        },
       };
 }

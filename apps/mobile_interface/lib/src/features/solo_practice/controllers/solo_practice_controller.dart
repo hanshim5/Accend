@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../courses/models/lesson_item.dart';
 import '../models/pronunciation_feedback.dart';
 import '../services/pronunciation_feedback_service.dart';
 
-/// Temporary list of practice prompts used until real lesson data is wired in.
-/// TODO: Replace with a real data source (e.g. API response or lesson model).
-const List<String> _defaultCards = [
+/// Fallback prompts used when no lesson items are available from the database.
+const List<String> _defaultCardTexts = [
   'The quick brown fox jumped over the lazy dog.',
   'She sells seashells by the seashore.',
   'How much wood would a woodchuck chuck?',
@@ -28,12 +28,26 @@ const List<String> _defaultCards = [
   'You\'ve done it! Great work completing the lesson.',
 ];
 
+LessonItem _textToItem(String text, int index) => LessonItem(
+      id: '',
+      lessonId: '',
+      position: index + 1,
+      text: text,
+    );
+
 /// Holds session state and logic for the solo practice flow:
 /// current card index, mic state (idle/recording/playback), and feedback.
 class SoloPracticeController {
-  SoloPracticeController({List<String>? cards}) : _cards = cards ?? _defaultCards;
+  SoloPracticeController({List<LessonItem>? items})
+      : _items = (items != null && items.isNotEmpty)
+            ? items
+            : _defaultCardTexts
+                .asMap()
+                .entries
+                .map((e) => _textToItem(e.value, e.key))
+                .toList();
 
-  final List<String> _cards;
+  final List<LessonItem> _items;
 
   int currentCardIndex = 0;
 
@@ -42,9 +56,11 @@ class SoloPracticeController {
 
   PronunciationFeedbackMock? currentFeedback;
 
-  int get totalCards => _cards.length;
+  int get totalCards => _items.length;
 
-  String get currentCard => _cards[currentCardIndex];
+  LessonItem get currentItem => _items[currentCardIndex];
+
+  String get currentCard => currentItem.text;
 
   /// Progress value between 0.0 and 1.0 for the progress bar.
   double get progress => (currentCardIndex + 1) / totalCards;

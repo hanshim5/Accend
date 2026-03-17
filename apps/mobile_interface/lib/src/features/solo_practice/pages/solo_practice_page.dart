@@ -3,9 +3,12 @@ import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 import '../../../app/constants.dart';
+import '../../../common/services/auth_service.dart';
 import '../../../common/widgets/microphone.dart';
+import '../../courses/models/lesson.dart';
 import '../controllers/solo_practice_controller.dart';
 import '../widgets/feedback_card.dart';
 
@@ -13,7 +16,10 @@ import '../widgets/feedback_card.dart';
 // Page
 // ---------------------------------------------------------------------------
 class SoloPracticePage extends StatefulWidget {
-  const SoloPracticePage({super.key});
+  const SoloPracticePage({super.key, this.lesson});
+
+  /// The lesson to practice. When null, falls back to built-in sample prompts.
+  final Lesson? lesson;
 
   @override
   State<SoloPracticePage> createState() => _SoloPracticePageState();
@@ -33,7 +39,9 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
   @override
   void initState() {
     super.initState();
-    _controller = SoloPracticeController();
+    _controller = SoloPracticeController(
+      items: widget.lesson?.items,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -82,10 +90,17 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
     final bytes = await file.readAsBytes();
     final referenceText = _controller.currentCard;
 
+    String? accessToken;
+    try {
+      accessToken = context.read<AuthService>().accessToken;
+    } catch (_) {
+      // AuthService not available (e.g. standalone debug mode).
+    }
+
     await _controller.submit(
       audioBytes: bytes,
       referenceText: referenceText,
-      accessToken: null, // TODO: pass Supabase session access token when auth is wired
+      accessToken: accessToken,
     );
 
     if (!mounted) return;
@@ -155,28 +170,33 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
   @override
   Widget build(BuildContext context) {
     final bool showRetrySubmit = _controller.showRetrySubmit;
+    final currentItem = _controller.currentItem;
 
-    // --- Text styles (defined here to keep build readable) ---
+    // --- Text styles ---
 
-    // Used for the lesson title and any bold UI labels.
     final headingStyle = GoogleFonts.inter(
       color: AppColors.textPrimary,
       fontSize: 16,
       fontWeight: FontWeight.w700,
     );
 
-    // Used for secondary UI text like the card counter and instruction copy.
     final bodyStyle = GoogleFonts.publicSans(
       color: AppColors.textSecondary,
       fontSize: 14,
       fontWeight: FontWeight.w500,
     );
 
-    // Used for the main prompt text displayed on the practice card.
     final promptStyle = GoogleFonts.publicSans(
       color: AppColors.textPrimary,
       fontSize: 24,
       fontWeight: FontWeight.w500,
+    );
+
+    final ipaStyle = GoogleFonts.publicSans(
+      color: AppColors.textSecondary,
+      fontSize: 15,
+      fontWeight: FontWeight.w400,
+      letterSpacing: 0.5,
     );
 
     return Scaffold(
@@ -191,9 +211,6 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Back button: resets session progress before popping the route.
-                // This is a placeholder behaviour — in production this would
-                // likely prompt the user before discarding their progress.
                 IconButton(
                   onPressed: () {
                     setState(() => _controller.resetSession());
@@ -203,8 +220,6 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                 ),
                 const SizedBox(height: 8),
 
-                // Progress row + bar, constrained to a fixed width for
-                // consistent alignment across different screen sizes.
                 Center(
                   child: SizedBox(
                     width: 350,
@@ -213,18 +228,16 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                       children: [
                         Row(
                           children: [
-                            // Card counter e.g. "3/20"
                             Text('${_controller.currentCardIndex + 1}/${_controller.totalCards}', style: bodyStyle),
                             const Spacer(),
-                            // Lesson name — hardcoded for now, pass via constructor later.
-                            Text('Lesson Title', style: headingStyle),
+                            Text(
+                              widget.lesson?.title ?? 'Practice',
+                              style: headingStyle,
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
 
-                        // Progress bar clipped to rounded corners using ClipRRect
-                        // because LinearProgressIndicator doesn't natively support
-                        // border radius.
                         ClipRRect(
                           borderRadius: BorderRadius.circular(AppRadii.sm),
                           child: LinearProgressIndicator(
@@ -242,7 +255,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
             ),
 
             // -----------------------------------------------------------------
-            // MIDDLE SECTION — prompt card or inline feedback card (explorable)
+            // MIDDLE SECTION — prompt card or inline feedback card
             // -----------------------------------------------------------------
             Expanded(
               child: LayoutBuilder(
@@ -256,22 +269,50 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                             ? Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  // Prompt card: phrase the user should read aloud.
+                                  // Prompt card
                                   Container(
                                     width: 300,
-                                    height: 200,
                                     padding: const EdgeInsets.all(AppSpacing.lg),
                                     decoration: BoxDecoration(
                                       color: AppColors.surface,
                                       borderRadius: BorderRadius.circular(AppRadii.lg),
                                       border: Border.all(color: AppColors.border),
                                     ),
-                                    child: Center(
-                                      child: Text(
-                                        _controller.currentCard,
-                                        textAlign: TextAlign.center,
-                                        style: promptStyle,
-                                      ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          currentItem.text,
+                                          textAlign: TextAlign.center,
+                                          style: promptStyle,
+                                        ),
+                                        if (currentItem.ipa != null) ...[
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            currentItem.ipa!,
+                                            textAlign: TextAlign.center,
+                                            style: ipaStyle,
+                                          ),
+                                        ],
+                                        if (currentItem.hint != null) ...[
+                                          const SizedBox(height: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primaryBg,
+                                              borderRadius: BorderRadius.circular(AppRadii.sm),
+                                            ),
+                                            child: Text(
+                                              currentItem.hint!,
+                                              textAlign: TextAlign.center,
+                                              style: bodyStyle.copyWith(fontSize: 12),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                   ),
                                   const SizedBox(height: AppSpacing.md),
@@ -305,8 +346,6 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
 
-                  // Retry button — only visible in playback state (2).
-                  // Resets mic to idle so the user can re-record.
                   if (showRetrySubmit) ...[
                     Expanded(
                       child: ElevatedButton(
@@ -320,8 +359,6 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                           ),
                           padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                         ),
-                        // inherit: false prevents a TextStyle lerp crash when
-                        // Flutter animates the button press. See theme.dart for context.
                         child: Text(
                           'Retry',
                           style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary).copyWith(inherit: false),
@@ -331,9 +368,6 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                     const SizedBox(width: AppSpacing.sm),
                   ],
 
-                  // Mic button — the primary interaction element.
-                  // A Container provides the glow shadow; ElevatedButton handles taps.
-                  // Color shifts to failure red while recording (state 1).
                   Container(
                     width: 96,
                     height: 96,
@@ -341,7 +375,6 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          // Glow shifts from accent (idle/playback) to failure (recording).
                           color: _controller.micStateIndex == 1
                               ? AppColors.failure.withOpacity(0.4)
                               : AppColors.accent.withOpacity(0.3),
@@ -363,8 +396,6 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                           ),
                   ),
 
-                  // Submit button — only visible in playback state (2).
-                  // Advances to the next card or shows completion dialog on last card.
                   if (showRetrySubmit) ...[
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
@@ -378,8 +409,6 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                           ),
                           padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                         ),
-                        // Label changes to 'Finish' on the final card.
-                        // inherit: false prevents TextStyle lerp crash on button press.
                         child: Text(
                           _controller.currentCardIndex == _controller.totalCards - 1 ? 'Finish' : 'Submit',
                           style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF101828)).copyWith(inherit: false),
