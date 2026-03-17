@@ -57,19 +57,81 @@ class FeedbackCard extends StatelessWidget {
       return AppColors.failure;
     }
 
-    /// Color for "You said" phoneme: green only when it matches the expected
-    /// (symbol). When it doesn't match (e.g. "iy" vs "ih"), never green—use orange or red.
+    /// Color for "You said" phoneme: green only when the symbol matches AND
+    /// accuracy is high (≥ 85). A correct symbol with a low score still shows
+    /// orange/red because the user didn't produce the sound cleanly enough.
     Color userSaidPhonemeColor(PhonemeFeedback p) {
       final said = p.userSaid ?? p.symbol;
-      if (said == p.symbol) return AppColors.success;
-      // Mismatch: never green; use phonemeColor but treat green as orange.
+      final symbolMatches = said == p.symbol;
+      if (symbolMatches && (p.accuracy ?? 0) >= 85) return AppColors.success;
+      // Symbol wrong or accuracy too low — use score-based color, but never
+      // promote to green (treat it as orange at best).
       final c = phonemeColor(p.accuracy);
       return c == AppColors.success ? AppColors.action : c;
     }
 
+    /// Show a phoneme-detail popup for a single phoneme [symbol].
+    /// Displays the symbol, its instruction from [phonemeInstructions], and
+    /// the score chip. Opened when the user taps any phoneme chip.
+    void showPhonemeDetailDialog({
+      required BuildContext parentContext,
+      required String symbol,
+      double? accuracy,
+      Color? chipColor,
+    }) {
+      final instruction = phonemeInstructions[symbol.toLowerCase()];
+      showDialog<void>(
+        context: parentContext,
+        builder: (detailContext) {
+          return AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.inputFill,
+                    borderRadius: BorderRadius.circular(AppRadii.sm),
+                  ),
+                  child: Text(
+                    symbol,
+                    style: GoogleFonts.inter(
+                      color: chipColor ?? AppColors.textPrimary,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (accuracy != null) ...[
+                  const SizedBox(width: 10),
+                  Text(
+                    '${accuracy.round()}',
+                    style: GoogleFonts.inter(
+                      color: chipColor ?? AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            content: instruction == null
+                ? Text('No instruction available for "$symbol".', style: bodyStyle)
+                : Text(instruction, style: bodyStyle),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(detailContext).pop(),
+                child: const Text('Got it'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+
     /// Show a popup listing phonemes for a given [word]: top row = what the
     /// user said (detected), bottom row = what they should have said (reference).
-    /// "You said" chips are green only when they match the expected phoneme.
+    /// Tap any phoneme chip to see its full articulation instruction.
     void showPhonemeDialog(WordFeedback word) {
       showDialog<void>(
         context: context,
@@ -103,7 +165,13 @@ class FeedbackCard extends StatelessWidget {
                         runSpacing: 8,
                         children: [
                           for (final p in word.phonemes)
-                            Chip(
+                            ActionChip(
+                              onPressed: () => showPhonemeDetailDialog(
+                                parentContext: dialogContext,
+                                symbol: p.userSaid ?? p.symbol,
+                                accuracy: p.accuracy,
+                                chipColor: userSaidPhonemeColor(p),
+                              ),
                               label: Text(
                                 p.userSaid ?? p.symbol,
                                 style: bodyStyle.copyWith(
@@ -112,6 +180,9 @@ class FeedbackCard extends StatelessWidget {
                                 ),
                               ),
                               backgroundColor: AppColors.inputFill,
+                              shape: StadiumBorder(
+                                side: BorderSide(color: AppColors.border),
+                              ),
                             ),
                         ],
                       ),
@@ -130,7 +201,12 @@ class FeedbackCard extends StatelessWidget {
                         runSpacing: 8,
                         children: [
                           for (final p in word.phonemes)
-                            Chip(
+                            ActionChip(
+                              onPressed: () => showPhonemeDetailDialog(
+                                parentContext: dialogContext,
+                                symbol: p.symbol,
+                                chipColor: AppColors.textPrimary,
+                              ),
                               label: Text(
                                 p.symbol,
                                 style: bodyStyle.copyWith(
@@ -139,8 +215,16 @@ class FeedbackCard extends StatelessWidget {
                                 ),
                               ),
                               backgroundColor: AppColors.inputFill,
+                              shape: StadiumBorder(
+                                side: BorderSide(color: AppColors.border),
+                              ),
                             ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tap any phoneme for how to pronounce it.',
+                        style: bodyStyle.copyWith(fontSize: 11, color: AppColors.textSecondary),
                       ),
                     ],
                   ),
