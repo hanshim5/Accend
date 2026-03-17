@@ -58,3 +58,11 @@ class AppRadii {
 class AppStrings {
   static const appName = 'Accend';
 }
+
+/// Supabase Storage bucket names and path helpers.
+class AppStorage {
+  static const phonemeBucket = 'phoneme-audio';
+
+  /// Returns the storage path for a phoneme audio clip, e.g. "iy.m4a".
+  static String phonemeAudioPath(String symbol) => '${symbol.toLowerCase()}.m4a';
+}
