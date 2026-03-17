@@ -1,5 +1,7 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/constants.dart';
 import '../models/pronunciation_feedback.dart';
@@ -57,19 +59,41 @@ class FeedbackCard extends StatelessWidget {
       return AppColors.failure;
     }
 
-    /// Color for "You said" phoneme: green only when it matches the expected
-    /// (symbol). When it doesn't match (e.g. "iy" vs "ih"), never green—use orange or red.
+    /// Color for "You said" phoneme: green only when the symbol matches AND
+    /// accuracy is high (≥ 85). A correct symbol with a low score still shows
+    /// orange/red because the user didn't produce the sound cleanly enough.
     Color userSaidPhonemeColor(PhonemeFeedback p) {
       final said = p.userSaid ?? p.symbol;
-      if (said == p.symbol) return AppColors.success;
-      // Mismatch: never green; use phonemeColor but treat green as orange.
+      final symbolMatches = said == p.symbol;
+      if (symbolMatches && (p.accuracy ?? 0) >= 85) return AppColors.success;
+      // Symbol wrong or accuracy too low — use score-based color, but never
+      // promote to green (treat it as orange at best).
       final c = phonemeColor(p.accuracy);
       return c == AppColors.success ? AppColors.action : c;
     }
 
+    /// Show a phoneme-detail popup for a single phoneme [symbol].
+    /// Displays the symbol, articulation instruction, accuracy score, and a
+    /// play button that streams the reference audio from Supabase Storage.
+    void showPhonemeDetailDialog({
+      required BuildContext parentContext,
+      required String symbol,
+      double? accuracy,
+      Color? chipColor,
+    }) {
+      showDialog<void>(
+        context: parentContext,
+        builder: (_) => _PhonemeDetailDialog(
+          symbol: symbol,
+          accuracy: accuracy,
+          chipColor: chipColor ?? AppColors.textPrimary,
+        ),
+      );
+    }
+
     /// Show a popup listing phonemes for a given [word]: top row = what the
     /// user said (detected), bottom row = what they should have said (reference).
-    /// "You said" chips are green only when they match the expected phoneme.
+    /// Tap any phoneme chip to see its full articulation instruction.
     void showPhonemeDialog(WordFeedback word) {
       showDialog<void>(
         context: context,
@@ -103,7 +127,13 @@ class FeedbackCard extends StatelessWidget {
                         runSpacing: 8,
                         children: [
                           for (final p in word.phonemes)
-                            Chip(
+                            ActionChip(
+                              onPressed: () => showPhonemeDetailDialog(
+                                parentContext: dialogContext,
+                                symbol: p.userSaid ?? p.symbol,
+                                accuracy: p.accuracy,
+                                chipColor: userSaidPhonemeColor(p),
+                              ),
                               label: Text(
                                 p.userSaid ?? p.symbol,
                                 style: bodyStyle.copyWith(
@@ -112,6 +142,9 @@ class FeedbackCard extends StatelessWidget {
                                 ),
                               ),
                               backgroundColor: AppColors.inputFill,
+                              shape: StadiumBorder(
+                                side: BorderSide(color: AppColors.border),
+                              ),
                             ),
                         ],
                       ),
@@ -130,7 +163,12 @@ class FeedbackCard extends StatelessWidget {
                         runSpacing: 8,
                         children: [
                           for (final p in word.phonemes)
-                            Chip(
+                            ActionChip(
+                              onPressed: () => showPhonemeDetailDialog(
+                                parentContext: dialogContext,
+                                symbol: p.symbol,
+                                chipColor: AppColors.textPrimary,
+                              ),
                               label: Text(
                                 p.symbol,
                                 style: bodyStyle.copyWith(
@@ -139,8 +177,16 @@ class FeedbackCard extends StatelessWidget {
                                 ),
                               ),
                               backgroundColor: AppColors.inputFill,
+                              shape: StadiumBorder(
+                                side: BorderSide(color: AppColors.border),
+                              ),
                             ),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tap any phoneme for how to pronounce it.',
+                        style: bodyStyle.copyWith(fontSize: 11, color: AppColors.textSecondary),
                       ),
                     ],
                   ),
@@ -286,6 +332,153 @@ class ScoreChip extends StatelessWidget {
         Text(
           '${score.round()}',
           style: style.copyWith(fontSize: 14),
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Phoneme detail dialog
+// ---------------------------------------------------------------------------
+
+/// Dialog shown when the user taps a phoneme chip.
+/// Manages its own [AudioPlayer] so it is properly disposed on close.
+class _PhonemeDetailDialog extends StatefulWidget {
+  const _PhonemeDetailDialog({
+    required this.symbol,
+    required this.chipColor,
+    this.accuracy,
+  });
+
+  final String symbol;
+  final Color chipColor;
+  final double? accuracy;
+
+  @override
+  State<_PhonemeDetailDialog> createState() => _PhonemeDetailDialogState();
+}
+
+class _PhonemeDetailDialogState extends State<_PhonemeDetailDialog> {
+  final AudioPlayer _player = AudioPlayer();
+  bool _isPlaying = false;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _player.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state == PlayerState.playing;
+          // Clear loading once the player is actually doing something.
+          if (state != PlayerState.stopped) _isLoading = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _togglePlayback() async {
+    if (_isPlaying) {
+      await _player.stop();
+      return;
+    }
+    setState(() => _isLoading = true);
+    final url = Supabase.instance.client.storage
+        .from(AppStorage.phonemeBucket)
+        .getPublicUrl(AppStorage.phonemeAudioPath(widget.symbol));
+    try {
+      await _player.stop();
+      await _player.play(UrlSource(url));
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not play audio. Please try again.')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bodyStyle = GoogleFonts.publicSans(
+      color: AppColors.textSecondary,
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+    );
+
+    final instruction = phonemeInstructions[widget.symbol.toLowerCase()];
+
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.inputFill,
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+            ),
+            child: Text(
+              widget.symbol,
+              style: GoogleFonts.inter(
+                color: widget.chipColor,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          if (widget.accuracy != null) ...[
+            const SizedBox(width: 10),
+            Text(
+              '${widget.accuracy!.round()}',
+              style: GoogleFonts.inter(
+                color: widget.chipColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          const Spacer(),
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: _isLoading
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: CircularProgressIndicator(
+                      color: AppColors.accent,
+                      strokeWidth: 2.5,
+                    ),
+                  )
+                : IconButton(
+                    onPressed: _togglePlayback,
+                    tooltip: _isPlaying ? 'Stop' : 'Play example',
+                    icon: Icon(
+                      _isPlaying
+                          ? Icons.stop_circle_outlined
+                          : Icons.play_circle_outline,
+                      color: AppColors.accent,
+                      size: 32,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+      content: instruction == null
+          ? Text('No instruction available for "${widget.symbol}".', style: bodyStyle)
+          : Text(instruction, style: bodyStyle),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Got it'),
         ),
       ],
     );
