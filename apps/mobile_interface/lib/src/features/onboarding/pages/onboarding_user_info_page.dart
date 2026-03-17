@@ -31,7 +31,12 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
   bool _submitting = false;
 
   String? _nativeLanguage;
-  final _languages = const ['Spanish', 'Chinese', 'Vietnamese'];
+  final _languages = const [
+    'English', 'Spanish', 'French', 'Japanese', 'Korean', 'Mandarin', 'Cantonese', 'Wu', 'Vietnamese', 
+    'Ilocano', 'Tagalog', 'Russian', 'Arabic', 'Georgian', 'German', 'Latin', 'Bulgarian', 'Scandanavian', 
+    'Sinhala', 'Hindi', 'Portuguese', 'Nepali', 'Signese', 'Braille', 'Hausa', 'Yoruba', 'Igbo', 'Swedish',
+    'Italian', 'Greek', 'Pidgin'
+    ];
 
   @override
   void dispose() {

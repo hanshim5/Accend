@@ -14,10 +14,12 @@ class OnboardingLanguageDropdown extends StatefulWidget {
   });
 
   @override
-  State<OnboardingLanguageDropdown> createState() => _OnboardingLanguageDropdownState();
+  State<OnboardingLanguageDropdown> createState() =>
+      _OnboardingLanguageDropdownState();
 }
 
-class _OnboardingLanguageDropdownState extends State<OnboardingLanguageDropdown> {
+class _OnboardingLanguageDropdownState
+    extends State<OnboardingLanguageDropdown> {
   bool _open = false;
   final _search = TextEditingController();
 
@@ -32,7 +34,11 @@ class _OnboardingLanguageDropdownState extends State<OnboardingLanguageDropdown>
     final t = Theme.of(context);
 
     final filtered = widget.options
-        .where((l) => l.toLowerCase().contains(_search.text.trim().toLowerCase()))
+        .where(
+          (l) => l.toLowerCase().contains(
+                _search.text.trim().toLowerCase(),
+              ),
+        )
         .toList();
 
     return Column(
@@ -49,16 +55,23 @@ class _OnboardingLanguageDropdownState extends State<OnboardingLanguageDropdown>
             ),
             child: Row(
               children: [
-                Text(
-                  widget.value ?? 'Select Language',
-                  style: t.textTheme.bodyLarge?.copyWith(
-                    color: widget.value == null
-                        ? AppColors.textSecondary
-                        : AppColors.textPrimary,
+                Expanded(
+                  child: Text(
+                    widget.value ?? 'Select Language',
+                    overflow: TextOverflow.ellipsis,
+                    style: t.textTheme.bodyLarge?.copyWith(
+                      color: widget.value == null
+                          ? AppColors.textSecondary
+                          : AppColors.textPrimary,
+                    ),
                   ),
                 ),
-                const Spacer(),
-                const Icon(Icons.keyboard_arrow_down_rounded),
+                const SizedBox(width: 8),
+                Icon(
+                  _open
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                ),
               ],
             ),
           ),
@@ -66,12 +79,14 @@ class _OnboardingLanguageDropdownState extends State<OnboardingLanguageDropdown>
         if (_open) ...[
           const SizedBox(height: 10),
           Container(
+            width: double.infinity,
             decoration: BoxDecoration(
               color: AppColors.inputFill,
               borderRadius: BorderRadius.circular(AppRadii.sm),
               border: Border.all(color: AppColors.border),
             ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Padding(
                   padding: const EdgeInsets.all(10),
@@ -86,21 +101,43 @@ class _OnboardingLanguageDropdownState extends State<OnboardingLanguageDropdown>
                   ),
                 ),
                 const Divider(height: 1),
-                ...filtered.map(
-                  (opt) => ListTile(
-                    dense: true,
-                    title: Text(opt, style: t.textTheme.bodyLarge),
-                    onTap: () {
-                      widget.onChanged(opt);
-                      setState(() => _open = false);
-                    },
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxHeight: 260,
                   ),
+                  child: filtered.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Text(
+                            'No matches',
+                            style: t.textTheme.bodyMedium,
+                          ),
+                        )
+                      : Scrollbar(
+                          thumbVisibility: true,
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filtered.length,
+                            itemBuilder: (context, index) {
+                              final opt = filtered[index];
+                              return ListTile(
+                                dense: true,
+                                title: Text(
+                                  opt,
+                                  style: t.textTheme.bodyLarge,
+                                ),
+                                onTap: () {
+                                  widget.onChanged(opt);
+                                  setState(() {
+                                    _open = false;
+                                    _search.clear();
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ),
                 ),
-                if (filtered.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text('No matches', style: t.textTheme.bodyMedium),
-                  ),
               ],
             ),
           ),
