@@ -9,6 +9,7 @@ import '../controllers/courses_controller.dart';
 import '../models/course.dart';
 import '../widgets/course_card.dart';
 import '../widgets/generate_course_popup.dart';
+import '../widgets/start_lesson_popup.dart';
 
 class CoursesListPage extends StatefulWidget {
   const CoursesListPage({super.key});
@@ -103,9 +104,38 @@ class _CoursesListPageState extends State<CoursesListPage> {
 
               return _CoursesGrid(
                 courses: ctrl.courses,
-                onTapCourse: (course) {
-                  // TODO: Story 20 - tapping card starts course overlay / detail
-                  // Navigator.pushNamed(context, AppRoutes.courseDetail, arguments: course.id);
+                onTapCourse: (course) async {
+                  final ctrl = context.read<CoursesController>();
+
+                  try {
+                    final lessons = await ctrl.fetchLessons(course.id);
+
+                    if (!context.mounted) return;
+
+                    await showDialog(
+                      context: context,
+                      barrierDismissible: true,
+                      builder: (_) => StartLessonPopup(
+                        course: course,
+                        lessons: lessons,
+                        onStart: (lesson) {
+                          Navigator.of(context).pop();
+                          Navigator.of(context).pushNamed(
+                            AppRoutes.soloPractice,
+                            arguments: lesson,
+                          );
+                        },
+                      ),
+                    );
+                  } catch (e) {
+                    if (!context.mounted) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Could not load lessons: $e'),
+                      ),
+                    );
+                  }
                 },
               );
             },

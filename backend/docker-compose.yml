@@ -10,11 +10,13 @@ services:
       - AI_COURSE_GEN_SERVICE_URL=http://ai-course-gen-service:8000
       - PRONUNCIATION_FEEDBACK_SERVICE_URL=http://pronunciation-feedback:8000
       - USER_PROFILE_SERVICE_URL=http://user-profile-service:8000
+      - GROUP_SERVICE_URL=http://group-service:8000
     depends_on:
       - courses-service
       - ai-course-gen-service
       - pronunciation-feedback
       - user-profile-service
+      - group-service
 
   courses-service:
     build: ./services/courses-service
@@ -42,3 +44,10 @@ services:
       - "8084:8000"
     env_file:
       - .env
+
+  group-service:
+    build: ./services/group-service
+    ports:
+      - "8085:8000"
+    env_file:
+     - .env
