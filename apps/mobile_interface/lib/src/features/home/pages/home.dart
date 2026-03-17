@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../common/widgets/bottom_nav_bar.dart';
+import '../../../common/widgets/colored_button.dart';
 import '../../../app/routes.dart';
 
 class HomePage extends StatelessWidget {
@@ -22,8 +23,37 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Home")),
-      body: const Center(
-        child: Text("This is the home page!"),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Spacer(),
+            ColoredButton(
+              title: 'Solo Practice',
+              subtitle: 'Personalized AI drills',
+              icon: Icons.headphones,
+              onTap: () {
+                Navigator.of(context).pushNamed(AppRoutes.courses);
+              },
+              firstColor: 0xFF06B6D5,
+              secondColor: 0xFF49DC7E,
+              shadow: 0xFF06B6D5,
+            ),
+            const SizedBox(height: 24),
+            ColoredButton(
+              icon: Icons.group,
+              title: 'Group Practice',
+              subtitle: 'Join a live conversation group',
+              onTap: () {
+                Navigator.of(context).pushNamed(AppRoutes.home);
+              },
+              firstColor: 0xFF06B6D5,
+              secondColor: 0xFF984ADD,
+              shadow: 0xFF06B6D5,
+            ),
+            Spacer(),
+          ],
+        ),
       ),
       bottomNavigationBar: BottomNavBar(
         selectedIndex: 1,

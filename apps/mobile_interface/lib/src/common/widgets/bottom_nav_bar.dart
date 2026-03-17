@@ -20,7 +20,8 @@ class BottomNavBar extends StatelessWidget {
 
     return NavigationBarTheme(
       data: NavigationBarThemeData(
-        backgroundColor: const Color(0xFF0F172A), // dark background
+        backgroundColor: const Color(0xFF1E293B),
+
         labelTextStyle: WidgetStateProperty.resolveWith<TextStyle>((states) {
           return const TextStyle(color: Colors.grey);
         }),
