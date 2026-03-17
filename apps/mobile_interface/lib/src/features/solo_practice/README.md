@@ -83,3 +83,6 @@ Use this when adding something new (or when AI/tools need to decide where code b
 **Examples:** “Where does the logic for loading the next prompt go?” → **controllers/**  
 “Where does the type for a practice session go?” → **models/**  
 “Where does the widget that shows one exercise card go?” → **widgets/**
+
+# Todo:
+- fix display when user adds/omits words

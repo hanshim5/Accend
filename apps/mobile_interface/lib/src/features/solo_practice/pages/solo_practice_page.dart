@@ -29,6 +29,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
   late final SoloPracticeController _controller;
   final AudioPlayer _audioPlayer = AudioPlayer();
   String? _recordingPath;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -87,6 +88,8 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
       return;
     }
 
+    setState(() => _isSubmitting = true);
+
     final bytes = await file.readAsBytes();
     final referenceText = _controller.currentCard;
 
@@ -104,7 +107,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
     );
 
     if (!mounted) return;
-    setState(() {});
+    setState(() => _isSubmitting = false);
   }
 
   /// After user taps Next on feedback: clear feedback, go to next card or show completion.
@@ -265,71 +268,87 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minHeight: constraints.maxHeight),
                       child: Center(
-                        child: _controller.currentFeedback == null
+                        child: _isSubmitting
                             ? Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  // Prompt card
-                                  Container(
-                                    width: 300,
-                                    padding: const EdgeInsets.all(AppSpacing.lg),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.surface,
-                                      borderRadius: BorderRadius.circular(AppRadii.lg),
-                                      border: Border.all(color: AppColors.border),
-                                    ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          currentItem.text,
-                                          textAlign: TextAlign.center,
-                                          style: promptStyle,
-                                        ),
-                                        if (currentItem.ipa != null) ...[
-                                          const SizedBox(height: 12),
-                                          Text(
-                                            currentItem.ipa!,
-                                            textAlign: TextAlign.center,
-                                            style: ipaStyle,
-                                          ),
-                                        ],
-                                        if (currentItem.hint != null) ...[
-                                          const SizedBox(height: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.primaryBg,
-                                              borderRadius: BorderRadius.circular(AppRadii.sm),
-                                            ),
-                                            child: Text(
-                                              currentItem.hint!,
-                                              textAlign: TextAlign.center,
-                                              style: bodyStyle.copyWith(fontSize: 12),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
+                                  const CircularProgressIndicator(
+                                    color: AppColors.accent,
+                                    strokeWidth: 3,
                                   ),
                                   const SizedBox(height: AppSpacing.md),
                                   Text(
-                                    'Record yourself using the microphone button below!',
+                                    'Analysing your pronunciation…',
                                     textAlign: TextAlign.center,
                                     style: bodyStyle,
                                   ),
                                 ],
                               )
-                            : Padding(
-                                padding: const EdgeInsets.only(top: AppSpacing.md),
-                                child: FeedbackCard(
-                                  feedback: _controller.currentFeedback!,
-                                  onNext: _advanceToNextCard,
-                                ),
-                              ),
+                            : _controller.currentFeedback == null
+                                ? Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Prompt card
+                                      Container(
+                                        width: 300,
+                                        padding: const EdgeInsets.all(AppSpacing.lg),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.surface,
+                                          borderRadius: BorderRadius.circular(AppRadii.lg),
+                                          border: Border.all(color: AppColors.border),
+                                        ),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              currentItem.text,
+                                              textAlign: TextAlign.center,
+                                              style: promptStyle,
+                                            ),
+                                            if (currentItem.ipa != null) ...[
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                currentItem.ipa!,
+                                                textAlign: TextAlign.center,
+                                                style: ipaStyle,
+                                              ),
+                                            ],
+                                            if (currentItem.hint != null) ...[
+                                              const SizedBox(height: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 6,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.primaryBg,
+                                                  borderRadius: BorderRadius.circular(AppRadii.sm),
+                                                ),
+                                                child: Text(
+                                                  currentItem.hint!,
+                                                  textAlign: TextAlign.center,
+                                                  style: bodyStyle.copyWith(fontSize: 12),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: AppSpacing.md),
+                                      Text(
+                                        'Record yourself using the microphone button below!',
+                                        textAlign: TextAlign.center,
+                                        style: bodyStyle,
+                                      ),
+                                    ],
+                                  )
+                                : Padding(
+                                    padding: const EdgeInsets.only(top: AppSpacing.md),
+                                    child: FeedbackCard(
+                                      feedback: _controller.currentFeedback!,
+                                      onNext: _advanceToNextCard,
+                                    ),
+                                  ),
                       ),
                     ),
                   );
@@ -349,7 +368,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                   if (showRetrySubmit) ...[
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: _onRetryPressed,
+                        onPressed: _isSubmitting ? null : _onRetryPressed,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.surface,
                           foregroundColor: AppColors.textPrimary,
@@ -400,7 +419,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: _onSubmitPressed,
+                        onPressed: _isSubmitting ? null : _onSubmitPressed,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.action,
                           foregroundColor: const Color(0xFF101828),
@@ -409,10 +428,19 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
                           ),
                           padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                         ),
-                        child: Text(
-                          _controller.currentCardIndex == _controller.totalCards - 1 ? 'Finish' : 'Submit',
-                          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF101828)).copyWith(inherit: false),
-                        ),
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Color(0xFF101828),
+                                ),
+                              )
+                            : Text(
+                                _controller.currentCardIndex == _controller.totalCards - 1 ? 'Finish' : 'Submit',
+                                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF101828)).copyWith(inherit: false),
+                              ),
                       ),
                     ),
                   ],
