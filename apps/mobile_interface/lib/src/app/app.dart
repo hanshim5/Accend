@@ -52,7 +52,7 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark(),
 
-        initialRoute: AppRoutes.groupSessionSelect,
+        initialRoute: AppRoutes.login,
 
         routes: AppRoutes.table,
       ),

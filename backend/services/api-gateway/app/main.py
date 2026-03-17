@@ -25,7 +25,6 @@ from app.supabase_client import supabase_select_one
 
 from fastapi.middleware.cors import CORSMiddleware
 
-
 # Create FastAPI app
 app = FastAPI(title="api-gateway")
 
@@ -355,28 +354,56 @@ async def proxy_pronunciation_assess(
 # Group Session Service
 # -----------------------------------
 
-@app.get("/private_lobbies")
-async def proxy_get_private_lobby(
-    # lobby_id: int,
-    authorization: str | None = Header(default=None)
+@app.get("/private_lobbies/{lobby_id}")
+async def proxy_get_lobby(
+    lobby_id: str,
+    authorization: str | None = Header(default=None),
 ):
-    """
-    Forward GET /courses to courses-service.
-
-    Steps:
-    1. Validate JWT.
-    2. Extract user_id.
-    3. Call courses-service with X-User-Id header.
-    4. Return response.
-    """
     user_id = verify_supabase_jwt(authorization)
 
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.get(
-            f"{settings.GROUP_SERVICE_URL}/private_lobby",
+            f"{settings.GROUP_SERVICE_URL}/private_lobbies/{lobby_id}",
             headers={"X-User-Id": user_id},
         )
-        if r.status_code >= 400:
-            raise HTTPException(status_code=r.status_code, detail=r.text)
-        
-        return r.json()
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+@app.get("/private_lobbies/me")
+async def proxy_get_my_private_lobbies(
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{settings.GROUP_SERVICE_URL}/private_lobbies/me",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.delete("/private_lobbies/{row_id}")
+async def proxy_delete_private_lobby_row(
+    row_id: int,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.delete(
+            f"{settings.GROUP_SERVICE_URL}/private_lobbies/{row_id}",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()

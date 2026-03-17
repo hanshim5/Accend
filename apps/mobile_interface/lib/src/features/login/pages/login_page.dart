@@ -270,12 +270,12 @@ class _LoginPageState extends State<LoginPage> {
                     child: OutlinedButton(
                       onPressed: _isLoading
                           ? null
-                          : () => Navigator.pushNamed(context, AppRoutes.groupSessionActiveLobby),
+                          : () => Navigator.pushNamed(context, AppRoutes.groupSessionSelect),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: AppColors.action),
                         foregroundColor: AppColors.action,
                       ),
-                      child: const Text('Go to Active Lobby (Debug)'),
+                      child: const Text('Go to Group Sessions (Debug)'),
                     ),
                   ),
 

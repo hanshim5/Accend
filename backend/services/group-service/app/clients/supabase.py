@@ -127,3 +127,22 @@ def rest_patch(table: str, match: dict[str, str], payload: dict[str, Any], selec
 
     data = resp.json()
     return data if isinstance(data, list) else []
+
+
+def rest_delete(table: str, match: dict[str, str], select: str) -> list[dict[str, Any]]:
+    """
+    DELETE rows via PostgREST and return deleted rows.
+
+    match example:
+      {"id": "eq.123"}
+    """
+    url = f"{settings.SUPABASE_URL}/rest/v1/{table}"
+    client = get_http()
+
+    params = {"select": select, **match}
+    resp = client.delete(url, headers=_headers(), params=params)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Supabase REST DELETE failed ({resp.status_code}): {resp.text}")
+
+    data = resp.json()
+    return data if isinstance(data, list) else []

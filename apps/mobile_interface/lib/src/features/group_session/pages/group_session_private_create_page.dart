@@ -26,7 +26,7 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final ctrl = context.read<GroupSessionController>();
-      ctrl.loadLobby("hans");
+      ctrl.getLobby("112233");
     });
   }
 
@@ -42,6 +42,7 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
     } else if (ctrl.privateLobby.isNotEmpty) {
       lobbyCode = ctrl.privateLobby.first.lobbyId;
     } else if (ctrl.error != null) {
+      print(ctrl.error);
       lobbyCode = 'Error';
     } else {
       lobbyCode = '------';

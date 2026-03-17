@@ -15,7 +15,7 @@ routers -> services -> repositories -> supabase client
 from random import randint
 from uuid import UUID
 
-from app.clients.supabase import rest_get, rest_post
+from app.clients.supabase import rest_delete, rest_get, rest_post
 from app.schemas.private_lobby_schema import PrivateLobbyMemberOut
 
 
@@ -33,6 +33,7 @@ class SupabasePrivateLobbyRepo:
         """
         Fetch all members of a private lobby, sorted by join order
         """
+        print(f"_______________________________Get Lobby Called {lobby_id}___________________________________")
         rows = rest_get(
             table="private_lobbies",
             params={
@@ -42,6 +43,18 @@ class SupabasePrivateLobbyRepo:
             },
         )
 
+        return [PrivateLobbyMemberOut.model_validate(row) for row in rows]
+
+    def get_my_lobbies(self, user_id: UUID) -> list[PrivateLobbyMemberOut]:
+        rows = rest_get(
+            table="private_lobbies",
+            params={
+                "select": "id,lobby_id,username,user_id,host,session_start,joined_at",
+                "user_id": f"eq.{str(user_id)}",
+                "order": "joined_at.desc",
+                "limit": "10",
+            },
+        )
         return [PrivateLobbyMemberOut.model_validate(row) for row in rows]
 
     def create_lobby(self, user_id: UUID, username: str) -> PrivateLobbyMemberOut:
@@ -116,5 +129,16 @@ class SupabasePrivateLobbyRepo:
             raise RuntimeError("Supabase REST POST returned no row")
         
         return PrivateLobbyMemberOut.model_validate(rows[0])
+
+    def delete_row(self, user_id: UUID, row_id: int) -> bool:
+        rows = rest_delete(
+            table="private_lobbies",
+            match={
+                "id": f"eq.{row_id}",
+                "user_id": f"eq.{str(user_id)}",
+            },
+            select="id",
+        )
+        return len(rows) > 0
         
 

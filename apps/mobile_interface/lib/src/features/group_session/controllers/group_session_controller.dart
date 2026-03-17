@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:mobile_interface/src/common/services/api_client.dart';
 import 'package:mobile_interface/src/common/services/auth_service.dart';
@@ -23,19 +22,22 @@ class GroupSessionController extends ChangeNotifier {
   String? get error => _error;
   List<PrivateLobby> get privateLobby => List.unmodifiable(_privateLobby);
 
-  Future<void> loadLobby(String username) async {
+  Future<List<PrivateLobby>> getLobby(String lobbyId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final client = Supabase.instance.client;
-      final list = await client
-          .from('private_lobbies')
-          .select('id,lobby_id,username,user_id,host,session_start,joined_at')
-          .eq('username', username)
-          .limit(10);
+      final token = _auth.accessToken;
+      if (token == null || token.isEmpty) {
+        throw StateError('Not authenticated');
+      }
 
+      final list = await _api.getList(
+        '/private_lobbies/$lobbyId',
+        accessToken: token,
+      );
+      print("flag________________________________________");
       _privateLobby = list
           .cast<Map<String, dynamic>>()
           .map((e) => PrivateLobby.fromJson(e))
@@ -46,6 +48,75 @@ class GroupSessionController extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+    return _privateLobby;
+
+  }
+
+
+  Future<void> loadMyLobby() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final token = _auth.accessToken;
+      if (token == null || token.isEmpty) {
+        throw StateError('Not authenticated');
+      }
+
+      final list = await _api.getList(
+        '/private_lobbies/me',
+        accessToken: token,
+      );
+
+      _privateLobby = list
+          .cast<Map<String, dynamic>>()
+          .map(PrivateLobby.fromJson)
+          .toList();
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deletePrivateLobbyRow(String rowId) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final token = _auth.accessToken;
+      if (token == null || token.isEmpty) {
+        throw StateError('Not authenticated');
+      }
+
+      final res = await _api.deleteJson(
+        '/private_lobbies/$rowId',
+        accessToken: token,
+      );
+
+      final deleted = res['deleted'] == true;
+      if (deleted) {
+        _privateLobby = _privateLobby.where((e) => e.id != rowId).toList();
+      }
+      return deleted;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> subscribeToLobby(String lobbyId) async {
+    // Placeholder: realtime subscription can be added later.
+  }
+
+  void unsubscribeFromLobby() {
+    // Placeholder: realtime unsubscription can be added later.
   }
 
 }

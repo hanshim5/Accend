@@ -13,9 +13,9 @@ Rule of thumb:
 - GetPrivateLobby    = What the api returns to the client.
 """
 
-from pydantic import BaseModel
 from datetime import datetime
-from uuid import UUID
+
+from pydantic import BaseModel
 
 class PrivateLobbyMemberOut(BaseModel):
     """
@@ -27,10 +27,14 @@ class PrivateLobbyMemberOut(BaseModel):
     - created_at -> datetime
     """
 
-    id: UUID
-    room_id: int
+    id: str
+    lobby_id: int
     username: str
-    user_id: UUID
+    user_id: str
     host: bool
     session_start: bool
     joined_at: datetime
+
+
+class PrivateLobbyDeleteOut(BaseModel):
+    deleted: bool
