@@ -12,10 +12,11 @@ routers -> services -> repositories -> supabase client
 (no DB calls in routers)
 """
 
+from random import randint
 from uuid import UUID
+
 from app.clients.supabase import rest_get, rest_post
 from app.schemas.private_lobby_schema import PrivateLobbyMemberOut
-from random import randint
 
 
 class SupabasePrivateLobbyRepo:
@@ -28,14 +29,14 @@ class SupabasePrivateLobbyRepo:
        except via gateway.)
     """
 
-    def get_lobby(self, lobby_id: UUID) -> list[PrivateLobbyMemberOut]:
+    def get_lobby(self, lobby_id: int) -> list[PrivateLobbyMemberOut]:
         """
         Fetch all members of a private lobby, sorted by join order
         """
         rows = rest_get(
             table="private_lobbies",
             params={
-                "select": "id,lobby_id,username,user_id,title,host,session_start,joined_at",
+                "select": "id,lobby_id,username,user_id,host,session_start,joined_at",
                 "lobby_id": f"eq.{str(lobby_id)}",
                 "order": "joined_at.asc",
             },
@@ -77,7 +78,7 @@ class SupabasePrivateLobbyRepo:
         
         return PrivateLobbyMemberOut.model_validate(rows[0])
     
-    def join_lobby(elf, user_id: UUID, lobby_id: int, username: str) -> PrivateLobbyMemberOut:
+    def join_lobby(self, user_id: UUID, lobby_id: int, username: str) -> PrivateLobbyMemberOut:
         # rows = rest_get(
         #     table="private_lobbies",
         #     params={
@@ -103,7 +104,7 @@ class SupabasePrivateLobbyRepo:
             "lobby_id": lobby_id,
             "username": username,
             "user_id": str(user_id),
-            "host": "FALSE",
+            "host": False,
         }
 
         rows = rest_post(

@@ -45,7 +45,7 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark(),
 
-        initialRoute: AppRoutes.login,
+        initialRoute: AppRoutes.groupSessionSelect,
 
         routes: AppRoutes.table,
       ),

@@ -23,8 +23,9 @@ It only:
 - Calls the service layer
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, Header, HTTPException
 
 from app.dependencies import get_private_lobby_service
 from app.schemas.private_lobby_schema import PrivateLobbyMemberOut
@@ -69,7 +70,7 @@ def _get_user_id(x_user_id: str | None) -> UUID:
         raise HTTPException(status_code=400, detail="Invalid X-User-Id")
 
 
-@router.get("", response_model=list[PrivateLobbyMemberOut])
+@router.get("/{lobby_id}", response_model=list[PrivateLobbyMemberOut])
 def get_lobby(
     lobby_id: int,
     
@@ -99,8 +100,8 @@ def get_lobby(
     - UUIDs and datetimes are serialized properly
     """
 
-    user_id = _get_user_id(x_user_id)
-    return svc.list_courses(lobby_id)
+    _get_user_id(x_user_id)
+    return svc.get_lobby(lobby_id)
 
 
 @router.post("", response_model=PrivateLobbyMemberOut)
@@ -139,7 +140,7 @@ def create_lobby(
     user_id = _get_user_id(x_user_id)
     return svc.create_lobby(user_id, username)
 
-@router.post("", response_model=PrivateLobbyMemberOut)
+@router.post("/join", response_model=PrivateLobbyMemberOut)
 def join_lobby(
 
     lobby_id: int,
@@ -152,4 +153,4 @@ def join_lobby(
 ):
 
     user_id = _get_user_id(x_user_id)
-    return svc.create_lobby(user_id, lobby_id, username)
+    return svc.join_lobby(user_id, lobby_id, username)

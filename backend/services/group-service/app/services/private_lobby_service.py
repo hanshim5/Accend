@@ -16,6 +16,7 @@ Later you might add rules like:
 """
 
 from uuid import UUID
+
 from app.repositories.private_lobby_repo import PrivateLobbyRepo
 from app.schemas.private_lobby_schema import PrivateLobbyMemberOut
 
@@ -29,7 +30,7 @@ class PrivateLobbyService:
     def __init__(self, repo: PrivateLobbyRepo):
         self.repo = repo
 
-    def get_lobby(self, lobby_id: UUID) -> list[PrivateLobbyMemberOut]: 
+    def get_lobby(self, lobby_id: int) -> list[PrivateLobbyMemberOut]: 
         """Return members in a lobby."""
         return self.repo.get_lobby(lobby_id)
     

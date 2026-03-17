@@ -1,40 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../../../app/constants.dart';
-import '../../../common/widgets/primary_button.dart';
-import '../controllers/group_session_controller.dart';
-import '../widgets/widget1.dart';
-import '../../../app/routes.dart' as routes;
-import '../widgets/private_button.dart' as private_button;
 import '../../../common/widgets/bottom_nav_bar.dart' as bot_nav_bar;
+import '../controllers//group_session_controller.dart';
 import '../widgets/private_code_display.dart' as private_code_display;
 
 class GroupSessionPrivateCreatePage extends StatefulWidget {
   const GroupSessionPrivateCreatePage({super.key});
 
   @override
-  State<GroupSessionPrivateCreatePage> createState() => _GroupSessionSelectPageState();
+  State<GroupSessionPrivateCreatePage> createState() => _GroupSessionPrivateCreatePageState();
 }
 
-class _GroupSessionSelectPageState extends State<GroupSessionPrivateCreatePage> {
+class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreatePage> {
 
 
-  final _lobbyCode = TextEditingController();
+  int _selectedIndex = 1;
 
 
 
   @override
-  void dispose() {
-    _lobbyCode.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctrl = context.read<GroupSessionController>();
+      ctrl.loadLobby();
+    });
   }
-
-
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
 
-    int _selectedIndex = 1;
+    final ctrl = context.watch<GroupSessionController>();
+
+    final String lobbyCode;
+    if (ctrl.isLoading) {
+      lobbyCode = 'Loading...';
+    } else if (ctrl.privateLobby.isNotEmpty) {
+      lobbyCode = ctrl.privateLobby.first.lobbyId;
+    } else if (ctrl.error != null) {
+      lobbyCode = 'Error';
+    } else {
+      lobbyCode = '------';
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -55,12 +66,12 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateCreatePage> 
                       Align(
                         alignment: Alignment.center,
                         child: Padding(
-                          padding: EdgeInsets.only(top:8),
+                          padding: const EdgeInsets.only(top: 8),
                           child: RichText(
                             text: TextSpan(
                               style: t.textTheme.headlineMedium,
-                              children: [
-                                const TextSpan(text: 'Create Lobby'),
+                              children: const [
+                                TextSpan(text: 'Create Lobby'),
                               ],
                             ),
                           ),
@@ -76,14 +87,14 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateCreatePage> 
                     thickness: 5,
                   ),
 
-                  Spacer(),
+                  const Spacer(),
                   // const SizedBox(height: 30),
 
                   private_code_display.PrivateCodeDisplay(
-                    code: "11223344",
+                    code: lobbyCode,
                   ),
                   
-                  Spacer(),
+                 const  Spacer(),
 
                   bot_nav_bar.BottomNavBar(
                     selectedIndex: _selectedIndex,

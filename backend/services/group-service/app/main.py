@@ -10,10 +10,9 @@ Purpose:
 """
 
 from fastapi import FastAPI
-from app.routers.courses import router as courses_router
-from app.routers.lessons import router as lessons_router
+from app.routers.private_lobbies import router as private_lobbies_router
 
-app = FastAPI(title="courses-service")
+app = FastAPI(title="group-service")
 
 
 @app.get("/health")
@@ -25,9 +24,8 @@ def health():
     - docker-compose (manual testing)
     - load balancers / orchestration later
     """
-    return {"ok": True, "service": "courses-service"}
+    return {"ok": True, "service": "group-service"}
 
 
 # Attach the /courses routes
-app.include_router(courses_router)
-app.include_router(lessons_router)
+app.include_router(private_lobbies_router)
