@@ -54,9 +54,19 @@ class FeedbackCard extends StatelessWidget {
       return AppColors.failure;
     }
 
-    /// Show a popup listing phonemes for a given [word], in the order they
-    /// were returned by the microservice. Each phoneme is color-coded based
-    /// on its accuracy score to visually guide practice.
+    /// Color for "You said" phoneme: green only when it matches the expected
+    /// (symbol). When it doesn't match (e.g. "iy" vs "ih"), never green—use orange or red.
+    Color userSaidPhonemeColor(PhonemeFeedback p) {
+      final said = p.userSaid ?? p.symbol;
+      if (said == p.symbol) return AppColors.success;
+      // Mismatch: never green; use phonemeColor but treat green as orange.
+      final c = phonemeColor(p.accuracy);
+      return c == AppColors.success ? AppColors.action : c;
+    }
+
+    /// Show a popup listing phonemes for a given [word]: top row = what the
+    /// user said (detected), bottom row = what they should have said (reference).
+    /// "You said" chips are green only when they match the expected phoneme.
     void showPhonemeDialog(WordFeedback word) {
       showDialog<void>(
         context: context,
@@ -72,21 +82,63 @@ class FeedbackCard extends StatelessWidget {
                     'No phoneme data available for this word.',
                     style: bodyStyle,
                   )
-                : Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (final p in word.phonemes)
-                        Chip(
-                          label: Text(
-                            p.symbol,
-                            style: bodyStyle.copyWith(
-                              color: phonemeColor(p.accuracy),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          backgroundColor: AppColors.inputFill,
+                      Text(
+                        'You said:',
+                        style: bodyStyle.copyWith(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
                         ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final p in word.phonemes)
+                            Chip(
+                              label: Text(
+                                p.userSaid ?? p.symbol,
+                                style: bodyStyle.copyWith(
+                                  color: userSaidPhonemeColor(p),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              backgroundColor: AppColors.inputFill,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Should be:',
+                        style: bodyStyle.copyWith(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final p in word.phonemes)
+                            Chip(
+                              label: Text(
+                                p.symbol,
+                                style: bodyStyle.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              backgroundColor: AppColors.inputFill,
+                            ),
+                        ],
+                      ),
                     ],
                   ),
             actions: [

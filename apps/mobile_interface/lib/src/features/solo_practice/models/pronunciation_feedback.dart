@@ -1,14 +1,18 @@
 /// Phoneme-level assessment for a single sound within a word.
 ///
 /// Mirrors the `phonemes` array emitted by the pronunciation-feedback
-/// microservice: each entry has the phoneme `symbol` plus its `accuracy`.
+/// microservice: each entry has the expected `symbol`, its `accuracy`,
+/// and `userSaid` (top detected phoneme from NBestPhonemes — what the user said).
 class PhonemeFeedback {
   final String symbol;
   final double? accuracy;
+  /// Phoneme that was detected (what the user said). Null if not available.
+  final String? userSaid;
 
   const PhonemeFeedback({
     required this.symbol,
     this.accuracy,
+    this.userSaid,
   });
 }
 

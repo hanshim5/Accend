@@ -57,7 +57,8 @@ PronunciationFeedbackMock getMockFeedback(String referenceText) {
     for (var j = 0; j < word.length; j++) {
       final pJitter = ((i + 1) * (j + 3) * 5) % 25;
       final pScore = (base + pJitter).clamp(40.0, 100.0);
-      phonemes.add(PhonemeFeedback(symbol: word[j], accuracy: pScore.toDouble()));
+      final ch = word[j];
+      phonemes.add(PhonemeFeedback(symbol: ch, accuracy: pScore.toDouble(), userSaid: ch));
     }
     words.add(
       WordFeedback(
@@ -160,10 +161,12 @@ PronunciationFeedbackMock? _feedbackFromAssessmentJson(String body) {
         final symbol = (p['symbol'] as String?) ?? '';
         if (symbol.isEmpty) continue;
         final pAccuracy = (p['accuracy'] as num?)?.toDouble();
+        final userSaid = p['user_said'] as String?;
         phonemes.add(
           PhonemeFeedback(
             symbol: symbol,
             accuracy: pAccuracy,
+            userSaid: userSaid?.isNotEmpty == true ? userSaid : null,
           ),
         );
       }
