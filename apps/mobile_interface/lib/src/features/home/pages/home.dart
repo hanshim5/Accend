@@ -45,7 +45,7 @@ class HomePage extends StatelessWidget {
               title: 'Group Practice',
               subtitle: 'Join a live conversation group',
               onTap: () {
-                Navigator.of(context).pushNamed(AppRoutes.home);
+                Navigator.of(context).pushNamed(AppRoutes.groupSessionSelect);
               },
               firstColor: 0xFF06B6D5,
               secondColor: 0xFF984ADD,
