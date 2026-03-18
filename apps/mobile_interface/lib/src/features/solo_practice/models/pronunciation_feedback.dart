@@ -24,6 +24,7 @@ const Map<String, String> phonemeInstructions = {
   't':  'Touch the tip of your tongue to the ridge behind your teeth, then release; no voice, like in top.',
   'd':  'Same as "t" but with voice; like in dog.',
   'k':  'Raise the back of your tongue to the soft palate, then release; no voice, like in cat.',
+  // mattsan
   'g':  'Same as "k" but with voice; like in go.',
   'f':  'Place your top teeth on your bottom lip and blow air; no voice, like in fan.',
   'v':  'Same as "f" but with voice; like in van.',
