@@ -5,8 +5,8 @@ API Gateway (BFF - Backend For Frontend)
 
 Purpose:
 - Serve as the single public entry point for the mobile app.
-- Validate authentication once at the edge.
-- Route requests to the correct internal microservice.
+- Validate authentication at the edge.
+- Route requests to the appropriate internal microservice.
 - Orchestrate multi-service workflows when one client action requires multiple backend calls.
 
 Architecture:
@@ -14,14 +14,16 @@ Flutter → Gateway → Internal Services → Supabase
 
 Gateway Responsibilities:
 - Verify Supabase JWTs
-- Forward authenticated identity via X-User-Id
-- Proxy requests to internal services
-- Aggregate responses for frontend-friendly flows
+- Extract authenticated user identity
+- Forward identity to internal services via X-User-Id
+- Proxy requests to downstream services
+- Aggregate multi-service responses for frontend-friendly APIs
 - Support one-request-per-screen BFF patterns
 
 Notes:
-- Internal services are not meant to be called directly by Flutter.
-- In Sprint 1, auth is centralized here and downstream services trust the gateway.
+- Internal services are not intended to be called directly by Flutter.
+- In Sprint 1, JWT validation happens only in the Gateway.
+- Downstream services trust the Gateway and use X-User-Id for identity.
 """
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
@@ -37,12 +39,12 @@ from app.supabase_client import supabase_select_one
 from fastapi.middleware.cors import CORSMiddleware
 
 
-# Create FastAPI application instance.
+# Create FastAPI application instance for the public gateway service.
 app = FastAPI(title="api-gateway")
 
 # CORS configuration for local development.
-# Allows requests from localhost / 127.0.0.1 on any port so Flutter web/dev
-# can reach the gateway even when the dev server port changes.
+# Allows localhost / 127.0.0.1 on any port so Flutter web and other local
+# dev clients can reach the gateway even when ports change.
 # This should be tightened for production deployments.
 app.add_middleware(
     CORSMiddleware,
@@ -71,7 +73,7 @@ def health():
 
 
 # -----------------------------------
-# Proxy: GET /profile/username-available (PUBLIC)
+# Profile Service
 # -----------------------------------
 
 @app.get("/profile/username-available")
@@ -80,10 +82,10 @@ async def proxy_username_available(username: str):
     Forward username availability checks to user-profile-service.
 
     Public endpoint:
-    - No JWT required because this is needed before signup/profile init.
+    - No JWT required because this is used before profile initialization.
 
     Flow:
-    1. Validate and normalize username query parameter.
+    1. Validate and normalize the username query parameter.
     2. Call user-profile-service.
     3. Return the downstream JSON response.
     """
@@ -103,10 +105,6 @@ async def proxy_username_available(username: str):
     return r.json()
 
 
-# -----------------------------------
-# Proxy: GET /profile (PROTECTED)
-# -----------------------------------
-
 @app.get("/profile")
 async def proxy_profile_get(
     authorization: str | None = Header(default=None),
@@ -117,10 +115,10 @@ async def proxy_profile_get(
     Flow:
     1. Validate JWT and extract user_id.
     2. Forward request to user-profile-service with X-User-Id.
-    3. Return profile JSON.
+    3. Return the downstream profile JSON.
 
     Used for:
-    - Onboarding resume logic
+    - Onboarding resume decisions
     - Profile screen data
     """
     user_id = verify_supabase_jwt(authorization)
@@ -137,10 +135,6 @@ async def proxy_profile_get(
     return r.json()
 
 
-# -----------------------------------
-# Proxy: POST /profile/init (PROTECTED)
-# -----------------------------------
-
 @app.post("/profile/init")
 async def proxy_profile_init(
     body: dict,
@@ -151,12 +145,12 @@ async def proxy_profile_init(
 
     Flow:
     1. Validate JWT and extract user_id.
-    2. Forward request body to user-profile-service.
-    3. Include X-User-Id header for identity.
-    4. Return downstream response.
+    2. Forward the request body to user-profile-service.
+    3. Include X-User-Id for identity.
+    4. Return the downstream response.
 
     Typical usage:
-    - Called after first signup/login when profile data is collected.
+    - Called after signup/login when initial profile data is collected.
     """
     user_id = verify_supabase_jwt(authorization)
 
@@ -173,8 +167,41 @@ async def proxy_profile_init(
     return r.json()
 
 
+@app.patch("/profile/onboarding")
+async def proxy_profile_onboarding(
+    body: dict,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Update onboarding-related profile fields.
+
+    Flow:
+    1. Validate JWT and extract user_id.
+    2. Forward PATCH body to user-profile-service.
+    3. Include X-User-Id header.
+    4. Return the downstream response.
+
+    Used for:
+    - Multi-step onboarding updates
+    - Marking onboarding as complete
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.patch(
+            f"{settings.USER_PROFILE_SERVICE_URL}/profiles/onboarding",
+            headers={"X-User-Id": user_id},
+            json=body,
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
 # -----------------------------------
-# Proxy: GET /courses
+# Courses Service
 # -----------------------------------
 
 @app.get("/courses")
@@ -202,10 +229,6 @@ async def proxy_list_courses(
 
         return r.json()
 
-
-# -----------------------------------
-# Proxy: GET /courses/{course_id}/lessons
-# -----------------------------------
 
 @app.get("/courses/{course_id}/lessons")
 async def proxy_list_lessons(
@@ -236,10 +259,6 @@ async def proxy_list_lessons(
 
     return r.json()
 
-
-# -----------------------------------
-# Proxy: POST /courses/{course_id}/lessons/{lesson_id}/complete
-# -----------------------------------
 
 @app.post("/courses/{course_id}/lessons/{lesson_id}/complete")
 async def proxy_complete_lesson(
@@ -292,14 +311,14 @@ async def generate_course(
     authorization: str | None = Header(default=None),
 ):
     """
-    Orchestrated AI → persistence flow.
+    Orchestrate AI generation and course persistence.
 
     Flow:
     1. Validate JWT and extract user_id.
     2. Call AI service to generate course structure.
-    3. Create a course row in courses-service.
+    3. Create the parent course row in courses-service.
     4. Normalize and persist generated curriculum in courses-service.
-    5. Return aggregated response containing:
+    5. Return an aggregated response containing:
        - created course row
        - persisted lessons
        - raw AI output
@@ -308,9 +327,9 @@ async def generate_course(
     - This is a cross-service workflow.
     - AI service generates structure but does not own course tables.
     - Courses service owns persistence.
-    - Gateway orchestrates the two while presenting a single API call to Flutter.
+    - Gateway coordinates both while exposing a single endpoint to Flutter.
     """
-    # Step 1: Verify identity
+    # Step 1: Validate identity.
     user_id = verify_supabase_jwt(authorization)
 
     async with httpx.AsyncClient(timeout=30) as client:
@@ -328,9 +347,9 @@ async def generate_course(
 
         ai_data = ai_resp.json()
 
-        # Minimal gateway-side validation before persistence.
-        # The AI service should return a title plus lessons, but the gateway
-        # defensively checks and normalizes before writing anything.
+        # Minimal validation before persistence.
+        # The AI service should return a title and lessons, but the gateway
+        # still validates and normalizes the response before writing anything.
         if "title" not in ai_data:
             raise HTTPException(status_code=502, detail="AI service returned no title")
 
@@ -352,8 +371,8 @@ async def generate_course(
         if not course_id:
             raise HTTPException(status_code=502, detail="Courses service returned no id")
 
-        # Step 4: Normalize AI lesson output into the curriculum payload expected
-        # by courses-service.
+        # Step 4: Normalize AI lesson output into the curriculum payload
+        # expected by courses-service.
         curriculum_payload = {"lessons": []}
 
         # Support both current and legacy shapes:
@@ -388,8 +407,8 @@ async def generate_course(
                         "hint": it.get("hint"),
                     })
 
-            # Skip empty lessons so courses-service does not receive invalid
-            # curriculum data with no items.
+            # Skip lessons with no valid items so courses-service
+            # does not receive invalid curriculum data.
             if not normalized_items:
                 continue
 
@@ -398,7 +417,7 @@ async def generate_course(
                 "items": normalized_items,
             })
 
-        # Persist the curriculum only if there is at least one valid lesson.
+        # Persist the curriculum only if at least one valid lesson exists.
         if curriculum_payload["lessons"]:
             curriculum_resp = await client.post(
                 f"{settings.COURSES_SERVICE_URL}/courses/{course_id}/curriculum",
@@ -501,34 +520,107 @@ async def proxy_get_private_lobby(
 
 
 # -----------------------------------
-# Proxy: PATCH /profile/onboarding
+# Follow Service
 # -----------------------------------
 
-@app.patch("/profile/onboarding")
-async def proxy_profile_onboarding(
-    body: dict,
+@app.get("/social/followers")
+async def proxy_social_followers(
     authorization: str | None = Header(default=None),
 ):
     """
-    Update onboarding-related profile fields.
+    Fetch the authenticated user's followers from follow-service.
 
     Flow:
-    1. Validate JWT and extract user_id.
-    2. Forward PATCH body to user-profile-service.
-    3. Include X-User-Id header.
-    4. Return downstream response.
-
-    Used for:
-    - Multi-step onboarding state updates
-    - Marking onboarding complete
+    1. Validate JWT.
+    2. Forward request with X-User-Id.
+    3. Return follower data.
     """
     user_id = verify_supabase_jwt(authorization)
 
     async with httpx.AsyncClient(timeout=10) as client:
-        r = await client.patch(
-            f"{settings.USER_PROFILE_SERVICE_URL}/profiles/onboarding",
+        r = await client.get(
+            f"{settings.FOLLOW_SERVICE_URL}/followers",
             headers={"X-User-Id": user_id},
-            json=body,
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.get("/social/following")
+async def proxy_social_following(
+    authorization: str | None = Header(default=None),
+):
+    """
+    Fetch the authenticated user's following list from follow-service.
+
+    Flow:
+    1. Validate JWT.
+    2. Forward request with X-User-Id.
+    3. Return following data.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{settings.FOLLOW_SERVICE_URL}/following",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.post("/social/follow/{followee_id}")
+async def proxy_social_follow_user(
+    followee_id: str,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Follow another user through follow-service.
+
+    Flow:
+    1. Validate JWT.
+    2. Forward follow request with X-User-Id.
+    3. Return downstream response.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(
+            f"{settings.FOLLOW_SERVICE_URL}/follow/{followee_id}",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.delete("/social/follow/{followee_id}")
+async def proxy_social_unfollow_user(
+    followee_id: str,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Unfollow another user through follow-service.
+
+    Flow:
+    1. Validate JWT.
+    2. Forward unfollow request with X-User-Id.
+    3. Return downstream response.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.delete(
+            f"{settings.FOLLOW_SERVICE_URL}/follow/{followee_id}",
+            headers={"X-User-Id": user_id},
         )
 
     if r.status_code >= 400:

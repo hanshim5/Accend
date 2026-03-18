@@ -9,7 +9,7 @@ Purpose:
 - Fail fast at startup if required configuration is missing.
 
 Architecture:
-- Used by all gateway components (auth, routing, service calls).
+- Used by gateway auth, routing, and downstream service calls.
 - Acts as the single source of truth for service URLs and secrets.
 
 Environment Sources:
@@ -17,9 +17,9 @@ Environment Sources:
 - backend/.env file (development via pydantic-settings)
 
 Security:
-- Contains sensitive values (service role key, JWT config).
-- Never commit real secrets to version control.
-- Gateway is the only service that uses JWT verification settings.
+- Contains sensitive backend-only values such as service role keys and JWT settings.
+- Real secrets should never be committed to version control.
+- The Gateway is the only service that uses JWT verification configuration directly.
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -27,22 +27,22 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """
-    Gateway configuration schema.
+    Configuration schema for the API Gateway.
 
-    Supabase Config:
-    - SUPABASE_URL: Base URL of Supabase project
-    - SUPABASE_SERVICE_ROLE_KEY: Backend key for internal operations
-    - SUPABASE_JWT_SECRET: (legacy / optional depending on setup)
-    - SUPABASE_JWKS_URL: Public key endpoint for JWT verification
-    - SUPABASE_JWT_ISSUER: Expected issuer for JWT validation
+    Supabase Configuration:
+    - SUPABASE_URL: Base URL of the Supabase project
+    - SUPABASE_SERVICE_ROLE_KEY: Backend-only key for internal database access
+    - SUPABASE_JWT_SECRET: Legacy JWT secret setting (kept for compatibility)
+    - SUPABASE_JWKS_URL: Public JWKS endpoint used for JWT verification
+    - SUPABASE_JWT_ISSUER: Expected issuer claim for Supabase JWTs
 
     Internal Service URLs:
-    - URLs for routing requests to downstream microservices
-    - Injected via docker-compose
+    - Base URLs used by the Gateway to proxy or orchestrate requests
+      across downstream microservices
 
-    Dev Flags:
+    Development Flags:
     - ALLOW_ANON_PRONUNCIATION_ASSESS:
-        Allows skipping JWT validation for pronunciation endpoint in dev only
+      Allows POST /pronunciation/assess to skip JWT validation in local/dev only
     """
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -59,22 +59,23 @@ class Settings(BaseSettings):
     # -------------------------
     # Internal Service Routing
     # -------------------------
-    # These URLs are used by the gateway to forward requests
-    # to the appropriate microservices.
+    # These base URLs are used by the Gateway to forward requests
+    # to the correct downstream microservice.
     COURSES_SERVICE_URL: str
     AI_COURSE_GEN_SERVICE_URL: str
     PRONUNCIATION_FEEDBACK_SERVICE_URL: str
     GROUP_SERVICE_URL: str
+    FOLLOW_SERVICE_URL: str
     USER_PROFILE_SERVICE_URL: str
 
     # -------------------------
     # Development Flags
     # -------------------------
-    # Allows skipping JWT validation for pronunciation endpoint in dev.
-    # Must be disabled in production.
+    # Allows skipping JWT validation for pronunciation assessment in local/dev.
+    # This should remain disabled in production environments.
     ALLOW_ANON_PRONUNCIATION_ASSESS: bool = True
 
 
 # Singleton settings instance loaded at startup.
-# Ensures consistent configuration access across the gateway.
+# Ensures configuration is parsed once and reused consistently.
 settings = Settings()

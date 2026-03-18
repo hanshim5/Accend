@@ -15,6 +15,10 @@ class FollowersTab extends StatelessWidget {
 			builder: (context, controller, _) {
 				final users = controller.followers;
 
+				if (controller.isLoading && !controller.hasLoaded) {
+					return const Center(child: CircularProgressIndicator());
+				}
+
 				return Column(
 					crossAxisAlignment: CrossAxisAlignment.start,
 					children: [
@@ -34,7 +38,12 @@ class FollowersTab extends StatelessWidget {
 						),
 						const SizedBox(height: 12),
 						Expanded(
-							child: users.isEmpty
+							child: controller.error != null && users.isEmpty
+									? _ErrorState(
+											text: controller.error!,
+											onRetry: () => controller.load(force: true),
+									  )
+									: users.isEmpty
 									? _EmptyState(text: 'No followers match your search.')
 									: ListView.builder(
 											itemCount: users.length,
@@ -114,6 +123,38 @@ class _EmptyState extends StatelessWidget {
 					fontSize: 14,
 					fontWeight: FontWeight.w600,
 				),
+			),
+		);
+	}
+}
+
+class _ErrorState extends StatelessWidget {
+	const _ErrorState({required this.text, required this.onRetry});
+
+	final String text;
+	final VoidCallback onRetry;
+
+	@override
+	Widget build(BuildContext context) {
+		return Center(
+			child: Column(
+				mainAxisSize: MainAxisSize.min,
+				children: [
+					Text(
+						text,
+						textAlign: TextAlign.center,
+						style: GoogleFonts.montserrat(
+							color: AppColors.textSecondary,
+							fontSize: 14,
+							fontWeight: FontWeight.w600,
+						),
+					),
+					const SizedBox(height: 12),
+					OutlinedButton(
+						onPressed: onRetry,
+						child: const Text('Retry'),
+					),
+				],
 			),
 		);
 	}

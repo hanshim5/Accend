@@ -1,72 +1,85 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:mobile_interface/src/common/services/api_client.dart';
+import 'package:mobile_interface/src/common/services/auth_service.dart';
+
 import '../models/social_user.dart';
 
 class SocialController extends ChangeNotifier {
-  SocialController() : _users = _seedUsers;
+  SocialController({ApiClient? api, AuthService? auth})
+      : _api = api ?? ApiClient(),
+        _auth = auth ?? AuthService();
 
-  static const List<SocialUser> _seedUsers = [
-    SocialUser(
-      id: 'u1',
-      displayName: 'Mina Sue',
-      username: 'mina_sue',
-      level: 84,
-      iFollow: false,
-      followsMe: true,
-    ),
-    SocialUser(
-      id: 'u2',
-      displayName: 'Steve .',
-      username: 'ste_ve',
-      level: 67,
-      iFollow: false,
-      followsMe: true,
-    ),
-    SocialUser(
-      id: 'u3',
-      displayName: 'Saul Goodman',
-      username: 'saul_good',
-      level: 999,
-      iFollow: true,
-      followsMe: true,
-    ),
-    SocialUser(
-      id: 'u4',
-      displayName: 'Markus Grayson',
-      username: 'markus_grays',
-      level: 41,
-      iFollow: true,
-      followsMe: true,
-    ),
-    SocialUser(
-      id: 'u5',
-      displayName: 'Ari Calder',
-      username: 'ari_cal',
-      level: 53,
-      iFollow: true,
-      followsMe: false,
-    ),
-  ];
+  final ApiClient _api;
+  final AuthService _auth;
 
-  final List<SocialUser> _users;
+  List<SocialUser> _followers = const [];
+  List<SocialUser> _following = const [];
 
   String _followersQuery = '';
   String _followingQuery = '';
 
-  int get followerCount => _users.where((u) => u.followsMe).length;
-  int get followingCount => _users.where((u) => u.iFollow).length;
+  bool _isLoading = false;
+  bool _hasLoaded = false;
+  String? _error;
+
+  int get followerCount => _followers.length;
+  int get followingCount => _following.length;
 
   String get followersQuery => _followersQuery;
   String get followingQuery => _followingQuery;
+  bool get isLoading => _isLoading;
+  bool get hasLoaded => _hasLoaded;
+  String? get error => _error;
 
   List<SocialUser> get followers {
-    final source = _users.where((u) => u.followsMe).toList(growable: false);
-    return _filterByQuery(source, _followersQuery);
+    return _filterByQuery(_followers, _followersQuery);
   }
 
   List<SocialUser> get following {
-    final source = _users.where((u) => u.iFollow).toList(growable: false);
-    return _filterByQuery(source, _followingQuery);
+    return _filterByQuery(_following, _followingQuery);
+  }
+
+  Future<void> load({bool force = false}) async {
+    if (_isLoading) return;
+    if (_hasLoaded && !force) return;
+
+    final accessToken = _auth.accessToken;
+    if (accessToken == null || accessToken.isEmpty) {
+      _error = 'You must be logged in to view followers.';
+      _hasLoaded = true;
+      notifyListeners();
+      return;
+    }
+
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final followersJson = await _api.getList(
+        '/social/followers',
+        accessToken: accessToken,
+      );
+      final followingJson = await _api.getList(
+        '/social/following',
+        accessToken: accessToken,
+      );
+
+      _followers = followersJson
+          .map((row) => SocialUser.fromJson(Map<String, dynamic>.from(row as Map)))
+          .toList(growable: false);
+      _following = followingJson
+          .map((row) => SocialUser.fromJson(Map<String, dynamic>.from(row as Map)))
+          .toList(growable: false);
+      _hasLoaded = true;
+    } catch (e) {
+      _error = e.toString();
+      debugPrint('Failed to load social graph: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   void setFollowersQuery(String value) {
@@ -81,12 +94,12 @@ class SocialController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void follow(String userId) {
-    _setFollowState(userId: userId, following: true);
+  Future<void> follow(String userId) async {
+    await _setFollowState(userId: userId, following: true);
   }
 
-  void unfollow(String userId) {
-    _setFollowState(userId: userId, following: false);
+  Future<void> unfollow(String userId) async {
+    await _setFollowState(userId: userId, following: false);
   }
 
   List<SocialUser> _filterByQuery(List<SocialUser> source, String query) {
@@ -102,17 +115,27 @@ class SocialController extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  void _setFollowState({
+  Future<void> _setFollowState({
     required String userId,
     required bool following,
-  }) {
-    final index = _users.indexWhere((u) => u.id == userId);
-    if (index < 0) return;
+  }) async {
+    final accessToken = _auth.accessToken;
+    if (accessToken == null || accessToken.isEmpty) {
+      _error = 'You must be logged in to update follows.';
+      notifyListeners();
+      return;
+    }
 
-    final user = _users[index];
-    if (user.iFollow == following) return;
-
-    _users[index] = user.copyWith(iFollow: following);
-    notifyListeners();
+    try {
+      if (following) {
+        await _api.postJson('/social/follow/$userId', accessToken: accessToken);
+      } else {
+        await _api.deleteJson('/social/follow/$userId', accessToken: accessToken);
+      }
+      await load(force: true);
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
   }
 }

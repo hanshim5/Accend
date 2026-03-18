@@ -11,12 +11,14 @@ services:
       - PRONUNCIATION_FEEDBACK_SERVICE_URL=http://pronunciation-feedback:8000
       - USER_PROFILE_SERVICE_URL=http://user-profile-service:8000
       - GROUP_SERVICE_URL=http://group-service:8000
+      - FOLLOW_SERVICE_URL=http://follow-service:8000
     depends_on:
       - courses-service
       - ai-course-gen-service
       - pronunciation-feedback
       - user-profile-service
       - group-service
+      - follow-service
 
   courses-service:
     build: ./services/courses-service
@@ -51,3 +53,10 @@ services:
       - "8085:8000"
     env_file:
      - .env
+
+  follow-service:
+    build: ./services/follow-service
+    ports:
+      - "8086:8000"
+    env_file:
+      - .env
