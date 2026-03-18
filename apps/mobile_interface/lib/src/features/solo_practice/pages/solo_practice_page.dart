@@ -273,6 +273,10 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
+                  // ConstrainedBox(minHeight) + Center ensures the content is
+                  // vertically centred when it's shorter than the available
+                  // space, while still allowing the scroll view to grow when
+                  // the feedback card is taller than the viewport.
                   return SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                     child: ConstrainedBox(

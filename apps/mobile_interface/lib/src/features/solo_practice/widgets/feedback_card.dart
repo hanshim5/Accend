@@ -305,6 +305,9 @@ class FeedbackCard extends StatelessWidget {
 }
 
 /// Small chip showing a score label and numeric value (e.g. Accuracy: 85).
+///
+/// Styles are injected by the parent so all three chips in [FeedbackCard]
+/// share the same `GoogleFonts` instances without extra allocations.
 class ScoreChip extends StatelessWidget {
   const ScoreChip({
     super.key,
@@ -371,7 +374,9 @@ class _PhonemeDetailDialogState extends State<_PhonemeDetailDialog> {
       if (mounted) {
         setState(() {
           _isPlaying = state == PlayerState.playing;
-          // Clear loading once the player is actually doing something.
+          // The spinner shows from tap until the player leaves `stopped`.
+          // `stopped` is also the initial state before any audio loads, so
+          // we only clear the spinner once playback, pause, or completion fires.
           if (state != PlayerState.stopped) _isLoading = false;
         });
       }
@@ -394,6 +399,8 @@ class _PhonemeDetailDialogState extends State<_PhonemeDetailDialog> {
         .from(AppStorage.phonemeBucket)
         .getPublicUrl(AppStorage.phonemeAudioPath(widget.symbol));
     try {
+      // Stop any previous stream before starting a new one; calling play()
+      // directly on an active player can cause overlap or stale-state errors.
       await _player.stop();
       await _player.play(UrlSource(url));
     } catch (_) {

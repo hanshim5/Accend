@@ -23,8 +23,15 @@ String get _gatewayBaseUrl =>
 /// - Generate per-word "scores" with mild variation.
 /// - Generate per-phoneme "scores" by splitting each word into characters.
 PronunciationFeedbackMock getMockFeedback(String referenceText) {
+  // --- Base score ---------------------------------------------------------
+  // Seed a "base" in the range [70, 95) using the current millisecond so
+  // repeated calls look slightly different without needing a real RNG.
   final base = 70.0 + (DateTime.now().millisecond % 25);
-  // Split text on whitespace to approximate word tokens for the mock.
+
+  // --- Strip punctuation --------------------------------------------------
+  // Split on whitespace, then discard everything except letters, digits, and
+  // apostrophes. This gives clean word tokens ("it's" stays intact, trailing
+  // commas/periods are dropped) so the chip labels match what the user read.
   final rawTokens = referenceText.split(RegExp(r'\s+'));
   final tokens = <String>[];
   for (final token in rawTokens) {
@@ -44,14 +51,16 @@ PronunciationFeedbackMock getMockFeedback(String referenceText) {
       tokens.add(cleaned);
     }
   }
-  // Convert cleaned tokens into mock [WordFeedback] entries (with phonemes)
-  // so the UI behaves similarly to real assessments.
+
+  // --- Build per-word (and per-character) mock feedback -------------------
+  // Each word gets a score offset by a deterministic jitter so the chips
+  // aren't all the same colour. Phonemes are approximated by splitting the
+  // word into individual characters — real phoneme data only comes from the
+  // API, but this keeps the phoneme-detail dialog functional offline.
   final words = <WordFeedback>[];
   for (var i = 0; i < tokens.length; i++) {
     final jitter = (i * 7) % 25;
     final score = (base + jitter).clamp(40.0, 100.0);
-    // Simple mock phoneme breakdown: split word into characters so the
-    // phoneme dialog has something to display even without real API data.
     final phonemes = <PhonemeFeedback>[];
     final word = tokens[i];
     for (var j = 0; j < word.length; j++) {
@@ -69,8 +78,9 @@ PronunciationFeedbackMock getMockFeedback(String referenceText) {
     );
   }
 
-  // Aggregate mock scores; these are intentionally "reasonable" so the UI
-  // looks believable but should not be treated as real assessment data.
+  // --- Assemble top-level result ------------------------------------------
+  // Scores are intentionally "reasonable" so the UI looks believable, but
+  // they carry no real diagnostic value — only real API data should be acted on.
   return PronunciationFeedbackMock(
     accuracyScore: base + (DateTime.now().second % 15),
     fluencyScore: (base + 5).clamp(0.0, 100.0),
@@ -96,7 +106,9 @@ Future<PronunciationFeedbackMock?> fetchPronunciationFeedback({
   required String referenceText,
   String? accessToken,
 }) async {
-  // Gateway route that proxies to pronunciation-feedback microservice.
+  // --- Build multipart request --------------------------------------------
+  // The gateway expects `reference_text` as a plain field and the WAV as a
+  // file part named `audio`. The filename is arbitrary; the backend ignores it.
   final uri = Uri.parse('$_gatewayBaseUrl/pronunciation/assess');
   final request = http.MultipartRequest('POST', uri);
   request.fields['reference_text'] = referenceText;
@@ -105,10 +117,16 @@ Future<PronunciationFeedbackMock?> fetchPronunciationFeedback({
     audioBytes,
     filename: 'testaudio.wav',
   ));
+  // Attach the Supabase JWT so the gateway can authenticate the request.
+  // Omit the header entirely when no token is available rather than sending
+  // an empty value, which some middleware treats as a malformed credential.
   if (accessToken != null && accessToken.isNotEmpty) {
     request.headers['Authorization'] = 'Bearer $accessToken';
   }
 
+  // --- Send and handle response -------------------------------------------
+  // Any non-200 or network error returns null; the controller will fall back
+  // to getMockFeedback so the UI never blocks on a failed API call.
   try {
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
@@ -136,6 +154,10 @@ Future<PronunciationFeedbackMock?> fetchPronunciationFeedback({
 /// }
 PronunciationFeedbackMock? _feedbackFromAssessmentJson(String body) {
   try {
+    // --- Top-level summary scores -----------------------------------------
+    // The `summary` object is required; its three core fields (accuracy,
+    // fluency, completeness) must be present or we treat the response as
+    // invalid and return null so the caller falls back to mock data.
     final map = jsonDecode(body) as Map<String, dynamic>;
     final summary = map['summary'] as Map<String, dynamic>?;
     if (summary == null) return null;
@@ -145,6 +167,11 @@ PronunciationFeedbackMock? _feedbackFromAssessmentJson(String body) {
     final completeness = (summary['completeness'] as num?)?.toDouble();
     final pronScore = (summary['pronScore'] as num?)?.toDouble();
 
+    // --- Word list --------------------------------------------------------
+    // Walk each word entry, skipping any that are malformed or have no text.
+    // For each word, walk its nested phoneme list and store the detected
+    // phoneme (`user_said`) alongside the expected symbol so the UI can show
+    // "You said / Should be" comparisons.
     final wordsJson = map['words'] as List<dynamic>? ?? const [];
     final words = <WordFeedback>[];
     for (final item in wordsJson) {
@@ -162,6 +189,8 @@ PronunciationFeedbackMock? _feedbackFromAssessmentJson(String body) {
         if (symbol.isEmpty) continue;
         final pAccuracy = (p['accuracy'] as num?)?.toDouble();
         final userSaid = p['user_said'] as String?;
+        // Normalise empty strings to null so callers can use a simple null
+        // check rather than also guarding against "".
         phonemes.add(
           PhonemeFeedback(
             symbol: symbol,
@@ -181,6 +210,9 @@ PronunciationFeedbackMock? _feedbackFromAssessmentJson(String body) {
       );
     }
 
+    // --- Validate and assemble result -------------------------------------
+    // Guard here (after building the word list) rather than early-returning
+    // above, so we can still surface partial word data in a future extension.
     if (accuracy == null || fluency == null || completeness == null) return null;
     return PronunciationFeedbackMock(
       accuracyScore: accuracy,
