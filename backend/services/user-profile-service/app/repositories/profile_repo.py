@@ -4,6 +4,8 @@ from typing import Protocol
 class ProfileRepo(Protocol):
     def username_exists(self, username: str) -> bool: ...
 
+    async def get_profile(self, user_id: str) -> dict: ...
+
     def init_profile(
         self,
         user_id: str,

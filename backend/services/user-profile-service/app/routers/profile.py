@@ -5,12 +5,22 @@ from app.schemas.profile_schema import (
     UsernameAvailableResponse,
     ProfileInitRequest,
     ProfileInitResponse,
+    ProfileReadResponse,
     ProfileOnboardingUpdate,
 )
 from app.services.profile_service import ProfileService
 
 
 router = APIRouter()
+
+
+@router.get("/profiles/me")
+async def get_profile(
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: ProfileService = Depends(get_profile_service),
+) -> ProfileReadResponse:
+    profile = await svc.get_profile(x_user_id or "")
+    return ProfileReadResponse(**profile)
 
 
 @router.get("/username-available")

@@ -73,18 +73,29 @@ class _AccentSelectionPageState extends State<AccentSelectionPage> {
       AccentChoice.australian => 'australian',
     };
     onboardingController.setAccent(backend);
+    onboardingController.saveProgress();
   }
 
-  void _onContinue() {
+  Future<void> _onContinue() async {
     final sel = _selected;
     if (sel == null) return;
-    // The value is already set in the controller
+    await context.read<OnboardingController>().saveProgress(silent: false);
     Navigator.pushNamed(context, AppRoutes.onboardingFeedbackTone);
   }
 
   Future<void> _onBack() async {
+    final onboardingController = context.read<OnboardingController>();
+    await onboardingController.saveProgress();
     if (!mounted) return;
-    Navigator.maybePop(context);
+    final didPop = await Navigator.maybePop(context);
+    if (!didPop && mounted) {
+      final previousRoute = onboardingController.previousRouteFor(
+        AppRoutes.onboardingAccentSelection,
+      );
+      if (previousRoute != null) {
+        Navigator.pushReplacementNamed(context, previousRoute);
+      }
+    }
   }
 
   @override

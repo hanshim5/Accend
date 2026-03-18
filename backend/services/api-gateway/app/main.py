@@ -80,6 +80,30 @@ async def proxy_username_available(username: str):
     return r.json()
 
 # -----------------------------------
+# Proxy: GET /profile  (PROTECTED)
+# -----------------------------------
+
+@app.get("/profile")
+async def proxy_profile_get(
+    authorization: str | None = Header(default=None),
+):
+    """
+    Fetch authenticated user's profile for onboarding resume decisions.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{settings.USER_PROFILE_SERVICE_URL}/profiles/me",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+# -----------------------------------
 # Proxy: POST /profile/init  (PROTECTED)
 # -----------------------------------
 

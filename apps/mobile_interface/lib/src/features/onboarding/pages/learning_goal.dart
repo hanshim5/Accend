@@ -57,6 +57,7 @@ class _LearningGoalPageState extends State<LearningGoalPage> {
     setState(() => _selectedIndex = idx);
     final onboardingController = context.read<OnboardingController>();
     onboardingController.setLearningGoal(_options[idx].backendValue);
+    onboardingController.saveProgress();
   }
 
   String? get _selectedGoalBackendValue {
@@ -65,18 +66,28 @@ class _LearningGoalPageState extends State<LearningGoalPage> {
     return _options[idx].backendValue;
   }
 
-  void _onContinue() {
+  Future<void> _onContinue() async {
     final goal = _selectedGoalBackendValue;
     if (goal == null) return;
-    // The value is already set in the controller
     debugPrint('LearningGoal payload: {learning_goal: $goal}');
+    await context.read<OnboardingController>().saveProgress(silent: false);
     Navigator.pushNamed(context, AppRoutes.onboardingAccentSelection);
   }
 
   Future<void> _onBack() async {
+    final onboardingController = context.read<OnboardingController>();
+    await onboardingController.saveProgress();
 
     if (!mounted) return;
-    Navigator.maybePop(context);
+    final didPop = await Navigator.maybePop(context);
+    if (!didPop && mounted) {
+      final previousRoute = onboardingController.previousRouteFor(
+        AppRoutes.onboardingLearningGoal,
+      );
+      if (previousRoute != null) {
+        Navigator.pushReplacementNamed(context, previousRoute);
+      }
+    }
   }
 
   @override

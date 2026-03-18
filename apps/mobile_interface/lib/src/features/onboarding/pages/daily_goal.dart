@@ -75,6 +75,7 @@ class _DailyGoalPageState extends State<DailyGoalPage> {
       DailyGoalChoice.mountaineer => 'mountaineer',
     };
     onboardingController.setDailyPace(backend);
+    onboardingController.saveProgress();
   }
 
   void _onContinue() async {
@@ -99,8 +100,18 @@ class _DailyGoalPageState extends State<DailyGoalPage> {
   }
 
   Future<void> _onBack() async {
+    final onboardingController = context.read<OnboardingController>();
+    await onboardingController.saveProgress();
     if (!mounted) return;
-    Navigator.maybePop(context);
+    final didPop = await Navigator.maybePop(context);
+    if (!didPop && mounted) {
+      final previousRoute = onboardingController.previousRouteFor(
+        AppRoutes.onboardingDailyGoal,
+      );
+      if (previousRoute != null) {
+        Navigator.pushReplacementNamed(context, previousRoute);
+      }
+    }
   }
 
   @override

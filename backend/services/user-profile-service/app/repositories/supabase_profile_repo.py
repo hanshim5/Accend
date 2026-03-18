@@ -1,10 +1,25 @@
 import httpx
 from app.clients.supabase import supabase
 from app.repositories.profile_repo import ProfileRepo
-from app.utils.errors import conflict
+from app.utils.errors import conflict, not_found
 
 
 class SupabaseProfileRepo(ProfileRepo):
+
+    async def get_profile(self, user_id: str) -> dict:
+        rows = await supabase.get(
+            "profiles",
+            params={
+                "select": "id,username,onboarding_complete,native_language,full_name,learning_goal,feedback_tone,accent,daily_pace,skill_assess",
+                "id": f"eq.{user_id}",
+                "limit": "1",
+            },
+        )
+
+        if not rows:
+            not_found("profile not found for user")
+
+        return rows[0]
 
     async def username_exists(self, username: str) -> bool:
         params = {

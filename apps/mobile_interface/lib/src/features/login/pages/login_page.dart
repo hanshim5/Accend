@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:mobile_interface/src/app/constants.dart';
 import 'package:mobile_interface/src/app/routes.dart';
 import 'package:mobile_interface/src/common/services/auth_service.dart';
+import 'package:mobile_interface/src/features/onboarding/controllers/onboarding_controller.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -28,6 +29,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _signIn() async {
     final auth = context.read<AuthService>();
+    final onboarding = context.read<OnboardingController>();
 
     final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
@@ -43,11 +45,16 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       await auth.signIn(email: email, password: password);
+      var nextRoute = AppRoutes.courses;
+      try {
+        nextRoute = await onboarding.getPostLoginRoute();
+      } catch (e) {
+        debugPrint('Login resume route lookup failed: $e');
+      }
 
       if (!mounted) return;
 
-      // After login, go to Courses (or MainShell later)
-      Navigator.pushReplacementNamed(context, AppRoutes.courses);
+      Navigator.pushReplacementNamed(context, nextRoute);
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -106,7 +113,7 @@ class _LoginPageState extends State<LoginPage> {
                       children: [
                         const TextSpan(text: 'Welcome to '),
                         TextSpan(
-                          text: 'Ascension',
+                          text: 'Accend',
                           style: t.textTheme.headlineMedium?.copyWith(
                             color: AppColors.accent,
                           ),
