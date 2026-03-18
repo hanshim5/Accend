@@ -54,7 +54,7 @@ Example ownership:
 Profile Service → profiles, onboarding data\
 Courses Service → courses, lessons, lesson_items\
 Progress Service → course_progress, daily_minutes, streaks\
-Social Service → follows, avoid_list, thanks\
+Follow Service → user_follows\
 Group Service → lobbies, sessions, turns, votes
 
 Note: All services use SUPABASE_SERVICE_ROLE_KEY, so ownership is

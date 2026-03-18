@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_interface/src/app/constants.dart';
+import 'package:provider/provider.dart';
 
 import '../../../app/routes.dart';
 import '../../../common/widgets/bottom_nav_bar.dart';
+import '../controllers/social_controller.dart';
 
 import 'followers.dart';
 import 'following.dart';
@@ -17,6 +19,15 @@ class SocialPage extends StatefulWidget {
 
 class _SocialPageState extends State<SocialPage> {
   int _selectedTab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<SocialController>().load();
+    });
+  }
 
   void _onNavTap(int index) {
     switch (index) {

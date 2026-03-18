@@ -404,6 +404,84 @@ async def proxy_get_private_lobby(
             raise HTTPException(status_code=r.status_code, detail=r.text)
         
         return r.json()
+
+
+# -----------------------------------
+# Follow Service
+# -----------------------------------
+
+@app.get("/social/followers")
+async def proxy_social_followers(
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{settings.FOLLOW_SERVICE_URL}/followers",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.get("/social/following")
+async def proxy_social_following(
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{settings.FOLLOW_SERVICE_URL}/following",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.post("/social/follow/{followee_id}")
+async def proxy_social_follow_user(
+    followee_id: str,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(
+            f"{settings.FOLLOW_SERVICE_URL}/follow/{followee_id}",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.delete("/social/follow/{followee_id}")
+async def proxy_social_unfollow_user(
+    followee_id: str,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.delete(
+            f"{settings.FOLLOW_SERVICE_URL}/follow/{followee_id}",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
     
 #-----------------------------------
 # Connecting Profile to Database
