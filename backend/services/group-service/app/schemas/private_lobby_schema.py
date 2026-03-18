@@ -13,9 +13,33 @@ Rule of thumb:
 - GetPrivateLobby    = What the api returns to the client.
 """
 
-from pydantic import BaseModel, Field
 from datetime import datetime
-from uuid import UUID
+
+from pydantic import BaseModel
+
+class PrivateLobbyCreate(BaseModel):
+    """
+    Request shape for creating a private lobby.
+
+    Fields:
+    - username: The name of the user creating the lobby. Required to set the host and create the first member.
+    """
+
+    username: str
+    user_id: str
+
+class PrivateLobbyJoin(BaseModel):
+    """
+    Request shape for joining a private lobby.
+
+    Fields:
+    - user_id: The ID of the user joining the lobby.
+    - lobby_id: The ID of the lobby to join.
+    - username: The name of the user joining the lobby.
+    """
+    lobby_id: int
+    username: str
+    user_id: str
 
 class PrivateLobbyMemberOut(BaseModel):
     """
@@ -26,10 +50,15 @@ class PrivateLobbyMemberOut(BaseModel):
     - id/user_id -> UUID
     - created_at -> datetime
     """
-    id: UUID
-    room_id: int
+
+    id: str
+    lobby_id: int
     username: str
-    user_id: UUID
+    user_id: str
     host: bool
     session_start: bool
-    member_count: int
+    joined_at: datetime
+
+
+class PrivateLobbyDeleteOut(BaseModel):
+    deleted: bool

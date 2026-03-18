@@ -15,11 +15,6 @@ class GroupSessionSelectPage extends StatefulWidget {
 
 class _GroupSessionSelectPageState extends State<GroupSessionSelectPage> {
 
-
-  final _lobbyCode = TextEditingController();
-
-  bool _submitting = false;
-
   int _selectedIndex = 1;
 
 
@@ -39,7 +34,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionSelectPage> {
                   Stack(
                     children: [
                       IconButton(
-                        onPressed: () => Navigator.maybePop(context),
+                        onPressed: () => Navigator.pushNamed(context, routes.AppRoutes.home),
                         icon: const Icon(Icons.arrow_back_ios_new_rounded),
                       ),
 
@@ -83,7 +78,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionSelectPage> {
                     title: "Private Room", 
                     subtitle: "Create or join with a code", 
                     icon: Icons.lock, 
-                    onTap: () {Navigator.pushNamed(context, routes.AppRoutes.groupSessionPrivateSelect);} // leo TODO Need to make it actually do something later
+                    onTap: () {Navigator.pushNamed(context, routes.AppRoutes.groupSessionPrivateSelect);}
                   ),
 
                   Spacer(),

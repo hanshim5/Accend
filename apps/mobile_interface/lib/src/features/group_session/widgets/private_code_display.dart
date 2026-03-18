@@ -11,16 +11,33 @@ class PrivateCodeDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Theme.of(context);
+
+    final isNumeric = RegExp(r'^\d+$').hasMatch(code);
+    final display = (isNumeric && code.length >= 4) ? '#$code' : code;
+
     return Container(
-      height: 180,
-      width: 300,
-      color: AppColors.surface,
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 110),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadii.lg),
+        border: Border.all(
+          color: AppColors.accent2,
+          width: 2,
+        ),
+      ),
       child: Center(
         child: Text(
-          code,
-          style: TextStyle(fontSize: 30),
-        )
-      )
+          display,
+          style: t.textTheme.headlineLarge?.copyWith(
+            fontSize: 34,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
     );
   }
 }

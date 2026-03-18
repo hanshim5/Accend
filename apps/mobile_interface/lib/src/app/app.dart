@@ -13,6 +13,7 @@ import 'package:mobile_interface/src/features/onboarding/controllers/onboarding_
 import 'package:mobile_interface/src/features/social/controllers/social_controller.dart';
 
 import 'package:mobile_interface/src/features/courses/controllers/courses_controller.dart';
+import 'package:mobile_interface/src/features/group_session/controllers/group_session_controller.dart';
 
 import 'package:mobile_interface/src/common/widgets/bottom_nav_bar.dart';
 import 'package:mobile_interface/src/features/social/pages/social.dart';
@@ -30,6 +31,12 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<CoursesController>(
           create: (ctx) => CoursesController(
             api: ctx.read<ApiClient>(),
+            auth: ctx.read<AuthService>(),
+          ),
+        ),
+        ChangeNotifierProvider<GroupSessionController>(
+          create: (ctx) => GroupSessionController(
+            api: ctx.read<ApiClient>(), 
             auth: ctx.read<AuthService>(),
           ),
         ),

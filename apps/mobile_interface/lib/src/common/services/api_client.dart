@@ -90,10 +90,11 @@ class ApiClient {
 
   Future<Map<String, dynamic>> deleteJson(
     String path, {
+    Map<String, String>? query,
     String? accessToken,
   }) async {
     final res = await _client.delete(
-      _uri(path),
+      _uri(path, query),
       headers: _headers(accessToken: accessToken),
     );
 

@@ -20,13 +20,15 @@ class PrivateLobby {
 
   factory PrivateLobby.fromJson(Map<String, dynamic> json) {
     return PrivateLobby(
-      id: json["id"] as String,
-      lobbyId: json["lobby_id"] as String,
+      id: json["id"].toString(),
+      lobbyId: json["lobby_id"].toString(),
       username: json["username"] as String,
-      userId: json["user_id"] as String,
-      host: json["host"] as String,
-      sessionStart: json["session_start"] as String,
-      joinedAt: DateTime.parse(json["joined_at"] as String),
+      userId: json["user_id"].toString(),
+      host: json["host"].toString(),
+      sessionStart: json["session_start"].toString(),
+      joinedAt: json["joined_at"] is String
+        ? DateTime.parse(json["joined_at"] as String)
+        : (json["joined_at"] as DateTime),
     );
   }
 }

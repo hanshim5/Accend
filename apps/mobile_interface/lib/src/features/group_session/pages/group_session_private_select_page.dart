@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../app/constants.dart';
-import '../controllers/group_session_controller.dart';
-import '../widgets/widget1.dart';
 import '../../../app/routes.dart' as routes;
 import '../widgets/private_button.dart' as private_button;
-import '../../../common/widgets/bottom_nav_bar.dart' as bot_nav_bar;
+import 'package:flutter/services.dart';
 
 class GroupSessionPrivateSelectPage extends StatefulWidget {
   const GroupSessionPrivateSelectPage({super.key});
@@ -16,8 +14,7 @@ class GroupSessionPrivateSelectPage extends StatefulWidget {
 class _GroupSessionSelectPageState extends State<GroupSessionPrivateSelectPage> {
 
   final _lobbyCode = TextEditingController();
-
-  bool _submitting = false;
+  String? error;
 
   @override
   void dispose() {
@@ -28,8 +25,6 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateSelectPage> 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-
-    int _selectedIndex = 1;
 
     return Scaffold(
       body: SafeArea(
@@ -43,7 +38,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateSelectPage> 
                   Stack(
                     children: [
                       IconButton(
-                        onPressed: () => Navigator.maybePop(context),
+                        onPressed: () => Navigator.pushNamed(context, routes.AppRoutes.groupSessionSelect),
                         icon: const Icon(Icons.arrow_back_ios_new_rounded),
                       ),
 
@@ -112,18 +107,46 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateSelectPage> 
 
                   const SizedBox(height: 18),
 
-                  OnboardingLabeledField(
-                    label: 'Enter Lobby Code',
-  
-                    rightLabelColor: AppColors.failure,
-                    child: TextField(
-                      controller: _lobbyCode,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Error text above the TextField
+                      if (error != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4.0),
+                          child: Text(
+                            error!,
+                            style: const TextStyle(color: Colors.red, fontSize: 12),
+                          ),
+                        ),
 
-                      decoration: InputDecoration(
-                        hintText: 'e.g. 11223344',
-
+                      // The lobby code input
+                      TextField(
+                        controller: _lobbyCode,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: 'e.g. 112233',
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(
+                              color: error != null ? Colors.red : Colors.grey, // red if error
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(
+                              color: error != null ? Colors.red : Colors.blue, // red if error
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(6),
+                        ],
                       ),
-                    ),
+                    ],
                   ),
 
                   const SizedBox(height: 18),
@@ -132,15 +155,43 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateSelectPage> 
                     title: "Join Lobby", 
                     subtitle: "Create or join with a code", 
                     icon: Icons.arrow_circle_right_outlined, 
-                    onTap: () {Navigator.pushNamed(context, routes.AppRoutes.groupSessionPrivateJoin);} // leo TODO Need to make it actually do something later
+                    onTap: () {
+                      final code = _lobbyCode.text.trim();
+
+                      if (int.tryParse(code) == null) {
+                        // Show an error message or update a state variable
+                        setState(() {
+                          error = "Missing lobby code";
+                        });
+                        return; // stop further execution
+                      }
+
+                      if (code.length != 6) {
+                        // Show an error message or update a state variable
+                        setState(() {
+                          error = "Lobby code must be exactly 6 digits";
+                        });
+                        return; // stop further execution
+                      }
+                      
+                      // Clear any previous error
+                      setState(() {
+                        error = null;
+                      });
+
+                      // If valid, call your join function or navigate
+                      Navigator.pushNamed(
+                        context, 
+                        routes.AppRoutes.groupSessionPrivateJoin,
+                        arguments: _lobbyCode.text.trim(),
+                      );  
+                    ;}
                   ),
+
+                  
 
                   Spacer(),
 
-                  bot_nav_bar.BottomNavBar(
-                    selectedIndex: _selectedIndex,
-                    onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-                  ),
                 ],
               ),
             ),

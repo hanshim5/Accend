@@ -38,8 +38,12 @@ from app.supabase_client import supabase_select_one
 
 from fastapi.middleware.cors import CORSMiddleware
 
+<<<<<<< Leo/PrivateJoin
+# Create FastAPI app
+=======
 
 # Create FastAPI application instance for the public gateway service.
+>>>>>>> main
 app = FastAPI(title="api-gateway")
 
 # CORS configuration for local development.
@@ -494,24 +498,110 @@ async def proxy_pronunciation_assess(
 # Group Session Service
 # -----------------------------------
 
+<<<<<<< Leo/PrivateJoin
+@app.get("/private_lobbies/{lobby_id}")
+async def proxy_get_lobby(
+    lobby_id: str,
+    authorization: str | None = Header(default=None),
+=======
 @app.get("/private_lobbies")
 async def proxy_get_private_lobby(
     authorization: str | None = Header(default=None)
+>>>>>>> main
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{settings.GROUP_SERVICE_URL}/private_lobbies/{lobby_id}",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+class CreatePrivateLobbyReq(BaseModel):
+    """
+<<<<<<< Leo/PrivateJoin
+    Request schema for generating a private lobby.
+    """
+    username: str = Field(min_length=1, max_length=5000)
+    user_id: str = Field(min_length=1, max_length=5000)
+
+@app.post("/private_lobbies/create")
+async def proxy_create_lobby(
+    body: CreatePrivateLobbyReq,
+    authorization: str | None = Header(default=None),
 ):
     """
+    
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(
+            f"{settings.GROUP_SERVICE_URL}/private_lobbies/create",
+            headers={"X-User-Id": user_id},
+            json={"username": body.username, "user_id": body.user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+class JoinPrivateLobbyReq(BaseModel):
+    """
+    Request schema for joining a private lobby.
+    """
+    user_id: str = Field(min_length=1, max_length=5000)
+    lobby_id: int = Field(gt=0)
+    username: str = Field(min_length=1, max_length=5000)
+
+@app.post("/private_lobbies/join")
+async def proxy_join_lobby(
+    body: JoinPrivateLobbyReq,
+    authorization: str | None = Header(default=None),
+):
+    """
+    
+=======
     Fetch private lobby data from group-service.
 
     Flow:
     1. Validate JWT.
     2. Forward request with X-User-Id header.
     3. Return downstream JSON response.
+>>>>>>> main
     """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(
+            f"{settings.GROUP_SERVICE_URL}/private_lobbies/join",
+            headers={"X-User-Id": user_id},
+            json={"user_id": body.user_id, "lobby_id": body.lobby_id, "username": body.username},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+
+@app.get("/private_lobbies/me")
+async def proxy_get_my_private_lobbies(
+    authorization: str | None = Header(default=None),
+):
     user_id = verify_supabase_jwt(authorization)
 
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.get(
-            f"{settings.GROUP_SERVICE_URL}/private_lobby",
-            headers={"X-User-Id": user_id},
+            f"{settings.GROUP_SERVICE_URL}/private_lobbies/me",
+            eaders={"X-User-Id": user_id},
         )
         if r.status_code >= 400:
             raise HTTPException(status_code=r.status_code, detail=r.text)
@@ -540,6 +630,24 @@ async def proxy_social_followers(
     async with httpx.AsyncClient(timeout=10) as client:
         r = await client.get(
             f"{settings.FOLLOW_SERVICE_URL}/followers",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.delete("/private_lobbies/leave")
+async def proxy_leave_lobby(
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.delete(
+            f"{settings.GROUP_SERVICE_URL}/private_lobbies/leave",
             headers={"X-User-Id": user_id},
         )
 
