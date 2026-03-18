@@ -1,26 +1,27 @@
 """
 courses.py
 
-Courses Router
+Courses Router (API Layer)
 
 Purpose:
-- Define HTTP endpoints for the courses-service.
-- Handle request validation and response formatting.
-- Extract user identity from the X-User-Id header (set by the Gateway).
-- Delegate business logic to the CourseService.
+- Define HTTP endpoints for the courses service.
+- Handle request parsing, basic validation, and response serialization.
+- Extract authenticated user identity from the X-User-Id header set by the Gateway.
+- Delegate all business logic to the CourseService.
 
-Architecture rule:
-routers -> services -> repositories -> supabase
+Architecture:
+Client (Flutter) → Gateway → Courses Service (this router) → Service → Repository → Supabase
 
-This file should NOT:
-- Talk directly to the database
-- Contain business logic
-- Validate JWTs (Gateway handles that)
+Architecture Rules:
+- Routers should NOT talk directly to the database.
+- Routers should NOT contain business logic.
+- Routers should NOT validate JWTs (the Gateway handles that).
 
-It only:
-- Extracts inputs (headers + body)
-- Validates basic things
+This file only:
+- Extracts inputs (headers, path params, request body)
+- Performs lightweight validation
 - Calls the service layer
+- Returns typed API responses
 """
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -31,10 +32,10 @@ from app.schemas.course_schema import CourseCreate, CourseOut
 from app.services.course_service import CourseService
 
 
-# Router is mounted with prefix="/courses"
-# So endpoints here become:
-# GET  /courses
-# POST /courses
+# Router is mounted with prefix="/courses".
+# Endpoints defined here resolve to:
+# - GET  /courses
+# - POST /courses
 router = APIRouter(prefix="/courses", tags=["courses"])
 
 
@@ -43,56 +44,57 @@ def _get_user_id(x_user_id: str | None) -> UUID:
     Extract and validate the X-User-Id header.
 
     Why:
-    - We are using "Gateway-validated auth".
-    - Gateway verifies JWT and forwards the authenticated user's UUID
-      via the X-User-Id header.
-    - This service trusts that header (internal-only communication).
+    - We use gateway-validated authentication.
+    - The Gateway verifies the user's JWT.
+    - The Gateway then forwards the authenticated user's UUID in X-User-Id.
+    - This service trusts that header because it is intended for internal use.
 
-    What this does:
-    1. Ensure header exists
-    2. Ensure it is a valid UUID
-    3. Return UUID object for strong typing
+    Flow:
+    1. Ensure the header is present.
+    2. Ensure the header contains a valid UUID string.
+    3. Return a UUID object for strong typing in downstream code.
 
     Raises:
-    - 401 if header missing
-    - 400 if header is not a valid UUID
+    - 401 if the header is missing
+    - 400 if the header value is not a valid UUID
     """
 
     if not x_user_id:
-        # If gateway didn't forward user id, request is unauthorized
+        # If the gateway did not forward a user id, treat the request as unauthorized.
         raise HTTPException(status_code=401, detail="Missing X-User-Id")
 
     try:
         return UUID(x_user_id)
     except Exception:
-        # If header value is not a valid UUID string
+        # If the header value cannot be parsed as a UUID.
         raise HTTPException(status_code=400, detail="Invalid X-User-Id")
 
 
 @router.get("", response_model=list[CourseOut])
 def list_courses(
-    # FastAPI extracts X-User-Id header and assigns it here
+    # FastAPI extracts the X-User-Id header and injects it here.
     x_user_id: str | None = Header(default=None, alias="X-User-Id"),
 
     # Dependency injection:
-    # FastAPI calls get_course_service() and injects the result
+    # FastAPI calls get_course_service() and provides the resulting service instance.
     svc: CourseService = Depends(get_course_service),
 ):
     """
-    GET /courses
+    Return all courses belonging to the authenticated user.
 
-    Returns all courses belonging to the authenticated user.
+    Endpoint:
+    - GET /courses
 
     Flow:
-    1. Extract user_id from header
-    2. Call service layer
-    3. Service calls repository
-    4. Repository calls Supabase
-    5. Return structured CourseOut list
+    1. Extract and validate user_id from X-User-Id header.
+    2. Call the service layer.
+    3. The service delegates to the repository.
+    4. The repository fetches data from Supabase.
+    5. Return a typed list of CourseOut objects.
 
     response_model ensures:
-    - Output matches CourseOut schema
-    - UUIDs and datetimes are serialized properly
+    - Output matches the CourseOut schema
+    - UUID and datetime fields are serialized correctly
     """
 
     user_id = _get_user_id(x_user_id)
@@ -101,36 +103,37 @@ def list_courses(
 
 @router.post("", response_model=CourseOut)
 def create_course(
-    # Request body automatically parsed into CourseCreate schema
+    # Request body is automatically parsed and validated as CourseCreate.
     body: CourseCreate,
 
-    # Extract user identity from header
+    # Authenticated user identity forwarded by the Gateway.
     x_user_id: str | None = Header(default=None, alias="X-User-Id"),
 
-    # Inject service layer
+    # Inject the service layer.
     svc: CourseService = Depends(get_course_service),
 ):
     """
-    POST /courses
+    Create a new course for the authenticated user.
 
-    Creates a new course for the authenticated user.
+    Endpoint:
+    - POST /courses
 
-    Request body example:
+    Example request body:
     {
         "title": "Travel phrases for restaurants"
     }
 
     Flow:
-    1. FastAPI validates request body using CourseCreate schema
-    2. Extract user_id from header
-    3. Call service layer
-    4. Service calls repository
-    5. Repository inserts into Supabase
-    6. Return newly created course as CourseOut
+    1. FastAPI validates the request body using CourseCreate.
+    2. Extract and validate user_id from X-User-Id header.
+    3. Call the service layer.
+    4. The service delegates to the repository.
+    5. The repository inserts the course into Supabase.
+    6. Return the created course as CourseOut.
 
     response_model ensures:
-    - Returned data matches CourseOut structure
-    - Types are validated before sending response
+    - Returned data matches the CourseOut schema
+    - Response types are validated before being sent
     """
 
     user_id = _get_user_id(x_user_id)

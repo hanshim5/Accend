@@ -1,20 +1,30 @@
 """
 supabase.py
 
-Supabase REST client (PostgREST) factory.
+Supabase REST Client (PostgREST)
 
 Purpose:
-- Provide a minimal, stable way to interact with Supabase Postgres via HTTP.
-- Avoid SDK coupling (supabase-py) so sb_secret_* keys work reliably.
+- Provide a minimal, stable interface for interacting with Supabase Postgres via HTTP.
+- Avoid dependency on Supabase SDKs (e.g., supabase-py).
+- Support modern Supabase keys (sb_secret_*) without validation issues.
 
-Why:
-- Supabase's "new keys" (sb_secret_*) are not legacy JWT-style keys.
-- Some SDK versions validate key format and reject these keys.
-- Raw PostgREST HTTP is stable, explicit, and microservice-friendly.
+Architecture:
+Repository Layer → (this client) → Supabase PostgREST API → Database
 
-Important:
-- Uses SUPABASE_SERVICE_ROLE_KEY (server-only) even if its value is sb_secret_*.
-- Never expose this key to Flutter or public clients.
+Why not use the SDK:
+- Supabase "new keys" (sb_secret_*) are not JWTs.
+- Some SDKs assume JWT format and reject these keys.
+- Direct HTTP calls are simpler, explicit, and microservice-friendly.
+
+Security:
+- Uses SUPABASE_SERVICE_ROLE_KEY (server-only).
+- This key bypasses RLS and has full database access.
+- NEVER expose this key to frontend clients (Flutter, web, etc).
+
+Design Notes:
+- Thin wrapper around HTTP calls (GET, POST, PATCH).
+- Keeps logic simple and predictable.
+- Returns raw JSON rows for repositories to validate into schemas.
 """
 
 from __future__ import annotations
@@ -23,40 +33,47 @@ from typing import Any
 import httpx
 from app.config import settings
 
-# Module-level cache so we only create the client once per process.
+# Module-level cache so we only create one HTTP client per process.
+# This avoids unnecessary connection overhead.
 _http: httpx.Client | None = None
 
 
 def _headers() -> dict[str, str]:
     """
-    Headers required by Supabase PostgREST.
+    Build headers required by Supabase PostgREST.
 
-    Supabase expects:
-    - apikey: <key>
-    - Authorization: Bearer <key>
+    Required headers:
+    - apikey: Supabase service role key
+    - Authorization: Bearer <same key>
 
-    Note:
-    - This is the backend API key (service role / secret).
+    Notes:
     - This is NOT the user's JWT.
+    - This is a backend-only key with elevated privileges.
+    - "Prefer: return=representation" ensures inserts/updates return rows.
     """
     key = settings.SUPABASE_SERVICE_ROLE_KEY
     return {
         "apikey": key,
         "Authorization": f"Bearer {key}",
-        # For inserts, this header requests the inserted row be returned.
+        # Ensures POST/PATCH return the affected rows
         "Prefer": "return=representation",
     }
 
 
 def get_http() -> httpx.Client:
     """
-    Returns a cached HTTP client.
+    Return a cached HTTP client.
 
-    How it works:
-    - First call: creates a client and caches it in _http.
-    - Later calls: returns the cached client.
+    Flow:
+    - First call: create a new httpx.Client and cache it.
+    - Subsequent calls: reuse the same client.
 
-    Used by repositories (data access layer), not by routers directly.
+    Why:
+    - Reusing a client improves performance (connection pooling).
+    - Avoids recreating connections on every database call.
+
+    Usage:
+    - Used by repository layer only (not directly by routers/services).
     """
     global _http
 
@@ -68,15 +85,25 @@ def get_http() -> httpx.Client:
 
 def rest_get(table: str, params: dict[str, str]) -> list[dict[str, Any]]:
     """
-    GET rows from a table via PostgREST.
+    Fetch rows from a table using PostgREST.
 
-    Example params:
+    Args:
+    - table: Table name (e.g., "lessons")
+    - params: Query parameters for filtering, selecting, ordering
+
+    Example:
       {
         "select": "id,user_id,title,created_at",
         "user_id": "eq.<uuid>",
         "order": "created_at.desc",
         "limit": "100",
       }
+
+    Returns:
+    - List of row dictionaries (empty list if no results)
+
+    Error Handling:
+    - Raises RuntimeError if Supabase returns an error response.
     """
     url = f"{settings.SUPABASE_URL}/rest/v1/{table}"
     client = get_http()
@@ -89,16 +116,23 @@ def rest_get(table: str, params: dict[str, str]) -> list[dict[str, Any]]:
     return data if isinstance(data, list) else []
 
 
-from typing import Any
-
 def rest_post(table: str, payload: dict[str, Any] | list[dict[str, Any]], select: str) -> list[dict[str, Any]]:
     """
-    INSERT one or many rows via PostgREST and return inserted rows.
+    Insert one or multiple rows into a table.
 
-    If payload is a dict -> inserts 1 row
-    If payload is a list of dicts -> bulk insert
+    Args:
+    - table: Table name
+    - payload:
+        - dict → insert single row
+        - list[dict] → bulk insert
+    - select: Columns to return after insert
 
-    Returns a list of inserted row dicts (possibly length 1).
+    Returns:
+    - List of inserted row dictionaries (length 1 for single insert)
+
+    Notes:
+    - Uses "Prefer: return=representation" to return inserted rows.
+    - Bulk inserts are more efficient than multiple single inserts.
     """
     url = f"{settings.SUPABASE_URL}/rest/v1/{table}"
     client = get_http()
@@ -110,12 +144,28 @@ def rest_post(table: str, payload: dict[str, Any] | list[dict[str, Any]], select
     data = resp.json()
     return data if isinstance(data, list) else []
 
+
 def rest_patch(table: str, match: dict[str, str], payload: dict[str, Any], select: str) -> list[dict[str, Any]]:
     """
-    PATCH rows via PostgREST and return updated rows.
+    Update rows in a table and return updated rows.
 
-    match example:
-      {"id": "eq.<uuid>"}
+    Args:
+    - table: Table name
+    - match: Filtering conditions (PostgREST format)
+        Example: {"id": "eq.<uuid>"}
+    - payload: Fields to update
+    - select: Columns to return
+
+    Flow:
+    - Applies filters via query params.
+    - Sends PATCH request with updated fields.
+    - Returns updated rows.
+
+    Returns:
+    - List of updated row dictionaries
+
+    Error Handling:
+    - Raises RuntimeError on failure response.
     """
     url = f"{settings.SUPABASE_URL}/rest/v1/{table}"
     client = get_http()

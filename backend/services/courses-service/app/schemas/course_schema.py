@@ -1,15 +1,21 @@
 """
 course_schema.py
 
-Pydantic schemas for request/response shapes.
+Course Schemas (Data Models)
 
 Purpose:
-- Define the "API contract" for courses endpoints.
-- Validate inputs and structure outputs consistently.
+- Define request and response shapes for course-related endpoints.
+- Enforce input validation and ensure consistent API responses.
+- Serve as the contract between frontend (Flutter) and backend.
 
-Rule of thumb:
-- CourseCreate = what the client sends to create a course.
-- CourseOut    = what our API returns back to the client.
+Architecture:
+- Routers use these schemas for request parsing and response serialization.
+- Services and repositories use them for typed data handling.
+- Closely mirror the 'courses' table but are API-focused.
+
+Schema Types:
+- CourseCreate → input from client (create operations)
+- CourseOut    → output returned to client (read operations)
 """
 
 from pydantic import BaseModel, Field
@@ -19,31 +25,44 @@ from uuid import UUID
 
 class CourseCreate(BaseModel):
     """
-    Request body for creating a course.
+    Input schema for creating a course.
 
     Example:
     { "title": "Travel phrases for restaurants" }
 
-    Field constraints:
-    - min_length prevents empty/whitespace titles
-    - max_length prevents unbounded strings
+    Validation:
+    - title must be non-empty (min_length=1)
+    - title length is capped to prevent excessively large inputs
     """
     title: str = Field(min_length=1, max_length=200)
 
 
 class CourseOut(BaseModel):
     """
-    Response shape for a course returned from the DB.
+    Output schema for a course.
 
-    Fields match the columns we select from Supabase.
-    Supabase returns JSON, and Pydantic converts types:
-    - id/user_id -> UUID
-    - created_at -> datetime
+    Represents a course record returned from the database.
+
+    Fields:
+    - id: Unique course identifier
+    - user_id: Owner of the course
+    - title: Course title
+    - created_at: Timestamp of creation
+    - progress_percent: Cached completion percentage (0–100)
+    - status: Course state ("not_started", "in_progress", "completed")
+
+    Notes:
+    - Pydantic automatically converts:
+        - UUID fields from strings
+        - created_at from ISO string → datetime
+    - progress_percent and status are included for fast UI rendering
+      without recomputing progress on every request.
     """
     id: UUID
     user_id: UUID
     title: str
     created_at: datetime
 
+    # Cached progress fields (derived from lesson completion)
     progress_percent: int = 0
     status: str = "not_started"
