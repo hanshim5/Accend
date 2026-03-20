@@ -115,6 +115,37 @@ class _SocialPageState extends State<SocialPage> {
           ],
         ),
       ),
+      floatingActionButton: DecoratedBox(
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x33F97316),
+              blurRadius: 6,
+              offset: Offset(0, 4),
+              spreadRadius: -4,
+            ),
+            BoxShadow(
+              color: Color(0x33F97316),
+              blurRadius: 15,
+              offset: Offset(0, 10),
+              spreadRadius: -3,
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          onPressed: null, // TODO: open user search popup
+          backgroundColor: const Color(0xFFF6B17A),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          focusElevation: 0,
+          hoverElevation: 0,
+          highlightElevation: 0,
+          disabledElevation: 0,
+          shape: const CircleBorder(),
+          child: const Icon(Icons.search_rounded, size: 28),
+        ),
+      ),
       bottomNavigationBar: BottomNavBar(
         selectedIndex: 0,
         onDestinationSelected: _onNavTap,
