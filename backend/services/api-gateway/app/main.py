@@ -73,6 +73,75 @@ def health():
 
 
 # -----------------------------------
+# Login Identifier Resolution
+# -----------------------------------
+
+class ResolveLoginReq(BaseModel):
+    """
+    Resolve a login identifier into an email address for Supabase Auth.
+
+    Supported identifiers:
+    - email address
+    - username
+
+    Why this exists:
+    - Supabase Auth signs in with email + password.
+    - The app UI supports "Username or Email".
+    - The gateway resolves usernames to emails before the frontend calls
+      Supabase sign-in.
+
+    Security:
+    - This endpoint does not reveal whether a username exists.
+    - Failures return a generic invalid-credentials style message.
+    """
+    identifier: str = Field(min_length=1, max_length=255)
+
+
+@app.post("/auth/resolve-login")
+async def resolve_login_identifier(req: ResolveLoginReq):
+    """
+    Resolve a login identifier to an email address.
+
+    Flow:
+    1. Normalize the identifier.
+    2. If it looks like an email, return it directly.
+    3. Otherwise treat it as a username and look up the profile row.
+    4. Return the resolved email.
+
+    Notes:
+    - Public endpoint: no JWT required because it is used before login.
+    - User-facing callers should still show a generic login failure message
+      if this endpoint fails.
+    """
+    identifier = req.identifier.strip()
+    if not identifier:
+        raise HTTPException(status_code=400, detail="identifier required")
+
+    # If the identifier contains "@", treat it as an email.
+    # This assumes usernames are not allowed to look like email addresses.
+    if "@" in identifier:
+        return {"email": identifier}
+
+    try:
+        rows = await supabase_select_one(
+            table="profiles",
+            select="email",
+            filters={"username": f"eq.{identifier}"},
+        )
+    except HTTPStatusError:
+        raise HTTPException(status_code=502, detail="Login resolution failed")
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    email = rows[0].get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    return {"email": email}
+
+
+# -----------------------------------
 # Profile Service
 # -----------------------------------
 
@@ -512,6 +581,7 @@ async def proxy_get_lobby(
 
     return r.json()
 
+
 class CreatePrivateLobbyReq(BaseModel):
     """
     Request schema for generating a private lobby.
@@ -519,14 +589,12 @@ class CreatePrivateLobbyReq(BaseModel):
     username: str = Field(min_length=1, max_length=5000)
     user_id: str = Field(min_length=1, max_length=5000)
 
+
 @app.post("/private_lobbies/create")
 async def proxy_create_lobby(
     body: CreatePrivateLobbyReq,
     authorization: str | None = Header(default=None),
 ):
-    """
-    
-    """
     user_id = verify_supabase_jwt(authorization)
 
     async with httpx.AsyncClient(timeout=10) as client:
@@ -541,6 +609,7 @@ async def proxy_create_lobby(
 
     return r.json()
 
+
 class JoinPrivateLobbyReq(BaseModel):
     """
     Request schema for joining a private lobby.
@@ -549,13 +618,13 @@ class JoinPrivateLobbyReq(BaseModel):
     lobby_id: int = Field(gt=0)
     username: str = Field(min_length=1, max_length=5000)
 
+
 @app.post("/private_lobbies/join")
 async def proxy_join_lobby(
     body: JoinPrivateLobbyReq,
     authorization: str | None = Header(default=None),
 ):
     """
-    
     Fetch private lobby data from group-service.
 
     Flow:
@@ -578,7 +647,6 @@ async def proxy_join_lobby(
     return r.json()
 
 
-
 @app.get("/private_lobbies/me")
 async def proxy_get_my_private_lobbies(
     authorization: str | None = Header(default=None),
@@ -588,7 +656,7 @@ async def proxy_get_my_private_lobbies(
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.get(
             f"{settings.GROUP_SERVICE_URL}/private_lobbies/me",
-            eaders={"X-User-Id": user_id},
+            headers={"X-User-Id": user_id},
         )
         if r.status_code >= 400:
             raise HTTPException(status_code=r.status_code, detail=r.text)

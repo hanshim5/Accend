@@ -54,8 +54,18 @@ class LoginController extends ChangeNotifier {
         return;
       }
 
+      final resolved = await api.postJson(
+        '/auth/resolve-login',
+        body: {'identifier': identifier},
+      );
+
+      final email = (resolved['email'] as String?)?.trim();
+      if (email == null || email.isEmpty) {
+        throw Exception('Missing resolved email');
+      }
+
       await auth.signIn(
-        email: identifier,
+        email: email,
         password: password,
       );
 
