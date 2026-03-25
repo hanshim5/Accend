@@ -9,6 +9,7 @@ import '../controllers/social_controller.dart';
 
 import 'followers.dart';
 import 'following.dart';
+import 'search_popup.dart';
 
 class SocialPage extends StatefulWidget {
   const SocialPage({super.key});
@@ -40,6 +41,10 @@ class _SocialPageState extends State<SocialPage> {
         Navigator.of(context).pushReplacementNamed(AppRoutes.profile);
         break;
     }
+  }
+
+  Future<void> _openSearchPopup() async {
+    await SearchPopup.show(context);
   }
 
   @override
@@ -134,7 +139,7 @@ class _SocialPageState extends State<SocialPage> {
           ],
         ),
         child: FloatingActionButton(
-          onPressed: null, // TODO: open user search popup
+          onPressed: _openSearchPopup,
           backgroundColor: const Color(0xFFF6B17A),
           foregroundColor: Colors.white,
           elevation: 0,
