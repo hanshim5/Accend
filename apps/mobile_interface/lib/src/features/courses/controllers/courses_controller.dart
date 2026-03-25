@@ -105,5 +105,23 @@ class CoursesController extends ChangeNotifier {
         .map((e) => Lesson.fromJson(e))
         .toList();
   }
-  
+
+  /// Mark a lesson as complete on the server.
+  ///
+  /// Best-effort: errors are swallowed so the caller's UI flow is never blocked.
+  /// The server endpoint is idempotent — calling it on an already-completed
+  /// lesson is safe.
+  Future<void> completeLesson(String courseId, String lessonId) async {
+    final token = _auth.accessToken;
+    if (token == null) return;
+
+    try {
+      await _api.postJson(
+        '/courses/$courseId/lessons/$lessonId/complete',
+        accessToken: token,
+      );
+    } catch (_) {
+      // Silently swallow — completion is best-effort and must not disrupt UX.
+    }
+  }
 }

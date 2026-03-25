@@ -132,7 +132,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
         MaterialPageRoute<void>(
           builder: (_) => PracticeResultsPage(
             feedbacks: _controller.sessionFeedbacks,
-            lessonTitle: widget.lesson?.title,
+            lesson: widget.lesson,
           ),
         ),
       );

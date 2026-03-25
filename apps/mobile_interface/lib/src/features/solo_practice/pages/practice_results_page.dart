@@ -2,49 +2,86 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 import '../../../app/constants.dart';
 import '../../../app/routes.dart';
+import '../../courses/controllers/courses_controller.dart';
+import '../../courses/models/lesson.dart';
 import '../models/pronunciation_feedback.dart';
 
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
-class PracticeResultsPage extends StatelessWidget {
+class PracticeResultsPage extends StatefulWidget {
   const PracticeResultsPage({
     super.key,
     required this.feedbacks,
-    this.lessonTitle,
+    this.lesson,
   });
 
   final List<PronunciationFeedbackMock> feedbacks;
-  final String? lessonTitle;
+
+  /// The completed lesson. When provided, the server is notified of completion
+  /// on mount (best-effort, non-blocking).
+  final Lesson? lesson;
+
+  @override
+  State<PracticeResultsPage> createState() => _PracticeResultsPageState();
+}
+
+class _PracticeResultsPageState extends State<PracticeResultsPage> {
+  // -------------------------------------------------------------------------
+  // Lifecycle
+  // -------------------------------------------------------------------------
+
+  @override
+  void initState() {
+    super.initState();
+    _notifyLessonComplete();
+  }
+
+  void _notifyLessonComplete() {
+    final lesson = widget.lesson;
+    if (lesson == null || lesson.isCompleted) return;
+
+    // Fire-and-forget: we don't await or show any loading state here so the
+    // results page renders immediately. Failures are swallowed in the controller.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context
+          .read<CoursesController>()
+          .completeLesson(lesson.courseId, lesson.id);
+    });
+  }
+
+  List<PronunciationFeedbackMock> get _feedbacks => widget.feedbacks;
 
   // -------------------------------------------------------------------------
   // Computed averages
   // -------------------------------------------------------------------------
 
   double get _avgAccuracy {
-    if (feedbacks.isEmpty) return 0;
-    return feedbacks.map((f) => f.accuracyScore).reduce((a, b) => a + b) /
-        feedbacks.length;
+    if (_feedbacks.isEmpty) return 0;
+    return _feedbacks.map((f) => f.accuracyScore).reduce((a, b) => a + b) /
+        _feedbacks.length;
   }
 
   double get _avgFluency {
-    if (feedbacks.isEmpty) return 0;
-    return feedbacks.map((f) => f.fluencyScore).reduce((a, b) => a + b) /
-        feedbacks.length;
+    if (_feedbacks.isEmpty) return 0;
+    return _feedbacks.map((f) => f.fluencyScore).reduce((a, b) => a + b) /
+        _feedbacks.length;
   }
 
   double get _avgCompleteness {
-    if (feedbacks.isEmpty) return 0;
-    return feedbacks.map((f) => f.completenessScore).reduce((a, b) => a + b) /
-        feedbacks.length;
+    if (_feedbacks.isEmpty) return 0;
+    return _feedbacks.map((f) => f.completenessScore).reduce((a, b) => a + b) /
+        _feedbacks.length;
   }
 
   double get _avgOverall {
-    final withPron = feedbacks.where((f) => f.pronScore != null).toList();
+    final withPron = _feedbacks.where((f) => f.pronScore != null).toList();
     if (withPron.isNotEmpty) {
       return withPron.map((f) => f.pronScore!).reduce((a, b) => a + b) /
           withPron.length;
@@ -132,7 +169,7 @@ class PracticeResultsPage extends StatelessWidget {
 
                     // Lesson name
                     Text(
-                      lessonTitle ?? 'Practice Session',
+                      widget.lesson?.title ?? 'Practice Session',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.publicSans(
                         color: AppColors.textSecondary,
@@ -224,7 +261,7 @@ class PracticeResultsPage extends StatelessWidget {
 
                     // Cards completed count
                     Text(
-                      '${feedbacks.length} of ${feedbacks.length} exercise${feedbacks.length == 1 ? '' : 's'} completed',
+                      '${_feedbacks.length} of ${_feedbacks.length} exercise${_feedbacks.length == 1 ? '' : 's'} completed',
                       style: GoogleFonts.publicSans(
                         color: AppColors.textSecondary,
                         fontSize: 13,
