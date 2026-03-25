@@ -57,7 +57,7 @@ class SupabaseProfileRepo(ProfileRepo):
         rows = await supabase.get(
             "profiles",
             params={
-                "select": "id,username,onboarding_complete,native_language,full_name,learning_goal,feedback_tone,accent,daily_pace,skill_assess",
+                "select": "id,username,onboarding_complete,email,native_language,full_name,learning_goal,feedback_tone,accent,daily_pace,skill_assess",
                 "id": f"eq.{user_id}",
                 "limit": "1",
             },
@@ -94,6 +94,7 @@ class SupabaseProfileRepo(ProfileRepo):
         self,
         user_id: str,
         username: str,
+        email: str,
         full_name: str | None,
         native_language: str | None,
     ) -> None:
@@ -118,6 +119,7 @@ class SupabaseProfileRepo(ProfileRepo):
         payload = {
             "id": user_id,
             "username": username,
+            "email": email,
             "onboarding_complete": False,
         }
 

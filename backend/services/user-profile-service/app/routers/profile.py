@@ -96,7 +96,7 @@ async def init_profile(
     Initialize a new user profile.
 
     Flow:
-    1. Parse request body (username, full_name, native_language).
+    1. Parse request body (username, email, full_name, native_language).
     2. Extract user_id from header.
     3. Call service to create profile.
     4. Return success response.
@@ -108,6 +108,7 @@ async def init_profile(
     await svc.init_profile(
         user_id=x_user_id or "",
         username=body.username,
+        email=body.email,
         full_name=body.full_name,
         native_language=body.native_language,
     )

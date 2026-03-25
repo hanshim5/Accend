@@ -1,300 +1,71 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:mobile_interface/src/app/constants.dart';
-import 'package:mobile_interface/src/app/routes.dart';
-import 'package:mobile_interface/src/common/services/auth_service.dart';
-import 'package:mobile_interface/src/features/onboarding/controllers/onboarding_controller.dart';
+import '../../../app/constants.dart';
+import '../../../common/services/api_client.dart';
+import '../../../common/services/auth_service.dart';
+import '../../onboarding/controllers/onboarding_controller.dart';
+import '../controllers/login_controller.dart';
+import '../widgets/login_form_card.dart';
 
-class LoginPage extends StatefulWidget {
+class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider<LoginController>(
+      create: (ctx) => LoginController(
+        auth: ctx.read<AuthService>(),
+        api: ctx.read<ApiClient>(),
+        onboarding: ctx.read<OnboardingController>(),
+      ),
+      child: const _LoginView(),
+    );
+  }
 }
 
-class _LoginPageState extends State<LoginPage> {
-  final _emailCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-
-  bool _isLoading = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _emailCtrl.dispose();
-    _passwordCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _signIn() async {
-    final auth = context.read<AuthService>();
-    final onboarding = context.read<OnboardingController>();
-
-    final email = _emailCtrl.text.trim();
-    final password = _passwordCtrl.text;
-
-    setState(() {
-      _error = null;
-      _isLoading = true;
-    });
-
-    try {
-      if (email.isEmpty || password.isEmpty) {
-        throw Exception("Email and password are required");
-      }
-
-      await auth.signIn(email: email, password: password);
-      var nextRoute = AppRoutes.courses;
-      try {
-        nextRoute = await onboarding.getPostLoginRoute();
-      } catch (e) {
-        debugPrint('Login resume route lookup failed: $e');
-      }
-
-      if (!mounted) return;
-
-      Navigator.pushReplacementNamed(context, nextRoute);
-    } catch (e) {
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _signOut() async {
-    final auth = context.read<AuthService>();
-
-    setState(() {
-      _error = null;
-      _isLoading = true;
-    });
-
-    try {
-      await auth.signOut();
-      if (!mounted) return;
-
-      // Stay on login page; clear fields for convenience
-      _emailCtrl.clear();
-      _passwordCtrl.clear();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Logged out")),
-      );
-      setState(() {});
-    } catch (e) {
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+class _LoginView extends StatelessWidget {
+  const _LoginView();
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final auth = context.watch<AuthService>();
-    final isLoggedIn = auth.currentSession != null;
 
     return Scaffold(
+      backgroundColor: AppColors.primaryBg,
       body: SafeArea(
         child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Header
-                  RichText(
-                    textAlign: TextAlign.center,
-                    text: TextSpan(
-                      style: t.textTheme.headlineMedium,
-                      children: [
-                        const TextSpan(text: 'Welcome to '),
-                        TextSpan(
-                          text: 'Accend',
-                          style: t.textTheme.headlineMedium?.copyWith(
-                            color: AppColors.accent,
-                          ),
-                        ),
-                      ],
-                    ),
+                  Image.asset(
+                    'assets/images/accend_logo.png',
+                    width: 120,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Text(
-                    'Sign in to continue',
-                    style: t.textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // Error
-                  if (_error != null) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(AppSpacing.sm),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppRadii.md),
-                        border: Border.all(color: AppColors.failure),
-                      ),
-                      child: Text(
-                        _error!,
-                        style: t.textTheme.bodyMedium?.copyWith(
-                          color: AppColors.failure,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-
-                  // Email
-                  TextField(
-                    controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: "Email",
-                      hintText: "you@example.com",
+                    'Accend',
+                    style: t.textTheme.headlineMedium?.copyWith(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      height: 1.0,
                     ),
                   ),
-                  const SizedBox(height: 12),
-
-                  // Password
-                  TextField(
-                    controller: _passwordCtrl,
-                    obscureText: true,
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _isLoading ? null : _signIn(),
-                    decoration: const InputDecoration(
-                      labelText: "Password",
-                      hintText: "••••••••",
+                  const SizedBox(height: 2),
+                  Text(
+                    'Elevate Language',
+                    style: t.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
                     ),
                   ),
-
                   const SizedBox(height: 18),
-
-                  // Login button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _signIn,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accent,
-                        foregroundColor: AppColors.textPrimary,
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text("Log In"),
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  // Logout (only if logged in)
-                  if (isLoggedIn) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: OutlinedButton(
-                        onPressed: _isLoading ? null : _signOut,
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.failure),
-                          foregroundColor: AppColors.failure,
-                        ),
-                        child: const Text("Log Out"),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-
-                  // Keep onboarding button (your existing flow)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: OutlinedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () => Navigator.pushNamed(
-                                context,
-                                AppRoutes.onboardingUserInfo,
-                              ),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.accent),
-                        foregroundColor: AppColors.accent,
-                      ),
-                      child: const Text('Start Onboarding'),
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  // Debug: go to courses
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: OutlinedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () => Navigator.pushNamed(context, AppRoutes.courses),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.accent2),
-                        foregroundColor: AppColors.accent2,
-                      ),
-                      child: const Text('Go to Courses (Debug)'),
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: OutlinedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () => Navigator.pushNamed(context, AppRoutes.socialDebug),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.action),
-                        foregroundColor: AppColors.action,
-                      ),
-                      child: const Text('Go to Social (Debug)'),
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: OutlinedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () => Navigator.pushNamed(context, AppRoutes.groupSessionSelect),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.action),
-                        foregroundColor: AppColors.action,
-                      ),
-                      child: const Text('Go to Group Sessions (Debug)'),
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  // Logged-in hint
-                  if (isLoggedIn)
-                    Text(
-                      "Logged in as: ${auth.currentUser?.email ?? "(unknown)"}",
-                      style: t.textTheme.bodyMedium,
-                      textAlign: TextAlign.center,
-                    ),
+                  const LoginFormCard(),
                 ],
               ),
             ),
