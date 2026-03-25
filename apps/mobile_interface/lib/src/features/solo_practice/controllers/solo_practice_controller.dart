@@ -48,6 +48,7 @@ class SoloPracticeController {
                 .toList();
 
   final List<LessonItem> _items;
+  final List<PronunciationFeedbackMock> _sessionFeedbacks = [];
 
   int currentCardIndex = 0;
 
@@ -55,6 +56,10 @@ class SoloPracticeController {
   int micStateIndex = 0;
 
   PronunciationFeedbackMock? currentFeedback;
+
+  /// All feedback results collected so far in this session (one per submitted card).
+  List<PronunciationFeedbackMock> get sessionFeedbacks =>
+      List.unmodifiable(_sessionFeedbacks);
 
   int get totalCards => _items.length;
 
@@ -118,8 +123,12 @@ class SoloPracticeController {
   }
 
   /// Clear feedback and advance to next card (or stay on last). Resets mic to idle.
-  /// Returns true if there is a next card, false if this was the last card (caller may show completion dialog).
+  /// Saves the current feedback into [sessionFeedbacks] before clearing it.
+  /// Returns true if there is a next card, false if this was the last card.
   bool advanceToNextCard() {
+    if (currentFeedback != null) {
+      _sessionFeedbacks.add(currentFeedback!);
+    }
     currentFeedback = null;
     micStateIndex = 0;
     if (currentCardIndex < totalCards - 1) {
@@ -129,10 +138,11 @@ class SoloPracticeController {
     return false;
   }
 
-  /// Reset session to first card, clear feedback, mic to idle (e.g. back button).
+  /// Reset session to first card, clear feedback and accumulated results, mic to idle.
   void resetSession() {
     currentCardIndex = 0;
     micStateIndex = 0;
     currentFeedback = null;
+    _sessionFeedbacks.clear();
   }
 }

@@ -11,6 +11,7 @@ import '../../../common/widgets/microphone.dart';
 import '../../courses/models/lesson.dart';
 import '../controllers/solo_practice_controller.dart';
 import '../widgets/feedback_card.dart';
+import 'practice_results_page.dart';
 
 // ---------------------------------------------------------------------------
 // Page
@@ -120,30 +121,19 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
     });
   }
 
-  /// After user taps Next on feedback: clear feedback, go to next card or show completion.
+  /// After user taps Next on feedback: clear feedback, go to next card or show results page.
   void _advanceToNextCard() {
     _clearRecording();
     final hasMore = _controller.advanceToNextCard();
-    setState(() {});
-    if (!hasMore) {
-      showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          backgroundColor: AppColors.surface,
-          title: Text('Lesson Complete! 🎉', style: GoogleFonts.inter(color: AppColors.textPrimary)),
-          content: Text(
-            'You\'ve completed all ${_controller.totalCards} exercises. Great work!',
-            style: GoogleFonts.publicSans(color: AppColors.textSecondary),
+    if (hasMore) {
+      setState(() {});
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => PracticeResultsPage(
+            feedbacks: _controller.sessionFeedbacks,
+            lessonTitle: widget.lesson?.title,
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                Navigator.of(context).maybePop();
-              },
-              child: const Text('Finish'),
-            ),
-          ],
         ),
       );
     }
