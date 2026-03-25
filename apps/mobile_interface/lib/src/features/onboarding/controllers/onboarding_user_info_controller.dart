@@ -34,6 +34,8 @@ class OnboardingUserInfoController {
       usernameErr = 'Required';
     } else if (u.length < 3) {
       usernameErr = 'Must be at least 3 characters';
+    } else if (_looksLikeEmail(u)) {
+      usernameErr = 'Username cannot be an email address';
     }
 
     // Email
@@ -64,6 +66,11 @@ class OnboardingUserInfoController {
       emailErr == null &&
       passwordErr == null &&
       languageErr == null;
+
+  bool _looksLikeEmail(String value) {
+    final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    return emailRegex.hasMatch(value.trim());
+  }
 
   bool _isValidEmail(String email) {
     final emailRegex = RegExp(

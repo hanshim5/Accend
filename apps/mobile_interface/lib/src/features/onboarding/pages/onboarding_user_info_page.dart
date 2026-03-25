@@ -32,11 +32,38 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
 
   String? _nativeLanguage;
   final _languages = const [
-    'English', 'Spanish', 'French', 'Japanese', 'Korean', 'Mandarin', 'Cantonese', 'Wu', 'Vietnamese', 
-    'Ilocano', 'Tagalog', 'Russian', 'Arabic', 'Georgian', 'German', 'Latin', 'Bulgarian', 'Scandanavian', 
-    'Sinhala', 'Hindi', 'Portuguese', 'Nepali', 'Signese', 'Braille', 'Hausa', 'Yoruba', 'Igbo', 'Swedish',
-    'Italian', 'Greek', 'Pidgin'
-    ];
+    'English',
+    'Spanish',
+    'French',
+    'Japanese',
+    'Korean',
+    'Mandarin',
+    'Cantonese',
+    'Wu',
+    'Vietnamese',
+    'Ilocano',
+    'Tagalog',
+    'Russian',
+    'Arabic',
+    'Georgian',
+    'German',
+    'Latin',
+    'Bulgarian',
+    'Scandanavian',
+    'Sinhala',
+    'Hindi',
+    'Portuguese',
+    'Nepali',
+    'Signese',
+    'Braille',
+    'Hausa',
+    'Yoruba',
+    'Igbo',
+    'Swedish',
+    'Italian',
+    'Greek',
+    'Pidgin',
+  ];
 
   @override
   void dispose() {
@@ -102,6 +129,7 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
           'username': username,
           'full_name': fullName,
           'native_language': nativeLanguage,
+          'email': email,
         },
       );
 
@@ -109,6 +137,33 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
       Navigator.pushReplacementNamed(context, AppRoutes.onboardingSkillAssess);
     } on ApiException catch (e) {
       if (!mounted) return;
+
+      final msg = e.toString().toLowerCase();
+
+      if (msg.contains('username cannot be an email')) {
+        setState(() {
+          _c.usernameErr = 'Username cannot be an email address';
+        });
+        return;
+      }
+
+      if (msg.contains('username already taken') ||
+          msg.contains('username is taken')) {
+        setState(() {
+          _c.usernameErr = 'Username is taken';
+        });
+        return;
+      }
+
+      if (msg.contains('email already registered') ||
+          msg.contains('user already registered') ||
+          msg.contains('user_already_exists')) {
+        setState(() {
+          _c.emailErr = 'An account with this email already exists';
+        });
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Request failed: ${e.toString()}')),
       );

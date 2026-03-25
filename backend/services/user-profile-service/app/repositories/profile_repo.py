@@ -36,7 +36,7 @@ class ProfileRepo(Protocol):
     - ProfileService (business logic layer)
     """
 
-    def username_exists(self, username: str) -> bool: ...
+    async def username_exists(self, username: str) -> bool: ...
     """
     Check if a username is already taken.
 
@@ -54,10 +54,11 @@ class ProfileRepo(Protocol):
     - Return empty or raise if profile does not exist (implementation-dependent).
     """
 
-    def init_profile(
+    async def init_profile(
         self,
         user_id: str,
         username: str,
+        email: str,
         full_name: str | None,
         native_language: str | None,
     ) -> None: ...
@@ -66,7 +67,7 @@ class ProfileRepo(Protocol):
 
     Expected Behavior:
     - Insert a new profile row for the given user_id.
-    - Populate initial fields such as username, full_name, and native_language.
+    - Populate initial fields such as username, email, full_name, and native_language.
     - Called during onboarding/registration.
     """
 

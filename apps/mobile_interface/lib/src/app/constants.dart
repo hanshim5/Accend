@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 /// Widgets should NOT hardcode colors—pull from Theme.of(context) instead.
 class AppColors {
   // Primary background: #0E172A (Deep Midnight)
-  static const primaryBg = Color(0xFF0E172A);
+  static const primaryBg = Color(0xFF0F172A);
 
   // Card & Surface: #1E293B (Slate Navy)
   static const surface = Color(0xFF1E293B);

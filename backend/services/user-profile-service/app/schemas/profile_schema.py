@@ -37,6 +37,7 @@ class ProfileInitRequest(BaseModel):
 
     Fields:
     - username: Desired username (minimum length enforced)
+    - email: email of account used for auth and login
     - full_name: Optional display name
     - native_language: Optional user-native language
 
@@ -44,6 +45,7 @@ class ProfileInitRequest(BaseModel):
     - Used during onboarding after authentication.
     """
     username: str = Field(min_length=3)
+    email: str = Field(min_length=3)
     full_name: str | None = None
     native_language: str | None = None
 
@@ -68,6 +70,7 @@ class ProfileReadResponse(BaseModel):
     - id: User ID (matches Supabase auth user ID)
     - username: Unique username
     - onboarding_complete: Whether onboarding flow is finished
+    - email: Unique email
     - native_language: Optional
     - full_name: Optional
     - learning_goal: Optional onboarding field
@@ -82,6 +85,7 @@ class ProfileReadResponse(BaseModel):
     id: str
     username: str
     onboarding_complete: bool
+    email: str
     native_language: str | None = None
     full_name: str | None = None
     learning_goal: str | None = None
