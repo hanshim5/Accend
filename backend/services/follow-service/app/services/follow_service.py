@@ -13,6 +13,9 @@ class FollowService:
     async def list_following(self, user_id: UUID):
         return await self.repo.list_following(user_id)
 
+    async def search_profiles(self, user_id: UUID, q: str, limit: int):
+        return await self.repo.search_profiles(user_id=user_id, q=q, limit=limit)
+
     async def follow(self, follower_id: UUID, followee_id: UUID) -> None:
         await self.repo.follow(follower_id, followee_id)
 

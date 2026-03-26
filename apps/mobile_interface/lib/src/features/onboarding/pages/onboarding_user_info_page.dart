@@ -127,6 +127,7 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
         accessToken: accessToken,
         body: {
           'username': username,
+          'email': email,
           'full_name': fullName,
           'native_language': nativeLanguage,
           'email': email,

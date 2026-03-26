@@ -738,6 +738,30 @@ async def proxy_social_following(
     return r.json()
 
 
+@app.get("/social/search")
+async def proxy_social_search(
+    q: str,
+    limit: int = 20,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Search users by username through follow-service.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{settings.FOLLOW_SERVICE_URL}/search",
+            headers={"X-User-Id": user_id},
+            params={"q": q, "limit": str(limit)},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
 @app.post("/social/follow/{followee_id}")
 async def proxy_social_follow_user(
     followee_id: str,

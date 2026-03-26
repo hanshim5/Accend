@@ -84,6 +84,7 @@ class ProfileReadResponse(BaseModel):
     """
     id: str
     username: str
+    email: str
     onboarding_complete: bool
     email: str
     native_language: str | None = None
