@@ -69,15 +69,8 @@ class LoginController extends ChangeNotifier {
         password: password,
       );
 
-      var nextRoute = AppRoutes.courses;
-      try {
-        nextRoute = await onboarding.getPostLoginRoute();
-      } catch (e) {
-        debugPrint('Login resume route lookup failed: $e');
-      }
-
       if (!context.mounted) return;
-      Navigator.pushReplacementNamed(context, nextRoute);
+      Navigator.pushReplacementNamed(context, AppRoutes.home);
     } catch (e) {
       errorMessage = 'Invalid username, email, or password.';
     } finally {
