@@ -31,62 +31,60 @@ import re
 
 TOPIC_IMAGE_POOLS: dict[str, list[str]] = {
     "business": [
-        "https://example.com/course-images/business-1.jpg",
-        "https://example.com/course-images/business-2.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/business-1.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/business-2.jpg",
     ],
     "travel": [
-        "https://example.com/course-images/travel-1.jpg",
-        "https://example.com/course-images/travel-2.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/travel-1.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/travel-2.jpg",
     ],
     "grammar": [
-        "https://example.com/course-images/grammar-1.jpg",
-        "https://example.com/course-images/grammar-2.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/grammar-1.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/grammar-2.jpg",
     ],
     "pronunciation": [
-        "https://example.com/course-images/pronunciation-1.jpg",
-        "https://example.com/course-images/pronunciation-2.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/pronunciation-1.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/pronunciation-2.jpg",
     ],
     "conversation": [
-        "https://example.com/course-images/conversation-1.jpg",
-        "https://example.com/course-images/conversation-2.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/conversation-1.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/conversation-2.jpg",
     ],
     "vocabulary": [
-        "https://example.com/course-images/vocabulary-1.jpg",
-        "https://example.com/course-images/vocabulary-2.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/vocabulary-1.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/vocabulary-2.jpg",
     ],
     "reading": [
-        "https://example.com/course-images/reading-1.jpg",
-        "https://example.com/course-images/reading-2.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/reading-1.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/reading-2.jpg",
     ],
     "writing": [
-        "https://example.com/course-images/writing-1.jpg",
-        "https://example.com/course-images/writing-2.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/writing-1.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/writing-2.jpg",
     ],
     "listening": [
-        "https://example.com/course-images/listening-1.jpg",
-        "https://example.com/course-images/listening-2.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/listening-1.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/listening-2.jpg",
     ],
     "interview_workplace": [
-        "https://example.com/course-images/interview-workplace-1.jpg",
-        "https://example.com/course-images/interview-workplace-2.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/interview-1.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/interview-2.jpg",
     ],
     "academic": [
-        "https://example.com/course-images/academic-1.jpg",
-        "https://example.com/course-images/academic-2.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/academic-1.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/academic-2.jpg",
     ],
     "presentation": [
-        "https://example.com/course-images/presentation-1.jpg",
-        "https://example.com/course-images/presentation-2.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/presentation-1.jpg",
+        "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/presentation-2.jpg",
     ],
 }
 
 GENERAL_IMAGE_POOL: list[str] = [
-    "https://example.com/course-images/general-abstract-learning.jpg",
-    "https://example.com/course-images/general-books-study-desk.jpg",
-    "https://example.com/course-images/general-microphone-speaking.jpg",
-    "https://example.com/course-images/general-globe-language.jpg",
-    "https://example.com/course-images/general-neutral-gradient.jpg",
-    "https://example.com/course-images/general-branded-default.jpg",
+    "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/abstract-learning-1.jpg",
+    "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/study-1.jpg",
+    "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/speaking-1.jpg",
+    "https://ielsxciakbkhekjbdskt.supabase.co/storage/v1/object/public/course-images/global-1.jpg",
 ]
 
 
