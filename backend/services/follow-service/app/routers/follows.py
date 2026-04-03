@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from app.dependencies import get_follow_service
 from app.schemas.follow_schema import FollowWriteResponse, SocialUserOut
@@ -34,6 +34,16 @@ async def list_following(
     svc: FollowService = Depends(get_follow_service),
 ):
     return await svc.list_following(_get_user_id(x_user_id))
+
+
+@router.get("/search", response_model=list[SocialUserOut])
+async def search_profiles(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(20, ge=1, le=50),
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: FollowService = Depends(get_follow_service),
+):
+    return await svc.search_profiles(_get_user_id(x_user_id), q=q, limit=limit)
 
 
 @router.post("/follow/{followee_id}", response_model=FollowWriteResponse)

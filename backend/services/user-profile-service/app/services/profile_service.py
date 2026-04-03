@@ -127,7 +127,7 @@ class ProfileService:
             bad_request("user_id missing")
 
         u = username.strip()
-        e = email.strip()
+        e = email.strip().lower()
 
         if not u:
             bad_request("username is required")

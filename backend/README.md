@@ -135,8 +135,9 @@ Gateway aggregates data from multiple services and returns a single DTO.
 
 ## Backend Folder Structure
 
-backend/ services/ api-gateway/ courses-service/ app/ routers/ services/
-repositories/ clients/ schemas/ ai-service/ sessions-service/
+backend/ services/ api-gateway/ courses-service/ ai-course-gen-service/
+user-profile-service/ pronunciation-feedback/ group-service/ follow-service/
+progress-service/ app/ routers/ services/ repositories/ clients/ schemas/
 
 shared/ auth/ http/ logging.py
 
@@ -224,6 +225,17 @@ ACCEND/
 │   ├── services/
 │   │   ├── api-gateway/
 │   │   ├── courses-service/
+│   │   ├── ai-course-gen-service/
+│   │   ├── user-profile-service/
+│   │   ├── pronunciation-feedback/
+│   │   ├── group-service/
+│   │   ├── follow-service/
+│   │   ├── progress-service/
+│   │   │   ├── app/
+│   │   │   │   └── main.py
+│   │   │   ├── Dockerfile
+│   │   │   └── requirements.txt
+│   │   │
 │   │   │   ├── app/
 │   │   │   │   ├── main.py
 │   │   │   │   ├── config.py

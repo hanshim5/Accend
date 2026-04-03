@@ -65,10 +65,23 @@ class OnboardingController extends ChangeNotifier {
       throw Exception('No access token');
     }
 
-    final profile = await apiClient.getJson(
-      '/profile',
-      accessToken: accessToken,
-    );
+    Map<String, dynamic> profile;
+    try {
+      profile = await apiClient.getJson(
+        '/profile',
+        accessToken: accessToken,
+      );
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) {
+        await _initProfileForExistingUser(accessToken);
+        profile = await apiClient.getJson(
+          '/profile',
+          accessToken: accessToken,
+        );
+      } else {
+        rethrow;
+      }
+    }
 
     data.skillAssess = profile['skill_assess'] as String?;
     data.learningGoal = profile['learning_goal'] as String?;
@@ -86,6 +99,60 @@ class OnboardingController extends ChangeNotifier {
     if (data.accent == null) return AppRoutes.onboardingAccentSelection;
     if (data.feedbackTone == null) return AppRoutes.onboardingFeedbackTone;
     return AppRoutes.onboardingDailyGoal;
+  }
+
+  Future<void> _initProfileForExistingUser(String accessToken) async {
+    final user = authService.currentUser;
+    if (user == null) {
+      throw Exception('Missing user while initializing profile');
+    }
+
+    final metadata = user.userMetadata;
+    final fullName = (metadata?['full_name'] as String?)?.trim();
+    final email = (user.email ?? '').trim().toLowerCase();
+    if (email.isEmpty) {
+      throw Exception('Missing email while initializing profile');
+    }
+    final emailPrefix = (user.email ?? '').split('@').first.trim();
+    final idPrefix = user.id.replaceAll('-', '').substring(0, 8);
+
+    var username = _normalizeUsername(emailPrefix);
+    if (username.length < 3) {
+      username = 'user$idPrefix';
+    }
+
+    try {
+      await apiClient.postJson(
+        '/profile/init',
+        accessToken: accessToken,
+        body: {
+          'username': username,
+          'email': email,
+          'full_name': (fullName != null && fullName.isNotEmpty) ? fullName : null,
+          'native_language': null,
+        },
+      );
+    } on ApiException catch (e) {
+      if (e.statusCode != 409) rethrow;
+
+      await apiClient.postJson(
+        '/profile/init',
+        accessToken: accessToken,
+        body: {
+          'username': 'user$idPrefix',
+          'email': email,
+          'full_name': (fullName != null && fullName.isNotEmpty) ? fullName : null,
+          'native_language': null,
+        },
+      );
+    }
+  }
+
+  String _normalizeUsername(String raw) {
+    final lower = raw.toLowerCase();
+    final sanitized = lower.replaceAll(RegExp(r'[^a-z0-9_]'), '_');
+    final squashed = sanitized.replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'^_|_$'), '');
+    return squashed;
   }
 
   String? previousRouteFor(String currentRoute) {

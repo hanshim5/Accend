@@ -1,3 +1,5 @@
+// lib/src/features/courses/pages/courses_list_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -7,6 +9,7 @@ import '../../../common/widgets/bottom_nav_bar.dart';
 
 import '../controllers/courses_controller.dart';
 import '../models/course.dart';
+import '../pages/generate_course_page.dart';
 import '../widgets/course_card.dart';
 import '../widgets/generate_course_popup.dart';
 import '../widgets/start_lesson_popup.dart';
@@ -150,15 +153,19 @@ class _CoursesListPageState extends State<CoursesListPage> {
   }
 
   Future<void> _openGenerateCoursePopup(BuildContext context) async {
-    final ctrl = context.read<CoursesController>();
-
     await showDialog(
       context: context,
       barrierDismissible: true,
       builder: (_) => GenerateCoursePopup(
-        onGenerate: (prompt) async {
-          final ok = await ctrl.generateCourse(prompt);
-          return ok;
+        onSubmitPrompt: (prompt) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ChangeNotifierProvider.value(
+                value: context.read<CoursesController>(),
+                child: GenerateCoursePage(prompt: prompt),
+              ),
+            ),
+          );
         },
       ),
     );

@@ -12,6 +12,7 @@ services:
       - USER_PROFILE_SERVICE_URL=http://user-profile-service:8000
       - GROUP_SERVICE_URL=http://group-service:8000
       - FOLLOW_SERVICE_URL=http://follow-service:8000
+      - PROGRESS_SERVICE_URL=http://progress-service:8000
     depends_on:
       - courses-service
       - ai-course-gen-service
@@ -19,6 +20,7 @@ services:
       - user-profile-service
       - group-service
       - follow-service
+      - progress-service
 
   courses-service:
     build: ./services/courses-service
@@ -58,5 +60,12 @@ services:
     build: ./services/follow-service
     ports:
       - "8086:8000"
+    env_file:
+      - .env
+
+  progress-service:
+    build: ./services/progress-service
+    ports:
+      - "8087:8000"
     env_file:
       - .env

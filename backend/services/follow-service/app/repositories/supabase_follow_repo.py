@@ -1,4 +1,5 @@
 from uuid import UUID
+import httpx
 
 from app.clients.supabase import supabase
 from app.schemas.follow_schema import SocialUserOut
@@ -68,6 +69,58 @@ class SupabaseFollowRepo:
             if followee_id in profiles
         ]
 
+    async def search_profiles(self, user_id: UUID, q: str, limit: int) -> list[SocialUserOut]:
+        query = q.strip()
+        if not query:
+            return []
+
+        rows = await supabase.get(
+            "profiles",
+            params={
+                "select": self._profile_select,
+                "username": f"ilike.*{query}*",
+                "id": f"neq.{user_id}",
+                "order": "username.asc",
+                "limit": str(limit),
+            },
+        )
+        if not rows:
+            return []
+
+        candidate_ids = [row["id"] for row in rows if row.get("id")]
+        if not candidate_ids:
+            return []
+
+        following_rows = await supabase.get(
+            "user_follows",
+            params={
+                "select": "followee_id",
+                "follower_id": f"eq.{user_id}",
+                "followee_id": self._in_clause(candidate_ids),
+            },
+        )
+        i_follow_ids = {row["followee_id"] for row in following_rows}
+
+        follower_rows = await supabase.get(
+            "user_follows",
+            params={
+                "select": "follower_id",
+                "followee_id": f"eq.{user_id}",
+                "follower_id": self._in_clause(candidate_ids),
+            },
+        )
+        follows_me_ids = {row["follower_id"] for row in follower_rows}
+
+        return [
+            self._to_social_user(
+                row,
+                i_follow=row["id"] in i_follow_ids,
+                follows_me=row["id"] in follows_me_ids,
+            )
+            for row in rows
+            if row.get("id")
+        ]
+
     async def follow(self, follower_id: UUID, followee_id: UUID) -> None:
         if follower_id == followee_id:
             bad_request("cannot follow yourself")
@@ -95,13 +148,19 @@ class SupabaseFollowRepo:
         if existing:
             return
 
-        await supabase.post(
-            "user_follows",
-            json={
-                "follower_id": str(follower_id),
-                "followee_id": str(followee_id),
-            },
-        )
+        try:
+            await supabase.post(
+                "user_follows",
+                json={
+                    "follower_id": str(follower_id),
+                    "followee_id": str(followee_id),
+                },
+            )
+        except httpx.HTTPStatusError as e:
+            if e.response is not None and e.response.status_code == 409:
+                # Duplicate follow requests are treated as success.
+                return
+            raise
 
     async def unfollow(self, follower_id: UUID, followee_id: UUID) -> None:
         await supabase.delete(

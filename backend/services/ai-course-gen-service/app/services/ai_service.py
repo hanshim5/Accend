@@ -7,12 +7,14 @@ Purpose:
 - Contain the business logic for generating structured course content from a prompt.
 - Use Gemini as the primary generation engine.
 - Optionally fall back to a deterministic stub when configured to do so.
+- Select a representative course image URL based on the generated title.
 
 Architecture:
 Gateway → AI Course Gen Router → AI Service (this file) → Gemini API
 
 Role in the system:
-- This service generates course structure only.
+- This service generates course structure.
+- This service also selects a course image URL using local service logic.
 - It does NOT own database tables and does NOT persist courses, lessons, or items.
 - Persistence should be handled by the courses service, which owns that data.
 
@@ -35,10 +37,12 @@ import re
 import textwrap
 from typing import List
 
-from ..schemas.generate_schema import Lesson, LessonItem
-
 from google import genai
 from google.genai import types
+
+from ..schemas.generate_schema import Lesson, LessonItem
+from .image_selection_service import select_course_image
+
 
 # -------------------------
 # Stub (fallback)
@@ -58,14 +62,12 @@ def stub_generate_lessons(prompt: str) -> List[Lesson]:
     """
     lessons: List[Lesson] = []
 
-    # Fixed lesson sections used to create a minimal curriculum structure.
     for i, section in enumerate(
         ["Intro & key vocabulary", "Pronunciation practice", "Practice phrases"],
         start=1,
     ):
         lesson_title = f"Lesson {i}: {section}"
 
-        # Extract a few usable words from the prompt to seed fake lesson items.
         words = [w for w in textwrap.shorten(prompt, width=60).split() if len(w) > 2][:4]
         if not words:
             words = ["phrase", "word"]
@@ -83,8 +85,6 @@ def stub_generate_lessons(prompt: str) -> List[Lesson]:
 # Gemini (primary)
 # -------------------------
 
-# Instructions sent to Gemini so the model returns a strict JSON shape
-# that matches the expected API response structure.
 _JSON_SHAPE_INSTRUCTIONS = """
 Return ONLY valid JSON (no markdown, no backticks, no explanation) in EXACTLY this shape:
 
@@ -154,8 +154,10 @@ def _validate_and_normalize(payload: dict) -> dict:
     for l in lessons:
         if not isinstance(l, dict):
             continue
+
         lt = l.get("title")
         items = l.get("items")
+
         if not isinstance(lt, str) or not lt.strip():
             continue
         if not isinstance(items, list) or len(items) == 0:
@@ -165,11 +167,14 @@ def _validate_and_normalize(payload: dict) -> dict:
         for it in items:
             if not isinstance(it, dict):
                 continue
+
             text = it.get("text")
             if not isinstance(text, str) or not text.strip():
                 continue
+
             ipa = it.get("ipa")
             hint = it.get("hint")
+
             normalized_items.append(
                 {
                     "text": text.strip(),
@@ -179,12 +184,22 @@ def _validate_and_normalize(payload: dict) -> dict:
             )
 
         if normalized_items:
-            normalized_lessons.append({"title": lt.strip(), "items": normalized_items})
+            normalized_lessons.append(
+                {
+                    "title": lt.strip(),
+                    "items": normalized_items,
+                }
+            )
 
     if not normalized_lessons:
         raise ValueError("No valid lessons/items after normalization")
 
-    return {"title": title.strip(), "lessons": normalized_lessons}
+    normalized_title = title.strip()
+    return {
+        "title": normalized_title,
+        "image_url": select_course_image(normalized_title),
+        "lessons": normalized_lessons,
+    }
 
 
 def _gemini_generate(prompt: str) -> dict:
@@ -198,6 +213,7 @@ def _gemini_generate(prompt: str) -> dict:
     4. Parse the response as JSON.
     5. If JSON is invalid, ask Gemini once to repair it.
     6. Validate and normalize the final payload.
+    7. Select an image URL based on the generated title.
 
     Error Behavior:
     - Raises if the API key is missing.
@@ -210,8 +226,6 @@ def _gemini_generate(prompt: str) -> dict:
     model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     client = genai.Client(api_key=api_key)
 
-    # Prompt combines system-like instructions with the user's request.
-    # Goal: maximize the chance of receiving clean structured JSON.
     full_prompt = f"""
 You are generating a structured course for a language learning app.
 
@@ -227,14 +241,11 @@ User request:
         config=types.GenerateContentConfig(response_mime_type="application/json"),
     )
 
-    # Extract text output and defensively strip markdown fences if present.
     text = _strip_code_fences((getattr(resp, "text", "") or "").strip())
 
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        # If Gemini returns invalid JSON, give it one repair pass by feeding
-        # back the invalid output and restating the exact required schema.
         repair_prompt = f"""
 You returned INVALID JSON.
 
@@ -291,6 +302,7 @@ def generate_course_from_prompt(prompt: str) -> dict:
     4. If Gemini fails:
        - Raise immediately if fallback is disabled
        - Otherwise log failure and return stub-generated content
+    5. Select an image URL based on the generated or stub title.
 
     Notes:
     - Stub output is intentionally lower quality and meant mainly for development.
@@ -305,14 +317,16 @@ def generate_course_from_prompt(prompt: str) -> dict:
     try:
         return _gemini_generate(prompt_clean)
     except Exception as e:
-        # If fallback is disabled, fail hard so we do not silently
-        # create low-quality or misleading course content.
         if not allow_fallback:
             print("Gemini failed and fallback disabled:", repr(e), flush=True)
             raise
 
-        # Fallback path for local/dev resilience.
         print("Gemini failed, falling back to stub:", repr(e), flush=True)
         title = f"[STUB] {prompt_clean[:60]}".strip() or "[STUB] New Course"
         lessons = stub_generate_lessons(prompt_clean)
-        return {"title": title, "lessons": [lesson.dict() for lesson in lessons]}
+
+        return {
+            "title": title,
+            "image_url": select_course_image(title),
+            "lessons": [lesson.dict() for lesson in lessons],
+        }

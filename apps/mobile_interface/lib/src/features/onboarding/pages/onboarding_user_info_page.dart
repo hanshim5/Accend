@@ -127,9 +127,9 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
         accessToken: accessToken,
         body: {
           'username': username,
+          'email': email,
           'full_name': fullName,
           'native_language': nativeLanguage,
-          'email': email,
         },
       );
 
@@ -350,14 +350,19 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
                                 'Already have an account? ',
                                 style: t.textTheme.bodyMedium,
                               ),
-                              GestureDetector(
-                                onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Login page coming next'),
-                                    ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pushReplacementNamed(
+                                    context,
+                                    AppRoutes.login,
                                   );
                                 },
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
                                 child: Text(
                                   'Log in',
                                   style: t.textTheme.bodyMedium?.copyWith(

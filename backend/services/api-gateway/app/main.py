@@ -422,11 +422,17 @@ async def generate_course(
         if "title" not in ai_data:
             raise HTTPException(status_code=502, detail="AI service returned no title")
 
+        title = ai_data.get("title", "Untitled Course")
+        image_url = ai_data.get("image_url")
+
         # Step 3: Create the parent course row first.
         course_resp = await client.post(
             f"{settings.COURSES_SERVICE_URL}/courses",
             headers={"X-User-Id": user_id},
-            json={"title": ai_data.get("title", "Untitled Course")},
+            json={
+                "title": title,
+                "image_url": image_url,
+            },
         )
 
         if course_resp.status_code >= 400:
@@ -730,6 +736,30 @@ async def proxy_social_following(
         r = await client.get(
             f"{settings.FOLLOW_SERVICE_URL}/following",
             headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.get("/social/search")
+async def proxy_social_search(
+    q: str,
+    limit: int = 20,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Search users by username through follow-service.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{settings.FOLLOW_SERVICE_URL}/search",
+            headers={"X-User-Id": user_id},
+            params={"q": q, "limit": str(limit)},
         )
 
     if r.status_code >= 400:

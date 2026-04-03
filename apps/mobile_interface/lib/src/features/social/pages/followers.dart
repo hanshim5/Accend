@@ -14,6 +14,7 @@ class FollowersTab extends StatelessWidget {
 		return Consumer<SocialController>(
 			builder: (context, controller, _) {
 				final users = controller.followers;
+				final hasQuery = controller.followersQuery.trim().isNotEmpty;
 
 				if (controller.isLoading && !controller.hasLoaded) {
 					return const Center(child: CircularProgressIndicator());
@@ -24,6 +25,7 @@ class FollowersTab extends StatelessWidget {
 					children: [
 						_SocialSearchField(
 							hintText: 'Search followers...',
+							value: controller.followersQuery,
 							onChanged: controller.setFollowersQuery,
 						),
 						const SizedBox(height: 16),
@@ -44,7 +46,11 @@ class FollowersTab extends StatelessWidget {
 											onRetry: () => controller.load(force: true),
 									  )
 									: users.isEmpty
-									? _EmptyState(text: 'No followers match your search.')
+									? _EmptyState(
+											text: hasQuery
+													? 'No followers match your search.'
+													: 'You have no followers.',
+									  )
 									: ListView.builder(
 											itemCount: users.length,
 											itemBuilder: (context, index) {
@@ -75,10 +81,12 @@ class FollowersTab extends StatelessWidget {
 class _SocialSearchField extends StatelessWidget {
 	const _SocialSearchField({
 		required this.hintText,
+		required this.value,
 		required this.onChanged,
 	});
 
 	final String hintText;
+	final String value;
 	final ValueChanged<String> onChanged;
 
 	@override
@@ -88,7 +96,8 @@ class _SocialSearchField extends StatelessWidget {
 				color: const Color(0x991E293B),
 				borderRadius: BorderRadius.circular(12),
 			),
-			child: TextField(
+			child: TextFormField(
+				initialValue: value,
 				onChanged: onChanged,
 				style: GoogleFonts.montserrat(color: Colors.white),
 				decoration: InputDecoration(
