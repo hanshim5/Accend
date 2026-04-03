@@ -102,23 +102,23 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
   String get _motivationalMessage {
     final avg = _avgOverall;
     if (avg >= 85) {
-      return 'Excellent work! Your pronunciation is really sharp — keep it up.';
+      return 'You\'re at the summit — your pronunciation is crisp and confident. Keep ascending!';
     }
     if (avg >= 70) {
-      return 'Great job! A little more practice and you\'ll be sounding like a native.';
+      return 'You\'re well above base camp. A few more climbs like this and you\'ll own the peak.';
     }
     if (avg >= 55) {
-      return 'Good effort! Focus on the words that tripped you up and you\'ll see fast progress.';
+      return 'Good footing! Study the words that slowed your ascent and the summit will come quickly.';
     }
-    return 'Keep going! Consistent daily practice is the fastest path to improvement.';
+    return 'Every climb starts with one step. Keep pushing upward — the view gets better every day.';
   }
 
   String get _greetingHeadline {
     final avg = _avgOverall;
-    if (avg >= 85) return 'Outstanding!';
-    if (avg >= 70) return 'Great Work!';
-    if (avg >= 55) return 'Well Done!';
-    return 'Keep It Up!';
+    if (avg >= 85) return 'Summit Reached!';
+    if (avg >= 70) return 'Ascending Fast!';
+    if (avg >= 55) return 'Gaining Ground!';
+    return 'Keep Climbing!';
   }
 
   // -------------------------------------------------------------------------
@@ -132,22 +132,14 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Back button row
-            Align(
-              alignment: Alignment.centerLeft,
-              child: IconButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-              ),
-            ),
-
-            // Scrollable body
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: Column(
                   children: [
-                    const SizedBox(height: AppSpacing.lg),
+                    // Same vertical space as the old top bar row (no back control).
+                    const SizedBox(height: kToolbarHeight),
+                    const SizedBox(height: AppSpacing.sm),
 
                     // Trophy glow icon
                     _TrophyIcon(overallScore: _avgOverall),
@@ -178,9 +170,25 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
                       ),
                     ),
 
-                    const SizedBox(height: AppSpacing.xl),
+                    const SizedBox(height: AppSpacing.lg),
 
-                    // Score grid
+                    // Primary overall score (larger, under hero text)
+                    Center(
+                      child: _ScoreRing(
+                        label: 'Overall',
+                        score: _avgOverall,
+                        color: _scoreColor(_avgOverall),
+                        isHighlighted: true,
+                        ringSize: 128,
+                        scoreFontSize: 34,
+                        labelFontSize: 14,
+                        ringStrokeWidth: 8,
+                      ),
+                    ),
+
+                    const SizedBox(height: AppSpacing.lg),
+
+                    // Secondary metrics in one row
                     Row(
                       children: [
                         Expanded(
@@ -188,35 +196,25 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
                             label: 'Accuracy',
                             score: _avgAccuracy,
                             color: _scoreColor(_avgAccuracy),
+                            compact: true,
                           ),
                         ),
-                        const SizedBox(width: AppSpacing.sm),
+                        const SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: _ScoreRing(
                             label: 'Fluency',
                             score: _avgFluency,
                             color: _scoreColor(_avgFluency),
+                            compact: true,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      children: [
+                        const SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: _ScoreRing(
                             label: 'Completeness',
                             score: _avgCompleteness,
                             color: _scoreColor(_avgCompleteness),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: _ScoreRing(
-                            label: 'Overall',
-                            score: _avgOverall,
-                            color: _scoreColor(_avgOverall),
-                            isHighlighted: true,
+                            compact: true,
                           ),
                         ),
                       ],
@@ -377,21 +375,38 @@ class _ScoreRing extends StatelessWidget {
     required this.score,
     required this.color,
     this.isHighlighted = false,
+    this.compact = false,
+    this.ringSize = 72,
+    this.scoreFontSize = 20,
+    this.labelFontSize = 12,
+    this.ringStrokeWidth = 6,
   });
 
   final String label;
   final double score;
   final Color color;
   final bool isHighlighted;
+  /// Smaller ring + typography for the three-metric row.
+  final bool compact;
+  final double ringSize;
+  final double scoreFontSize;
+  final double labelFontSize;
+  final double ringStrokeWidth;
 
   @override
   Widget build(BuildContext context) {
     final displayScore = score.round().clamp(0, 100);
+    final effectiveRingSize = compact ? 58.0 : ringSize;
+    final effectiveScoreSize = compact ? 15.0 : scoreFontSize;
+    final effectiveLabelSize = compact ? 10.0 : labelFontSize;
+    final effectiveStroke = compact ? 4.5 : ringStrokeWidth;
+    final verticalPad = compact ? AppSpacing.sm : AppSpacing.md;
+    final horizontalPad = compact ? AppSpacing.xs : AppSpacing.sm;
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        vertical: AppSpacing.md,
-        horizontal: AppSpacing.sm,
+      padding: EdgeInsets.symmetric(
+        vertical: verticalPad,
+        horizontal: horizontalPad,
       ),
       decoration: BoxDecoration(
         color: isHighlighted
@@ -405,10 +420,9 @@ class _ScoreRing extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Circular progress ring with score overlaid
           SizedBox(
-            width: 72,
-            height: 72,
+            width: effectiveRingSize,
+            height: effectiveRingSize,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -417,7 +431,7 @@ class _ScoreRing extends StatelessWidget {
                     progress: (score / 100).clamp(0.0, 1.0),
                     color: color,
                     trackColor: AppColors.border,
-                    strokeWidth: 6,
+                    strokeWidth: effectiveStroke,
                   ),
                 ),
                 Center(
@@ -425,7 +439,7 @@ class _ScoreRing extends StatelessWidget {
                     '$displayScore',
                     style: GoogleFonts.inter(
                       color: color,
-                      fontSize: 20,
+                      fontSize: effectiveScoreSize,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -434,14 +448,17 @@ class _ScoreRing extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: AppSpacing.sm),
+          SizedBox(height: compact ? AppSpacing.xs : AppSpacing.sm),
 
           Text(
             label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.publicSans(
               color: isHighlighted ? AppColors.textPrimary : AppColors.textSecondary,
-              fontSize: 12,
+              fontSize: effectiveLabelSize,
               fontWeight: isHighlighted ? FontWeight.w600 : FontWeight.w500,
+              height: 1.2,
             ),
             textAlign: TextAlign.center,
           ),
