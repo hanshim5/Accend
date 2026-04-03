@@ -51,3 +51,5 @@ venv/
 # Node (if ever used)
 # ======================
 node_modules/
+
+.cursor/
