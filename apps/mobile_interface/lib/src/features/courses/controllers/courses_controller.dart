@@ -60,6 +60,16 @@ class CoursesController extends ChangeNotifier {
           .cast<Map<String, dynamic>>()
           .map((e) => Course.fromJson(e))
           .toList();
+
+      // Sort: incomplete first, completed last
+      _courses.sort((a, b) {
+        final aComplete = a.status == "COMPLETE";
+        final bComplete = b.status == "COMPLETE";
+
+        if (aComplete == bComplete) return 0;
+        if (aComplete) return 1;  // a goes after b
+        return -1;                // a goes before b
+      });
     } catch (e) {
       _error = e.toString();
     } finally {
