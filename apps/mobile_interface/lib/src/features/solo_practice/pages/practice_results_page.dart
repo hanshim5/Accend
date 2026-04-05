@@ -9,6 +9,7 @@ import '../../../app/routes.dart';
 import '../../courses/controllers/courses_controller.dart';
 import '../../courses/models/lesson.dart';
 import '../../courses/models/lesson_item.dart';
+import '../../progress/services/progress_service.dart';
 import '../models/pronunciation_feedback.dart';
 import '../widgets/feedback_card.dart';
 
@@ -46,6 +47,7 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
   void initState() {
     super.initState();
     _notifyLessonComplete();
+    _submitPhonemeScores();
   }
 
   void _notifyLessonComplete() {
@@ -59,6 +61,20 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
       context
           .read<CoursesController>()
           .completeLesson(lesson.courseId, lesson.id);
+    });
+  }
+
+  /// Fire-and-forget: aggregate all phoneme scores from the session and send
+  /// them to the progress-service for persistent weighted-average storage.
+  ///
+  /// Runs after the first frame so the results UI renders immediately.
+  /// Errors are swallowed inside [ProgressService.submitPhonemeScores].
+  void _submitPhonemeScores() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context
+          .read<ProgressService>()
+          .submitPhonemeScores(widget.feedbacks);
     });
   }
 

@@ -14,6 +14,7 @@ import 'package:mobile_interface/src/features/social/controllers/social_controll
 
 import 'package:mobile_interface/src/features/courses/controllers/courses_controller.dart';
 import 'package:mobile_interface/src/features/group_session/controllers/group_session_controller.dart';
+import 'package:mobile_interface/src/features/progress/services/progress_service.dart';
 
 import 'package:mobile_interface/src/common/widgets/bottom_nav_bar.dart';
 import 'package:mobile_interface/src/features/social/pages/social.dart';
@@ -30,6 +31,12 @@ class MyApp extends StatelessWidget {
         Provider<AuthService>(create: (_) => AuthService()),
         ChangeNotifierProvider<CoursesController>(
           create: (ctx) => CoursesController(
+            api: ctx.read<ApiClient>(),
+            auth: ctx.read<AuthService>(),
+          ),
+        ),
+        Provider<ProgressService>(
+          create: (ctx) => ProgressService(
             api: ctx.read<ApiClient>(),
             auth: ctx.read<AuthService>(),
           ),
