@@ -221,6 +221,7 @@ class ProfileService:
         feedback_tone: str | None = None,
         accent: str | None = None,
         daily_pace: str | None = None,
+        focus_areas: str | None = None,
     ) -> None:
         if not user_id:
             bad_request("user_id missing")
@@ -238,6 +239,8 @@ class ProfileService:
         cleaned_accent = self._normalize_choice(accent)
         cleaned_daily_pace = self._normalize_choice(daily_pace)
 
+        cleaned_focus_areas = self._normalize_learning_goals(focus_areas)
+
         await self.repo.update_profile_details(
             user_id=user_id,
             full_name=cleaned_full_name,
@@ -246,4 +249,5 @@ class ProfileService:
             feedback_tone=cleaned_feedback_tone,
             accent=cleaned_accent,
             daily_pace=cleaned_daily_pace,
+            focus_areas=cleaned_focus_areas,
         )

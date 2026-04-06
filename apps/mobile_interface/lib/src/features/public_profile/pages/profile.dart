@@ -77,6 +77,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String? _selectedAccent;
   String? _selectedDailyPace;
   final List<String> _selectedGoals = [];
+  final List<String> _selectedFocusAreas = [];
 
   String? _hydratedProfileId;
 
@@ -201,6 +202,27 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   const SizedBox(height: 18),
                   _StatsPanel(data: data),
+                  const SizedBox(height: 18),
+                  _SpecializedFocusSection(
+                    selected: _selectedFocusAreas,
+                    onToggle: (area) {
+                      final alreadySelected = _selectedFocusAreas.contains(area);
+                      if (!alreadySelected && _selectedFocusAreas.length >= 3) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('You can select up to 3 focus areas.')),
+                        );
+                        return;
+                      }
+
+                      setState(() {
+                        if (alreadySelected) {
+                          _selectedFocusAreas.remove(area);
+                        } else {
+                          _selectedFocusAreas.add(area);
+                        }
+                      });
+                    },
+                  ),
                   const SizedBox(height: 18),
                   _CollapsibleCard(
                     title: 'Profile Details',
@@ -339,6 +361,9 @@ class _ProfilePageState extends State<ProfilePage> {
       ..addAll(_splitGoals(data.learningGoal));
     _selectedAccent = _matchKey(_accentOptions, data.accent);
     _selectedDailyPace = _matchKey(_dailyPaceOptions, data.dailyPace);
+    _selectedFocusAreas
+      ..clear()
+      ..addAll(_splitFocusAreas(data.focusAreas));
   }
 
   List<String> _splitGoals(String? raw) {
@@ -435,6 +460,29 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
+  List<String> _splitFocusAreas(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return [];
+    return raw
+        .split(RegExp(r'[,;]'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .map((s) => _canonicalFocusLabel(s))
+        .toSet()
+        .toList();
+  }
+
+  String _canonicalFocusLabel(String value) {
+    const canonical = {
+      'vocabulary': 'Vocabulary',
+      'grammar': 'Grammar',
+      'slang': 'Slang',
+      'pronunciation': 'Pronunciation',
+      'listening': 'Listening',
+      'conversation': 'Conversation',
+    };
+    return canonical[value.trim().toLowerCase()] ?? value.trim();
+  }
+
   Future<void> _saveChanges(BuildContext context, PublicProfileController controller) async {
     try {
       await controller.saveProfileDetails(
@@ -444,6 +492,7 @@ class _ProfilePageState extends State<ProfilePage> {
         feedbackTone: _selectedTone ?? '',
         accent: _selectedAccent ?? '',
         dailyPace: _selectedDailyPace ?? '',
+        focusAreas: _selectedFocusAreas.map((s) => s.toLowerCase()).join(', '),
       );
 
       if (!context.mounted) return;
@@ -518,10 +567,10 @@ class _ProfileHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        Column(
           children: [
             Container(
               width: 96,
@@ -553,99 +602,96 @@ class _ProfileHero extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    data.displayName,
-                    style: GoogleFonts.inter(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '@${data.username}',
-                    style: GoogleFonts.inter(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.local_fire_department_rounded, color: AppColors.action, size: 18),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${data.followingCount} Following',
-                        style: GoogleFonts.inter(
-                          color: AppColors.textSecondary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0x1906F9F9),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0x3306F9F9)),
+              ),
+              child: Text(
+                data.levelLabel.toUpperCase(),
+                style: GoogleFonts.montserrat(
+                  color: const Color(0xFF06F9F9),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0x1906F9F9),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0x3306F9F9)),
-            ),
-            child: Text(
-              data.levelLabel.toUpperCase(),
-              style: GoogleFonts.montserrat(
-                color: const Color(0xFF06F9F9),
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Text.rich(
-            TextSpan(
-              style: GoogleFonts.inter(
-                color: AppColors.textSecondary,
-                fontSize: 12,
-                height: 1.6,
-              ),
-              children: [
-                const TextSpan(text: 'I am learning '),
-                const TextSpan(text: 'English', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600)),
-                const TextSpan(text: '. My native language is '),
-                TextSpan(
-                  text: nativeLanguage.trim().isNotEmpty ? nativeLanguage.trim() : 'not set',
-                  style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600),
+        const SizedBox(width: 18),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                data.displayName,
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
                 ),
-                const TextSpan(text: '. I am doing this for '),
-                TextSpan(
-                  text: goals.isEmpty ? 'continuous improvement' : goals.join(', '),
-                  style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '@${data.username}',
+                style: GoogleFonts.inter(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
                 ),
-                const TextSpan(text: '.'),
-              ],
-            ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.local_fire_department_rounded, color: AppColors.action, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    '',
+                    style: GoogleFonts.inter(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text.rich(
+                  TextSpan(
+                    style: GoogleFonts.inter(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      height: 1.6,
+                    ),
+                    children: [
+                      const TextSpan(text: 'I am learning '),
+                      const TextSpan(text: 'English', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600)),
+                      const TextSpan(text: '. My native language is '),
+                      TextSpan(
+                        text: nativeLanguage.trim().isNotEmpty ? nativeLanguage.trim() : 'not set',
+                        style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600),
+                      ),
+                      const TextSpan(text: '. I am doing this for '),
+                      TextSpan(
+                        text: goals.isEmpty ? 'continuous improvement' : goals.join(', '),
+                        style: const TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600),
+                      ),
+                      const TextSpan(text: '.'),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -1328,6 +1374,123 @@ class _GoalOption {
 
   final String label;
   final IconData icon;
+}
+
+class _SpecializedFocusSection extends StatelessWidget {
+  const _SpecializedFocusSection({
+    required this.selected,
+    required this.onToggle,
+  });
+
+  final List<String> selected;
+  final ValueChanged<String> onToggle;
+
+  static const _areas = [
+    'Vocabulary',
+    'Grammar',
+    'Slang',
+    'Pronunciation',
+    'Listening',
+    'Conversation',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Specialized Focus',
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '(Select up to 3)',
+              style: GoogleFonts.inter(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (int i = 0; i < _areas.length; i++) ...[
+                _FocusAreaCard(
+                  label: _areas[i],
+                  selected: selected.contains(_areas[i]),
+                  onTap: () => onToggle(_areas[i]),
+                ),
+                if (i < _areas.length - 1) const SizedBox(width: 14),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FocusAreaCard extends StatelessWidget {
+  const _FocusAreaCard({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 128,
+        height: 80,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(12),
+          border: selected
+              ? Border.all(color: AppColors.accent, width: 1.5)
+              : Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0x660F172A),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            Center(
+              child: Text(
+                label,
+                style: GoogleFonts.inter(
+                  color: selected ? AppColors.accent : Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _GoalOptionTile extends StatelessWidget {

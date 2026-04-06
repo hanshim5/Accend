@@ -61,6 +61,7 @@ class PublicProfileController extends ChangeNotifier {
     required String feedbackTone,
     required String accent,
     required String dailyPace,
+    required String focusAreas,
   }) async {
     final accessToken = _auth.accessToken;
     if (accessToken == null || accessToken.isEmpty) {
@@ -84,6 +85,7 @@ class PublicProfileController extends ChangeNotifier {
           'feedback_tone': feedbackTone,
           'accent': accent,
           'daily_pace': dailyPace,
+          'focus_areas': focusAreas,
         },
       );
       await load(force: true);

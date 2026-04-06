@@ -57,7 +57,7 @@ class SupabaseProfileRepo(ProfileRepo):
         rows = await supabase.get(
             "profiles",
             params={
-                "select": "id,username,onboarding_complete,email,native_language,full_name,learning_goal,feedback_tone,accent,daily_pace,skill_assess",
+                "select": "id,username,onboarding_complete,email,native_language,full_name,learning_goal,feedback_tone,accent,daily_pace,skill_assess,focus_areas",
                 "id": f"eq.{user_id}",
                 "limit": "1",
             },
@@ -193,6 +193,7 @@ class SupabaseProfileRepo(ProfileRepo):
         feedback_tone: str | None = None,
         accent: str | None = None,
         daily_pace: str | None = None,
+        focus_areas: str | None = None,
     ) -> None:
         payload: dict[str, object] = {}
 
@@ -208,6 +209,8 @@ class SupabaseProfileRepo(ProfileRepo):
             payload["accent"] = accent
         if daily_pace is not None:
             payload["daily_pace"] = daily_pace
+        if focus_areas is not None:
+            payload["focus_areas"] = focus_areas
 
         if not payload:
             return

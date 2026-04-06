@@ -11,6 +11,7 @@ class ProfilePageData {
     this.accent,
     this.dailyPace,
     this.skillAssess,
+    this.focusAreas,
     required this.followersCount,
     required this.followingCount,
   });
@@ -26,6 +27,7 @@ class ProfilePageData {
   final String? accent;
   final String? dailyPace;
   final String? skillAssess;
+  final String? focusAreas;
   final int followersCount;
   final int followingCount;
 
@@ -49,6 +51,7 @@ class ProfilePageData {
       accent: profile['accent']?.toString(),
       dailyPace: profile['daily_pace']?.toString(),
       skillAssess: profile['skill_assess']?.toString(),
+      focusAreas: profile['focus_areas']?.toString(),
       followersCount: (social['followers'] as num?)?.toInt() ?? 0,
       followingCount: (social['following'] as num?)?.toInt() ?? 0,
     );

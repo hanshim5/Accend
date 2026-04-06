@@ -93,6 +93,7 @@ class ProfileReadResponse(BaseModel):
     accent: str | None = None
     daily_pace: str | None = None
     skill_assess: str | None = None
+    focus_areas: str | None = None
 
 
 class ProfileOnboardingUpdate(BaseModel):
@@ -126,3 +127,4 @@ class ProfileDetailsUpdate(BaseModel):
     feedback_tone: str | None = None
     accent: str | None = None
     daily_pace: str | None = None
+    focus_areas: str | None = None

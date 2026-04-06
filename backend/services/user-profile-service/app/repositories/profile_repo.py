@@ -91,6 +91,7 @@ class ProfileRepo(Protocol):
         feedback_tone: str | None = None,
         accent: str | None = None,
         daily_pace: str | None = None,
+        focus_areas: str | None = None,
     ) -> None: ...
     """
     Update onboarding-related fields for a user's profile.
