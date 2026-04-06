@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     GROUP_SERVICE_URL: str
     FOLLOW_SERVICE_URL: str
     USER_PROFILE_SERVICE_URL: str
+    PROGRESS_SERVICE_URL: str
 
     # -------------------------
     # Development Flags
