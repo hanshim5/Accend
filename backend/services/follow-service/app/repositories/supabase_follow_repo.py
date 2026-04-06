@@ -7,7 +7,7 @@ from app.utils.errors import bad_request, not_found
 
 
 class SupabaseFollowRepo:
-    _profile_select = "id,username,full_name,level,skill_assess"
+    _profile_select = "id,username,full_name,level,skill_assess,native_language,learning_goal,focus_areas"
 
     async def get_counts(self, user_id: UUID) -> tuple[int, int]:
         followers_rows = await supabase.get(
@@ -221,6 +221,9 @@ class SupabaseFollowRepo:
             display_name=display_name,
             username=row.get("username") or "unknown",
             level_label=level_label,
+            native_language=row.get("native_language"),
+            learning_goal=row.get("learning_goal"),
+            focus_areas=row.get("focus_areas"),
             i_follow=i_follow,
             follows_me=follows_me,
         )
