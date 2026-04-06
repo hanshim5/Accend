@@ -17,6 +17,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final _fullNameCtrl = TextEditingController();
+  String? _fullNameError;
 
   bool _detailsExpanded = true;
   bool _preferencesExpanded = false;
@@ -201,7 +202,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     goals: _selectedGoals,
                   ),
                   const SizedBox(height: 18),
-                  _StatsPanel(data: data),
+                  const _StatsPanel(),
                   const SizedBox(height: 18),
                   _SpecializedFocusSection(
                     selected: _selectedFocusAreas,
@@ -230,7 +231,12 @@ class _ProfilePageState extends State<ProfilePage> {
                     onToggle: () => setState(() => _detailsExpanded = !_detailsExpanded),
                     child: Column(
                       children: [
-                        _EditableField(label: 'Full Name', controller: _fullNameCtrl),
+                        _EditableField(
+                          label: 'Full Name',
+                          controller: _fullNameCtrl,
+                          errorText: _fullNameError,
+                          onChanged: (value) => setState(() => _fullNameError = _validateFullName(value)),
+                        ),
                         const SizedBox(height: 14),
                         _DetailField(label: 'Email Address', value: data.email),
                         const SizedBox(height: 14),
@@ -294,11 +300,22 @@ class _ProfilePageState extends State<ProfilePage> {
                         const SizedBox(height: 16),
                         _SelectableField(
                           label: 'Accent',
-                          child: _OptionDropdown(
-                            hint: 'Select accent',
-                            options: _accentOptions,
-                            value: _selectedAccent,
-                            onChanged: (value) => setState(() => _selectedAccent = value),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _OptionDropdown(
+                                hint: 'Select accent',
+                                options: _accentOptions,
+                                value: _selectedAccent,
+                                disabledOptions: const {
+                                  'british',
+                                  'southern',
+                                  'australian',
+                                },
+                                unavailableLabelSuffix: ' (coming soon)',
+                                onChanged: (value) => setState(() => _selectedAccent = value),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 14),
@@ -483,7 +500,33 @@ class _ProfilePageState extends State<ProfilePage> {
     return canonical[value.trim().toLowerCase()] ?? value.trim();
   }
 
+  String? _validateFullName(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return 'Full name is required.';
+    }
+    if (trimmed.length < 2) {
+      return 'Full name must be at least 2 characters.';
+    }
+    if (!RegExp(r"^[A-Za-z][A-Za-z '.-]*$").hasMatch(trimmed)) {
+      return 'Enter a valid name.';
+    }
+    return null;
+  }
+
   Future<void> _saveChanges(BuildContext context, PublicProfileController controller) async {
+    final fullNameError = _validateFullName(_fullNameCtrl.text);
+    if (fullNameError != null) {
+      setState(() => _fullNameError = fullNameError);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(fullNameError),
+          backgroundColor: AppColors.failure,
+        ),
+      );
+      return;
+    }
+
     try {
       await controller.saveProfileDetails(
         fullName: _fullNameCtrl.text,
@@ -649,7 +692,7 @@ class _ProfileHero extends StatelessWidget {
                   const Icon(Icons.local_fire_department_rounded, color: AppColors.action, size: 18),
                   const SizedBox(width: 6),
                   Text(
-                    '',
+                    '## Day Streak',
                     style: GoogleFonts.inter(
                       color: AppColors.textSecondary,
                       fontSize: 14,
@@ -700,116 +743,134 @@ class _ProfileHero extends StatelessWidget {
 }
 
 class _StatsPanel extends StatelessWidget {
-  const _StatsPanel({required this.data});
-
-  final ProfilePageData data;
+  const _StatsPanel();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      height: 180,
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: const Color(0x1906B6D4),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const Icon(Icons.auto_graph_rounded, color: AppColors.accent),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 166,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0x1906B6D4),
+                        borderRadius: BorderRadius.circular(999),
                       ),
-                      const SizedBox(width: 12),
-                      Column(
+                      child: const Icon(Icons.track_changes_rounded, color: AppColors.accent, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '##',
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            height: 1.33,
+                          ),
+                        ),
+                        Text(
+                          'OVERALL\nACCURACY',
+                          style: GoogleFonts.inter(
+                            color: AppColors.textSecondary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            height: 1.5,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${data.followersCount}',
+                            '##',
                             style: GoogleFonts.inter(
                               color: Colors.white,
-                              fontSize: 24,
+                              fontSize: 18,
                               fontWeight: FontWeight.w700,
+                              height: 1.56,
                             ),
                           ),
                           Text(
-                            'FOLLOWERS',
+                            'LESSONS COMPLETED',
                             style: GoogleFonts.inter(
                               color: AppColors.textSecondary,
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              letterSpacing: 0.6,
+                              height: 1.5,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(child: _MiniStat(value: '${data.followingCount}', label: 'FOLLOWING')),
-                      const SizedBox(width: 16),
-                      Expanded(child: _MiniStat(value: data.onboardingComplete ? 'YES' : 'NO', label: 'ONBOARDING')),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '##',
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              height: 1.56,
+                            ),
+                          ),
+                          Text(
+                            'METERS CLIMBED',
+                            style: GoogleFonts.inter(
+                              color: AppColors.textSecondary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              height: 1.5,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            Container(
-              width: 1,
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              color: Colors.white.withValues(alpha: 0.05),
-            ),
-            const Expanded(child: _ActivityBars()),
-          ],
-        ),
+          ),
+          Container(
+            width: 1,
+            height: 96,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            color: Colors.white.withValues(alpha: 0.05),
+          ),
+          const Expanded(child: _ActivityBars()),
+        ],
       ),
-    );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  const _MiniStat({required this.value, required this.label});
-
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            color: AppColors.textSecondary,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -974,10 +1035,17 @@ class _DetailField extends StatelessWidget {
 }
 
 class _EditableField extends StatelessWidget {
-  const _EditableField({required this.label, required this.controller});
+  const _EditableField({
+    required this.label,
+    required this.controller,
+    this.errorText,
+    this.onChanged,
+  });
 
   final String label;
   final TextEditingController controller;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -989,6 +1057,7 @@ class _EditableField extends StatelessWidget {
         _FieldShell(
           child: TextField(
             controller: controller,
+            onChanged: onChanged,
             style: GoogleFonts.manrope(
               color: Colors.white,
               fontSize: 16,
@@ -1006,6 +1075,17 @@ class _EditableField extends StatelessWidget {
             ),
           ),
         ),
+        if (errorText != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            errorText!,
+            style: GoogleFonts.manrope(
+              color: AppColors.failure,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1059,20 +1139,26 @@ class _OptionDropdown extends StatelessWidget {
     required this.options,
     required this.value,
     required this.onChanged,
+    this.disabledOptions = const <String>{},
+    this.unavailableLabelSuffix = '',
   });
 
   final String hint;
   final Map<String, String> options;
   final String? value;
   final ValueChanged<String?> onChanged;
+  final Set<String> disabledOptions;
+  final String unavailableLabelSuffix;
 
   @override
   Widget build(BuildContext context) {
+    final selectedValue = options.containsKey(value) && !disabledOptions.contains(value) ? value : null;
+
     return _FieldShell(
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           isExpanded: true,
-          value: options.containsKey(value) ? value : null,
+          value: selectedValue,
           dropdownColor: AppColors.surface,
           iconEnabledColor: AppColors.textSecondary,
           style: GoogleFonts.manrope(
@@ -1086,10 +1172,21 @@ class _OptionDropdown extends StatelessWidget {
           ),
           items: options.entries
               .map(
-                (entry) => DropdownMenuItem<String>(
-                  value: entry.key,
-                  child: Text(entry.value),
-                ),
+                (entry) {
+                  final isDisabled = disabledOptions.contains(entry.key);
+                  return DropdownMenuItem<String>(
+                    value: entry.key,
+                    enabled: !isDisabled,
+                    child: Text(
+                      isDisabled ? '${entry.value}$unavailableLabelSuffix' : entry.value,
+                      style: GoogleFonts.manrope(
+                        color: isDisabled ? AppColors.textSecondary : Colors.white,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 16,
+                      ),
+                    ),
+                  );
+                },
               )
               .toList(growable: false),
           onChanged: onChanged,
