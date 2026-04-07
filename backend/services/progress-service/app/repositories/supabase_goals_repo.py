@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 import httpx
 
@@ -9,6 +9,9 @@ from app.repositories.goals_repo import GoalsRepo
 
 
 class SupabaseGoalsRepo(GoalsRepo):
+    def _utc_now_iso(self) -> str:
+        return datetime.now(timezone.utc).isoformat()
+
     async def get_today_minutes(self, user_id: str, day: date) -> int:
         try:
             rows = await supabase.get(
@@ -56,6 +59,7 @@ class SupabaseGoalsRepo(GoalsRepo):
                         "user_id": user_id,
                         "day": day.isoformat(),
                         "minutes": minutes,
+                        "updated_at": self._utc_now_iso(),
                     }
                 ],
             )
@@ -98,6 +102,7 @@ class SupabaseGoalsRepo(GoalsRepo):
                         "user_id": user_id,
                         "current_streak": max(0, int(current_streak)),
                         "longest_streak": max(0, int(longest_streak)),
+                        "updated_at": self._utc_now_iso(),
                     }
                 ],
             )

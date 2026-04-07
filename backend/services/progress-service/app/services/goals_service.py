@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 import math
 
 from app.repositories.goals_repo import GoalsRepo
@@ -70,11 +70,10 @@ class GoalsService:
             return
 
         today = date.today()
-        current_streak = 0
-        cursor = today
-        while cursor in qualified_days:
-            current_streak += 1
-            cursor = date.fromordinal(cursor.toordinal() - 1)
+        current_streak = self._current_streak_with_intraday_grace(
+            qualified_days=qualified_days,
+            today=today,
+        )
 
         sorted_days = sorted(qualified_days)
         longest_streak = 0
@@ -94,3 +93,29 @@ class GoalsService:
             current_streak=current_streak,
             longest_streak=longest_streak,
         )
+
+    @staticmethod
+    def _current_streak_with_intraday_grace(
+        *,
+        qualified_days: set[date],
+        today: date,
+    ) -> int:
+        """
+        Current streak counts consecutive goal-met days ending at the latest
+        "active" day: today if already met, otherwise yesterday (so a new
+        calendar day still shows yesterday's streak until the full day is
+        missed or broken).
+        """
+        if today in qualified_days:
+            cursor = today
+        else:
+            yesterday = today - timedelta(days=1)
+            if yesterday not in qualified_days:
+                return 0
+            cursor = yesterday
+
+        streak = 0
+        while cursor in qualified_days:
+            streak += 1
+            cursor = cursor - timedelta(days=1)
+        return streak
