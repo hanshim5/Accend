@@ -18,13 +18,6 @@ class GroupSessionPrivateJoinPage extends StatefulWidget {
 class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
   String? _lobbyCode;
 
-  Future<void> _refreshLobby(BuildContext context) async {
-    final ctrl = context.read<GroupSessionController>();
-    final lobbyId = _lobbyCode ?? ctrl.joinPrivateLobby?.lobbyId;
-    if (lobbyId == null || lobbyId.isEmpty) return;
-    await ctrl.getLobby(lobbyId);
-  }
-
   @override
   void initState() {
     super.initState();
@@ -43,8 +36,15 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
         await ctrl.joinLobby(userId, int.parse(lobbyCode), username);
         if (!mounted) return;
         await ctrl.getLobby(lobbyCode);
+        await ctrl.subscribeToLobby(lobbyCode);
       }();
     });
+  }
+
+  @override
+  void dispose() {
+    context.read<GroupSessionController>().unsubscribeFromLobby();
+    super.dispose();
   }
 
 
@@ -225,28 +225,18 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 12),
+                  // const SizedBox(height: 12),
 
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: (ctrl.isLoading || (_lobbyCode == null))
-                          ? null
-                          : () => _refreshLobby(context),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.textPrimary,
-                        side: const BorderSide(color: AppColors.border, width: 2),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.md),
-                        ),
-                      ),
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Refresh'),
-                    ),
-                  ),
+                  // SizedBox(
+                  //   width: double.infinity,
+                  //   child: Text(
+                  //     'Auto-updates enabled',
+                  //     textAlign: TextAlign.center,
+                  //     style: t.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                  //   ),
+                  // ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 48),
 
                 ],
               ),

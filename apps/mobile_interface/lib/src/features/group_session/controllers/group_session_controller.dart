@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:mobile_interface/src/common/services/api_client.dart';
 import 'package:mobile_interface/src/common/services/auth_service.dart';
@@ -19,6 +20,9 @@ class GroupSessionController extends ChangeNotifier {
   List<PrivateLobby> _privateLobby = [];
   PrivateLobby? _createPrivateLobby;
   PrivateLobby? _joinPrivateLobby;
+  RealtimeChannel? _lobbyChannel;
+  String? _subscribedLobbyId;
+  bool _isRealtimeSyncing = false;
 
 
   bool get isLoading => _isLoading;
@@ -70,10 +74,12 @@ class GroupSessionController extends ChangeNotifier {
 
 
 
-  Future<List<PrivateLobby>> getLobby(String lobbyId) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  Future<List<PrivateLobby>> getLobby(String lobbyId, {bool showLoading = true}) async {
+    if (showLoading) {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+    }
 
     try {
       final token = _auth.accessToken;
@@ -92,7 +98,9 @@ class GroupSessionController extends ChangeNotifier {
     } catch (e) {
       _error = e.toString();
     } finally {
-      _isLoading = false;
+      if (showLoading) {
+        _isLoading = false;
+      }
       notifyListeners();
     }
     return _privateLobby;
@@ -186,6 +194,7 @@ class GroupSessionController extends ChangeNotifier {
       _privateLobby = [];
       _createPrivateLobby = null;
       _joinPrivateLobby = null;
+      unsubscribeFromLobby();
       notifyListeners();
     }
     return true;
@@ -251,11 +260,50 @@ class GroupSessionController extends ChangeNotifier {
   }
 
   Future<void> subscribeToLobby(String lobbyId) async {
-    // Placeholder: realtime subscription can be added later.
+    if (lobbyId.isEmpty) return;
+    if (_subscribedLobbyId == lobbyId && _lobbyChannel != null) return;
+
+    unsubscribeFromLobby();
+    _subscribedLobbyId = lobbyId;
+
+    final channelName = 'private_lobby_$lobbyId';
+    _lobbyChannel = _auth.client
+        .channel(channelName)
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'private_lobbies',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'lobby_id',
+            value: lobbyId,
+          ),
+          callback: (_) async {
+            if (_isRealtimeSyncing) return;
+            _isRealtimeSyncing = true;
+            try {
+              await getLobby(lobbyId, showLoading: false);
+            } finally {
+              _isRealtimeSyncing = false;
+            }
+          },
+        )
+        .subscribe();
   }
 
   void unsubscribeFromLobby() {
-    // Placeholder: realtime unsubscription can be added later.
+    if (_lobbyChannel != null) {
+      _auth.client.removeChannel(_lobbyChannel!);
+    }
+    _lobbyChannel = null;
+    _subscribedLobbyId = null;
+    _isRealtimeSyncing = false;
+  }
+
+  @override
+  void dispose() {
+    unsubscribeFromLobby();
+    super.dispose();
   }
 
 }
