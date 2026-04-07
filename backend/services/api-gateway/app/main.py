@@ -204,6 +204,74 @@ async def proxy_profile_get(
     return r.json()
 
 
+def _is_active_course(course: dict) -> bool:
+    status = str(course.get("status", "")).strip().lower()
+    progress = int(course.get("progress_percent", 0) or 0)
+    if status in {"complete", "completed"}:
+        return False
+    return progress < 100
+
+
+@app.get("/home")
+async def proxy_home_preload(
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        profile_resp = await client.get(
+            f"{settings.USER_PROFILE_SERVICE_URL}/profiles/me",
+            headers={"X-User-Id": user_id},
+        )
+        if profile_resp.status_code >= 400:
+            raise HTTPException(status_code=profile_resp.status_code, detail=profile_resp.text)
+
+        goals_resp = await client.get(
+            f"{settings.PROGRESS_SERVICE_URL}/goals/progress",
+            headers={"X-User-Id": user_id},
+        )
+        if goals_resp.status_code >= 400:
+            raise HTTPException(status_code=goals_resp.status_code, detail=goals_resp.text)
+
+        courses_resp = await client.get(
+            f"{settings.COURSES_SERVICE_URL}/courses",
+            headers={"X-User-Id": user_id},
+        )
+        if courses_resp.status_code >= 400:
+            raise HTTPException(status_code=courses_resp.status_code, detail=courses_resp.text)
+
+    profile = profile_resp.json()
+    goals = goals_resp.json()
+    courses = courses_resp.json()
+    if not isinstance(courses, list):
+        courses = []
+
+    active_courses = [c for c in courses if isinstance(c, dict) and _is_active_course(c)]
+    active_courses.sort(key=lambda c: int(c.get("progress_percent", 0) or 0))
+    target = active_courses[0] if active_courses else None
+
+    full_name = (profile.get("full_name") if isinstance(profile, dict) else None) or ""
+    username = (profile.get("username") if isinstance(profile, dict) else None) or ""
+
+    active_course = None
+    if target:
+        active_course = {
+            "id": target.get("id"),
+            "title": target.get("title"),
+            "progress_percent": int(target.get("progress_percent", 0) or 0),
+            "status": target.get("status"),
+        }
+
+    return {
+        "display_name": (full_name.strip() or username.strip() or "there"),
+        "current_streak": int(goals.get("current_streak", 0) or 0),
+        "longest_streak": int(goals.get("longest_streak", 0) or 0),
+        "current_minutes": int(goals.get("current_minutes", 0) or 0),
+        "goal_minutes": int(goals.get("goal_minutes", 10) or 10),
+        "active_course": active_course,
+    }
+
+
 @app.post("/profile/init")
 async def proxy_profile_init(
     body: dict,

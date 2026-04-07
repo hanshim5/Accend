@@ -6,6 +6,8 @@ class GoalCard extends StatelessWidget {
   final int totalMinutes;
   final int streak;
   final double progress;
+  final VoidCallback? onKeepGoing;
+  final bool isLoading;
 
   const GoalCard({
     super.key,
@@ -14,6 +16,8 @@ class GoalCard extends StatelessWidget {
     required this.totalMinutes,
     required this.streak,
     required this.progress,
+    this.onKeepGoing,
+    this.isLoading = false,
   });
 
   @override
@@ -117,7 +121,7 @@ class GoalCard extends StatelessWidget {
               width: 160, // 🔽 smaller width
               height: 44, // 🔽 smaller height
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: isLoading ? null : onKeepGoing,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFF0AD72),
                   foregroundColor: const Color(0xFF0B1730),
