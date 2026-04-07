@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import '../widgets/quit_group_session_back_button.dart';
-import '../../../app/constants.dart';
-
-import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../app/constants.dart';
 import '../../../common/widgets/primary_button.dart';
 import '../controllers/group_session_controller.dart';
+import '../widgets/quit_group_session_back_button.dart';
 
 class GroupSessionActiveLobbyPage extends StatefulWidget {
   const GroupSessionActiveLobbyPage({super.key});

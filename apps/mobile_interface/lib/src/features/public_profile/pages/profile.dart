@@ -747,130 +747,150 @@ class _StatsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.sizeOf(context).width < 390;
+
     return Container(
-      height: 180,
+      constraints: const BoxConstraints(minHeight: 184),
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 166,
-            child: Column(
+      child: isCompact
+          ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: const Color(0x1906B6D4),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: const Icon(Icons.track_changes_rounded, color: AppColors.accent, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '##',
-                          style: GoogleFonts.inter(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            height: 1.33,
-                          ),
-                        ),
-                        Text(
-                          'OVERALL\nACCURACY',
-                          style: GoogleFonts.inter(
-                            color: AppColors.textSecondary,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            height: 1.5,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                const _StatsSummary(),
                 const SizedBox(height: 14),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '##',
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              height: 1.56,
-                            ),
-                          ),
-                          Text(
-                            'LESSONS COMPLETED',
-                            style: GoogleFonts.inter(
-                              color: AppColors.textSecondary,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              height: 1.5,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '##',
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              height: 1.56,
-                            ),
-                          ),
-                          Text(
-                            'METERS CLIMBED',
-                            style: GoogleFonts.inter(
-                              color: AppColors.textSecondary,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              height: 1.5,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                Container(height: 1, color: Colors.white.withValues(alpha: 0.05)),
+                const SizedBox(height: 12),
+                const _ActivityBars(),
+              ],
+            )
+          : Row(
+              children: [
+                const Expanded(flex: 6, child: _StatsSummary()),
+                Container(
+                  width: 1,
+                  height: 96,
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  color: Colors.white.withValues(alpha: 0.05),
+                ),
+                const Expanded(flex: 4, child: _ActivityBars()),
+              ],
+            ),
+    );
+  }
+}
+
+class _StatsSummary extends StatelessWidget {
+  const _StatsSummary();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 38,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0x1906B6D4),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Icon(Icons.track_changes_rounded, color: AppColors.accent, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '##',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    height: 1.33,
+                  ),
+                ),
+                Text(
+                  'OVERALL\nACCURACY',
+                  style: GoogleFonts.inter(
+                    color: AppColors.textSecondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    height: 1.5,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ],
             ),
-          ),
-          Container(
-            width: 1,
-            height: 96,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            color: Colors.white.withValues(alpha: 0.05),
-          ),
-          const Expanded(child: _ActivityBars()),
-        ],
-      ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '##',
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      height: 1.56,
+                    ),
+                  ),
+                  Text(
+                    'LESSONS COMPLETED',
+                    style: GoogleFonts.inter(
+                      color: AppColors.textSecondary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      height: 1.5,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '##',
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      height: 1.56,
+                    ),
+                  ),
+                  Text(
+                    'METERS CLIMBED',
+                    style: GoogleFonts.inter(
+                      color: AppColors.textSecondary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      height: 1.5,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -910,20 +930,29 @@ class _ActivityBars extends StatelessWidget {
         const SizedBox(height: 14),
         SizedBox(
           height: 84,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(
-              heights.length,
-              (index) => Container(
-                width: 24,
-                height: heights[index],
-                decoration: BoxDecoration(
-                  color: colors[index],
-                  borderRadius: BorderRadius.circular(999),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              const gap = 6.0;
+              final totalGap = gap * (heights.length - 1);
+              final rawBarWidth = (constraints.maxWidth - totalGap) / heights.length;
+              final barWidth = rawBarWidth.clamp(8.0, 24.0);
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(
+                  heights.length,
+                  (index) => Container(
+                    width: barWidth,
+                    height: heights[index],
+                    decoration: BoxDecoration(
+                      color: colors[index],
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
         const SizedBox(height: 10),
@@ -1254,20 +1283,19 @@ class _SecondaryAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 45,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.surface,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.surface,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        minimumSize: const Size.fromHeight(45),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500, height: 1.2),
       ),
     );
   }
@@ -1281,19 +1309,18 @@ class _DangerAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 45,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Color(0xFFEF4444)),
-          foregroundColor: const Color(0xFFEF4444),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: Color(0xFFEF4444)),
+        foregroundColor: const Color(0xFFEF4444),
+        minimumSize: const Size.fromHeight(45),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w500, height: 1.2),
       ),
     );
   }
