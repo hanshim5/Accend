@@ -28,13 +28,18 @@ class CourseCreate(BaseModel):
     Input schema for creating a course.
 
     Example:
-    { "title": "Travel phrases for restaurants" }
+    {
+        "title": "Travel phrases for restaurants",
+        "image_url": "https://..."
+    }
 
     Validation:
     - title must be non-empty (min_length=1)
     - title length is capped to prevent excessively large inputs
+    - image_url is optional so older callers remain compatible
     """
     title: str = Field(min_length=1, max_length=200)
+    image_url: str | None = None
 
 
 class CourseOut(BaseModel):
@@ -47,6 +52,7 @@ class CourseOut(BaseModel):
     - id: Unique course identifier
     - user_id: Owner of the course
     - title: Course title
+    - image_url: Optional course image URL
     - created_at: Timestamp of creation
     - progress_percent: Cached completion percentage (0–100)
     - status: Course state ("not_started", "in_progress", "completed")
@@ -61,6 +67,7 @@ class CourseOut(BaseModel):
     id: UUID
     user_id: UUID
     title: str
+    image_url: str | None = None
     created_at: datetime
 
     # Cached progress fields (derived from lesson completion)

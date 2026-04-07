@@ -13,7 +13,7 @@ Gateway → AI Course Gen Service (this service)
 
 Schema Types:
 - GenerateCourseReq → input from Gateway (user prompt)
-- GenerateCourseRes → structured AI output (course + lessons + items)
+- GenerateCourseRes → structured AI output (course + lessons + items + image)
 
 Notes:
 - These schemas are NOT direct database models.
@@ -76,13 +76,16 @@ class GenerateCourseRes(BaseModel):
 
     Fields:
     - title: Generated course title
+    - image_url: Selected course cover image URL
     - lessons: List of generated lessons, each with items
 
     Notes:
-    - This is structured output from the AI, not yet persisted.
+    - This is structured output from the AI/image-selection layer, not yet persisted.
     - The Gateway or courses-service may take this response and:
         1. Create a course
-        2. Insert lessons and lesson items
+        2. Store image_url
+        3. Insert lessons and lesson items
     """
     title: str
+    image_url: Optional[str] = None
     lessons: List[Lesson] = Field(default_factory=list)

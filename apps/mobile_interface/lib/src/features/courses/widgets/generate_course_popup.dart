@@ -5,11 +5,10 @@ import '../../../app/constants.dart';
 class GenerateCoursePopup extends StatefulWidget {
   const GenerateCoursePopup({
     super.key,
-    required this.onGenerate,
+    required this.onSubmitPrompt,
   });
 
-  /// Return true to close modal, false to keep open (and show error)
-  final Future<bool> Function(String prompt) onGenerate;
+  final void Function(String prompt) onSubmitPrompt;
 
   @override
   State<GenerateCoursePopup> createState() => _GenerateCoursePopupState();
@@ -17,7 +16,6 @@ class GenerateCoursePopup extends StatefulWidget {
 
 class _GenerateCoursePopupState extends State<GenerateCoursePopup> {
   final _promptCtrl = TextEditingController();
-  bool _submitting = false;
   String? _error;
 
   @override
@@ -26,7 +24,7 @@ class _GenerateCoursePopupState extends State<GenerateCoursePopup> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  void _submit() {
     final prompt = _promptCtrl.text.trim();
 
     if (prompt.isEmpty) {
@@ -34,22 +32,10 @@ class _GenerateCoursePopupState extends State<GenerateCoursePopup> {
       return;
     }
 
-    setState(() {
-      _error = null;
-      _submitting = true;
-    });
+    setState(() => _error = null);
 
-    final ok = await widget.onGenerate(prompt);
-
-    if (!mounted) return;
-
-    setState(() => _submitting = false);
-
-    if (ok) {
-      Navigator.of(context).pop();
-    } else {
-      setState(() => _error ??= 'Could not generate course. Please try again.');
-    }
+    Navigator.of(context).pop();
+    widget.onSubmitPrompt(prompt);
   }
 
   @override
@@ -67,7 +53,6 @@ class _GenerateCoursePopupState extends State<GenerateCoursePopup> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // top icon (matches figma vibe)
             Container(
               width: 44,
               height: 44,
@@ -78,7 +63,6 @@ class _GenerateCoursePopupState extends State<GenerateCoursePopup> {
               child: const Icon(Icons.add, color: AppColors.accent),
             ),
             const SizedBox(height: 12),
-
             Text(
               'Generate New Course?',
               textAlign: TextAlign.center,
@@ -89,7 +73,6 @@ class _GenerateCoursePopupState extends State<GenerateCoursePopup> {
               ),
             ),
             const SizedBox(height: 8),
-
             Text(
               'Ready to start a new journey? Enter a topic and our AI will craft a course for you.',
               textAlign: TextAlign.center,
@@ -99,18 +82,17 @@ class _GenerateCoursePopupState extends State<GenerateCoursePopup> {
               ),
             ),
             const SizedBox(height: 14),
-
             TextField(
               controller: _promptCtrl,
-              enabled: !_submitting,
               textInputAction: TextInputAction.done,
               onSubmitted: (_) => _submit(),
-              style: textTheme.bodyLarge?.copyWith(color: AppColors.textPrimary),
+              style: textTheme.bodyLarge?.copyWith(
+                color: AppColors.textPrimary,
+              ),
               decoration: const InputDecoration(
                 hintText: 'Enter a topic (e.g. Conversations)',
               ),
             ),
-
             if (_error != null) ...[
               const SizedBox(height: 10),
               Align(
@@ -125,27 +107,17 @@ class _GenerateCoursePopupState extends State<GenerateCoursePopup> {
                 ),
               ),
             ],
-
             const SizedBox(height: 14),
-
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _submitting ? null : _submit,
-                child: _submitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text("Yes, Let's Go!"),
+                onPressed: _submit,
+                child: const Text("Yes, Let's Go!"),
               ),
             ),
-
             const SizedBox(height: 8),
-
             TextButton(
-              onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(context).pop(),
               child: Text(
                 'MAYBE LATER',
                 style: textTheme.bodyMedium?.copyWith(

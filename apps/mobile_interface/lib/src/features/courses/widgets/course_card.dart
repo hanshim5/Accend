@@ -1,3 +1,5 @@
+// lib/src/features/courses/widgets/course_card.dart
+
 import 'package:flutter/material.dart';
 import '../../../app/constants.dart';
 import '../models/course.dart';
@@ -152,7 +154,7 @@ class _CourseImage extends StatelessWidget {
     return Image.network(
       imageUrl!,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
+      errorBuilder: (context, error, stackTrace) => Container(
         color: AppColors.primaryBg,
         child: const Center(
           child: Icon(

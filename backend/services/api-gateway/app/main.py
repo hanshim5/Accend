@@ -484,11 +484,17 @@ async def generate_course(
         if "title" not in ai_data:
             raise HTTPException(status_code=502, detail="AI service returned no title")
 
+        title = ai_data.get("title", "Untitled Course")
+        image_url = ai_data.get("image_url")
+
         # Step 3: Create the parent course row first.
         course_resp = await client.post(
             f"{settings.COURSES_SERVICE_URL}/courses",
             headers={"X-User-Id": user_id},
-            json={"title": ai_data.get("title", "Untitled Course")},
+            json={
+                "title": title,
+                "image_url": image_url,
+            },
         )
 
         if course_resp.status_code >= 400:
@@ -891,6 +897,46 @@ async def proxy_social_unfollow_user(
         r = await client.delete(
             f"{settings.FOLLOW_SERVICE_URL}/follow/{followee_id}",
             headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+# -----------------------------------
+# Progress Service — Phoneme Scores
+# -----------------------------------
+
+@app.post("/progress/phonemes/batch")
+async def proxy_phoneme_batch_update(
+    body: dict,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Merge a practice session's phoneme scores into the user's persistent record.
+
+    Called by the Flutter app at the end of a solo practice session. The client
+    sends per-phoneme aggregated scores and counts; the progress-service applies
+    a weighted-average merge with any previously stored data.
+
+    Flow:
+    1. Validate JWT and extract user_id.
+    2. Forward request body to progress-service with X-User-Id.
+    3. Return the downstream response (updated count).
+
+    Notes:
+    - Best-effort: failures on the client side should not block the results UI.
+    - The progress-service owns the 'user_phoneme_scores' table.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(
+            f"{settings.PROGRESS_SERVICE_URL}/phonemes/batch",
+            headers={"X-User-Id": user_id, "Content-Type": "application/json"},
+            json=body,
         )
 
     if r.status_code >= 400:

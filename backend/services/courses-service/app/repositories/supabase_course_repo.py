@@ -55,7 +55,7 @@ class SupabaseCourseRepo:
         rows = rest_get(
             table="courses",
             params={
-                "select": "id,user_id,title,created_at,progress_percent,status",
+                "select": "id,user_id,title,image_url,created_at,progress_percent,status",
                 "user_id": f"eq.{str(user_id)}",
                 "order": "created_at.desc",
             },
@@ -81,13 +81,14 @@ class SupabaseCourseRepo:
         payload = {
             "user_id": str(user_id),
             "title": data.title,
+            "image_url": data.image_url,
         }
 
         # Perform insert via Supabase REST.
         rows = rest_post(
             table="courses",
             payload=payload,
-            select="id,user_id,title,created_at,progress_percent,status",
+            select="id,user_id,title,image_url,created_at,progress_percent,status",
         )
         if not rows:
             raise RuntimeError("Supabase REST POST returned no row")
