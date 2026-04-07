@@ -6,6 +6,25 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../app/constants.dart';
 import '../models/pronunciation_feedback.dart';
 
+/// Maps a word/phoneme accuracy score to a semantic color.
+/// ≥ 85 → success green, ≥ 60 → action orange, else failure red.
+Color feedbackScoreColor(double? accuracy) {
+  if (accuracy == null) return AppColors.textPrimary;
+  if (accuracy >= 85) return AppColors.success;
+  if (accuracy >= 60) return AppColors.action;
+  return AppColors.failure;
+}
+
+/// Color for a "You said" phoneme chip — green only when the symbol matches
+/// AND accuracy is high (≥ 85).
+Color userSaidPhonemeColor(PhonemeFeedback p) {
+  final said = p.userSaid ?? p.symbol;
+  final symbolMatches = said == p.symbol;
+  if (symbolMatches && (p.accuracy ?? 0) >= 85) return AppColors.success;
+  final c = feedbackScoreColor(p.accuracy);
+  return c == AppColors.success ? AppColors.action : c;
+}
+
 /// Inline feedback card shown after the user submits a recording.
 /// Displays word-level and phoneme-level scores; tap a word to see phoneme breakdown.
 class FeedbackCard extends StatelessWidget {
@@ -39,39 +58,6 @@ class FeedbackCard extends StatelessWidget {
       fontWeight: FontWeight.w700,
     );
 
-    // Map a word-level accuracy score into a semantic color:
-    // - >= 85 → success green (very good)
-    // - >= 60 → action orange (needs some work)
-    // - else  → failure red (poor)
-    Color wordColor(double? accuracy) {
-      if (accuracy == null) return AppColors.textPrimary;
-      if (accuracy >= 85) return AppColors.success; // green
-      if (accuracy >= 60) return AppColors.action; // yellow / orange
-      return AppColors.failure; // red
-    }
-
-    // Same thresholds as [wordColor], but used for individual phonemes so
-    // users can see which sounds inside a word are strong vs weak.
-    Color phonemeColor(double? accuracy) {
-      if (accuracy == null) return AppColors.textPrimary;
-      if (accuracy >= 85) return AppColors.success;
-      if (accuracy >= 60) return AppColors.action;
-      return AppColors.failure;
-    }
-
-    /// Color for "You said" phoneme: green only when the symbol matches AND
-    /// accuracy is high (≥ 85). A correct symbol with a low score still shows
-    /// orange/red because the user didn't produce the sound cleanly enough.
-    Color userSaidPhonemeColor(PhonemeFeedback p) {
-      final said = p.userSaid ?? p.symbol;
-      final symbolMatches = said == p.symbol;
-      if (symbolMatches && (p.accuracy ?? 0) >= 85) return AppColors.success;
-      // Symbol wrong or accuracy too low — use score-based color, but never
-      // promote to green (treat it as orange at best).
-      final c = phonemeColor(p.accuracy);
-      return c == AppColors.success ? AppColors.action : c;
-    }
-
     /// Show a phoneme-detail popup for a single phoneme [symbol].
     /// Displays the symbol, articulation instruction, accuracy score, and a
     /// play button that streams the reference audio from Supabase Storage.
@@ -83,7 +69,7 @@ class FeedbackCard extends StatelessWidget {
     }) {
       showDialog<void>(
         context: parentContext,
-        builder: (_) => _PhonemeDetailDialog(
+        builder: (_) => PhonemeDetailDialog(
           symbol: symbol,
           accuracy: accuracy,
           chipColor: chipColor ?? AppColors.textPrimary,
@@ -240,7 +226,7 @@ class FeedbackCard extends StatelessWidget {
                     label: Text(
                       w.text,
                       style: bodyStyle.copyWith(
-                        color: wordColor(w.accuracy),
+                        color: feedbackScoreColor(w.accuracy),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -347,8 +333,9 @@ class ScoreChip extends StatelessWidget {
 
 /// Dialog shown when the user taps a phoneme chip.
 /// Manages its own [AudioPlayer] so it is properly disposed on close.
-class _PhonemeDetailDialog extends StatefulWidget {
-  const _PhonemeDetailDialog({
+class PhonemeDetailDialog extends StatefulWidget {
+  const PhonemeDetailDialog({
+    super.key,
     required this.symbol,
     required this.chipColor,
     this.accuracy,
@@ -359,10 +346,10 @@ class _PhonemeDetailDialog extends StatefulWidget {
   final double? accuracy;
 
   @override
-  State<_PhonemeDetailDialog> createState() => _PhonemeDetailDialogState();
+  State<PhonemeDetailDialog> createState() => _PhonemeDetailDialogState();
 }
 
-class _PhonemeDetailDialogState extends State<_PhonemeDetailDialog> {
+class _PhonemeDetailDialogState extends State<PhonemeDetailDialog> {
   final AudioPlayer _player = AudioPlayer();
   bool _isPlaying = false;
   bool _isLoading = false;

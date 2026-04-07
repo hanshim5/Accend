@@ -820,3 +820,43 @@ async def proxy_social_unfollow_user(
         raise HTTPException(status_code=r.status_code, detail=r.text)
 
     return r.json()
+
+
+# -----------------------------------
+# Progress Service — Phoneme Scores
+# -----------------------------------
+
+@app.post("/progress/phonemes/batch")
+async def proxy_phoneme_batch_update(
+    body: dict,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Merge a practice session's phoneme scores into the user's persistent record.
+
+    Called by the Flutter app at the end of a solo practice session. The client
+    sends per-phoneme aggregated scores and counts; the progress-service applies
+    a weighted-average merge with any previously stored data.
+
+    Flow:
+    1. Validate JWT and extract user_id.
+    2. Forward request body to progress-service with X-User-Id.
+    3. Return the downstream response (updated count).
+
+    Notes:
+    - Best-effort: failures on the client side should not block the results UI.
+    - The progress-service owns the 'user_phoneme_scores' table.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(
+            f"{settings.PROGRESS_SERVICE_URL}/phonemes/batch",
+            headers={"X-User-Id": user_id, "Content-Type": "application/json"},
+            json=body,
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()

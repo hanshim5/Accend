@@ -11,7 +11,11 @@ Purpose:
 
 from fastapi import FastAPI
 
+from app.routers import phonemes
+
 app = FastAPI(title="progress-service")
+
+app.include_router(phonemes.router)
 
 
 @app.get("/health")

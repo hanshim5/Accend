@@ -61,6 +61,9 @@ class SoloPracticeController {
   List<PronunciationFeedbackMock> get sessionFeedbacks =>
       List.unmodifiable(_sessionFeedbacks);
 
+  /// The ordered list of lesson items used in this session.
+  List<LessonItem> get items => List.unmodifiable(_items);
+
   int get totalCards => _items.length;
 
   LessonItem get currentItem => _items[currentCardIndex];

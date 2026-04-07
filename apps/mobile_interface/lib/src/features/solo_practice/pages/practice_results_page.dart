@@ -8,7 +8,10 @@ import '../../../app/constants.dart';
 import '../../../app/routes.dart';
 import '../../courses/controllers/courses_controller.dart';
 import '../../courses/models/lesson.dart';
+import '../../courses/models/lesson_item.dart';
+import '../../progress/services/progress_service.dart';
 import '../models/pronunciation_feedback.dart';
+import '../widgets/feedback_card.dart';
 
 // ---------------------------------------------------------------------------
 // Page
@@ -18,10 +21,14 @@ class PracticeResultsPage extends StatefulWidget {
   const PracticeResultsPage({
     super.key,
     required this.feedbacks,
+    required this.items,
     this.lesson,
   });
 
   final List<PronunciationFeedbackMock> feedbacks;
+
+  /// The ordered lesson items practiced — one per feedback entry.
+  final List<LessonItem> items;
 
   /// The completed lesson. When provided, the server is notified of completion
   /// on mount (best-effort, non-blocking).
@@ -40,6 +47,7 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
   void initState() {
     super.initState();
     _notifyLessonComplete();
+    _submitPhonemeScores();
   }
 
   void _notifyLessonComplete() {
@@ -53,6 +61,20 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
       context
           .read<CoursesController>()
           .completeLesson(lesson.courseId, lesson.id);
+    });
+  }
+
+  /// Fire-and-forget: aggregate all phoneme scores from the session and send
+  /// them to the progress-service for persistent weighted-average storage.
+  ///
+  /// Runs after the first frame so the results UI renders immediately.
+  /// Errors are swallowed inside [ProgressService.submitPhonemeScores].
+  void _submitPhonemeScores() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context
+          .read<ProgressService>()
+          .submitPhonemeScores(widget.feedbacks);
     });
   }
 
@@ -267,6 +289,56 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
                       ),
                     ),
 
+                    // -------------------------------------------------------
+                    // Session breakdown — expandable per-item feedback list
+                    // -------------------------------------------------------
+                    if (_feedbacks.isNotEmpty && widget.items.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xl),
+
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Session Breakdown',
+                          style: GoogleFonts.inter(
+                            color: AppColors.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: AppSpacing.sm),
+
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(AppRadii.lg),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          children: [
+                            for (int i = 0;
+                                i < math.min(widget.items.length, _feedbacks.length);
+                                i++) ...[
+                              if (i > 0)
+                                const Divider(
+                                  height: 1,
+                                  thickness: 1,
+                                  color: AppColors.border,
+                                ),
+                              _ItemBreakdownTile(
+                                index: i,
+                                item: widget.items[i],
+                                feedback: _feedbacks[i],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: AppSpacing.xl),
                   ],
                 ),
@@ -282,7 +354,7 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
                   onPressed: () => Navigator.of(context)
                       .pushNamedAndRemoveUntil(AppRoutes.courses, (_) => false),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
+                    backgroundColor: AppColors.action,
                     foregroundColor: AppColors.primaryBg,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadii.md),
@@ -298,6 +370,341 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
                     ).copyWith(inherit: false),
                   ),
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Session breakdown — per-item expandable tile
+// ---------------------------------------------------------------------------
+
+/// An [ExpansionTile] row showing one lesson item's score summary; expands to
+/// reveal word-level feedback chips and the reference text.
+class _ItemBreakdownTile extends StatelessWidget {
+  const _ItemBreakdownTile({
+    required this.index,
+    required this.item,
+    required this.feedback,
+  });
+
+  final int index;
+  final LessonItem item;
+  final PronunciationFeedbackMock feedback;
+
+  double get _overallScore {
+    if (feedback.pronScore != null) return feedback.pronScore!;
+    return (feedback.accuracyScore + feedback.fluencyScore + feedback.completenessScore) / 3;
+  }
+
+  Color _scoreColor(double score) {
+    if (score >= 85) return AppColors.success;
+    if (score >= 60) return AppColors.action;
+    return AppColors.failure;
+  }
+
+  /// Show the phoneme-breakdown dialog for a single [word].
+  void _showWordPhonemeDialog(BuildContext context, WordFeedback word) {
+    final bodyStyle = GoogleFonts.publicSans(
+      color: AppColors.textSecondary,
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+    );
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Text(
+            word.text,
+            style: GoogleFonts.inter(
+              color: AppColors.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          content: word.phonemes.isEmpty
+              ? Text(
+                  'No phoneme data available for this word.',
+                  style: bodyStyle,
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'You said:',
+                      style: bodyStyle.copyWith(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final p in word.phonemes)
+                          ActionChip(
+                            onPressed: () => showDialog<void>(
+                              context: dialogContext,
+                              builder: (_) => PhonemeDetailDialog(
+                                symbol: p.userSaid ?? p.symbol,
+                                accuracy: p.accuracy,
+                                chipColor: userSaidPhonemeColor(p),
+                              ),
+                            ),
+                            label: Text(
+                              p.userSaid ?? p.symbol,
+                              style: bodyStyle.copyWith(
+                                color: userSaidPhonemeColor(p),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            backgroundColor: AppColors.inputFill,
+                            shape: const StadiumBorder(
+                              side: BorderSide(color: AppColors.border),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Should be:',
+                      style: bodyStyle.copyWith(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final p in word.phonemes)
+                          ActionChip(
+                            onPressed: () => showDialog<void>(
+                              context: dialogContext,
+                              builder: (_) => PhonemeDetailDialog(
+                                symbol: p.symbol,
+                                chipColor: AppColors.textPrimary,
+                              ),
+                            ),
+                            label: Text(
+                              p.symbol,
+                              style: bodyStyle.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            backgroundColor: AppColors.inputFill,
+                            shape: const StadiumBorder(
+                              side: BorderSide(color: AppColors.border),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tap any phoneme to hear how to say it.',
+                      style: bodyStyle.copyWith(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final score = _overallScore;
+    final color = _scoreColor(score);
+
+    final bodyStyle = GoogleFonts.publicSans(
+      color: AppColors.textSecondary,
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+    );
+
+    return Theme(
+      // Remove the default ExpansionTile divider lines injected by the theme.
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.md,
+        ),
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withValues(alpha: 0.12),
+            border: Border.all(color: color.withValues(alpha: 0.45), width: 1.5),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            '${score.round()}',
+            style: GoogleFonts.inter(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        title: Text(
+          item.text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.publicSans(
+            color: AppColors.textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          'Exercise ${index + 1}',
+          style: bodyStyle.copyWith(fontSize: 11),
+        ),
+        iconColor: AppColors.textSecondary,
+        collapsedIconColor: AppColors.textSecondary,
+        children: [
+          // ----------------------------------------------------------------
+          // Expanded body — word chips + reference text
+          // ----------------------------------------------------------------
+
+          if (feedback.words.isNotEmpty) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'You said:',
+                style: bodyStyle.copyWith(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final w in feedback.words)
+                  ActionChip(
+                    onPressed: w.phonemes.isEmpty
+                        ? null
+                        : () => _showWordPhonemeDialog(context, w),
+                    backgroundColor: AppColors.inputFill,
+                    shape: const StadiumBorder(
+                      side: BorderSide(color: AppColors.border),
+                    ),
+                    label: Text(
+                      w.text,
+                      style: bodyStyle.copyWith(
+                        color: feedbackScoreColor(w.accuracy),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
+
+          if (feedback.words.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Tap a word to see phoneme breakdown.',
+              style: bodyStyle.copyWith(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+
+          const SizedBox(height: AppSpacing.xs),
+
+          // Mini score row
+          Row(
+            children: [
+              _MiniScoreChip(label: 'Accuracy', score: feedback.accuracyScore),
+              const SizedBox(width: AppSpacing.xs),
+              _MiniScoreChip(label: 'Fluency', score: feedback.fluencyScore),
+              const SizedBox(width: AppSpacing.xs),
+              _MiniScoreChip(label: 'Complete', score: feedback.completenessScore),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact inline score chip used inside the breakdown tile.
+class _MiniScoreChip extends StatelessWidget {
+  const _MiniScoreChip({required this.label, required this.score});
+
+  final String label;
+  final double score;
+
+  Color get _color {
+    if (score >= 85) return AppColors.success;
+    if (score >= 60) return AppColors.action;
+    return AppColors.failure;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: _color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          border: Border.all(color: _color.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${score.round()}',
+              style: GoogleFonts.inter(
+                color: _color,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              label,
+              style: GoogleFonts.publicSans(
+                color: AppColors.textSecondary,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
