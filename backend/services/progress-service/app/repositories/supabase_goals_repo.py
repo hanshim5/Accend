@@ -45,3 +45,21 @@ class SupabaseGoalsRepo(GoalsRepo):
 
         row = rows[0]
         return int(row.get("current_streak", 0) or 0), int(row.get("longest_streak", 0) or 0)
+
+    async def upsert_today_minutes(self, user_id: str, day: date, minutes: int) -> int:
+        minutes = max(0, int(minutes))
+        try:
+            await supabase.upsert(
+                "daily_minutes",
+                [
+                    {
+                        "user_id": user_id,
+                        "day": day.isoformat(),
+                        "minutes": minutes,
+                    }
+                ],
+            )
+        except httpx.HTTPStatusError:
+            # If write fails, return the current value we attempted.
+            return minutes
+        return minutes

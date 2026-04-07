@@ -212,6 +212,16 @@ def _is_active_course(course: dict) -> bool:
     return progress < 100
 
 
+def _goal_minutes_from_daily_pace(daily_pace: object) -> int:
+    pace = str(daily_pace or "").strip().lower()
+    return {
+        "hiker": 5,
+        "climber": 10,
+        "summiter": 15,
+        "mountaineer": 20,
+    }.get(pace, 10)
+
+
 @app.get("/home")
 async def proxy_home_preload(
     authorization: str | None = Header(default=None),
@@ -252,6 +262,7 @@ async def proxy_home_preload(
 
     full_name = (profile.get("full_name") if isinstance(profile, dict) else None) or ""
     username = (profile.get("username") if isinstance(profile, dict) else None) or ""
+    daily_pace = profile.get("daily_pace") if isinstance(profile, dict) else None
 
     active_course = None
     if target:
@@ -267,7 +278,7 @@ async def proxy_home_preload(
         "current_streak": int(goals.get("current_streak", 0) or 0),
         "longest_streak": int(goals.get("longest_streak", 0) or 0),
         "current_minutes": int(goals.get("current_minutes", 0) or 0),
-        "goal_minutes": int(goals.get("goal_minutes", 10) or 10),
+        "goal_minutes": _goal_minutes_from_daily_pace(daily_pace),
         "active_course": active_course,
     }
 
@@ -920,6 +931,32 @@ async def proxy_phoneme_batch_update(
     async with httpx.AsyncClient(timeout=10) as client:
         r = await client.post(
             f"{settings.PROGRESS_SERVICE_URL}/phonemes/batch",
+            headers={"X-User-Id": user_id, "Content-Type": "application/json"},
+            json=body,
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.post("/progress/daily-minutes")
+async def proxy_daily_minutes_update(
+    body: dict,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Add a practice-session time delta to today's daily minutes.
+
+    Expected body:
+    - seconds_delta: int (elapsed active seconds in current session chunk)
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(
+            f"{settings.PROGRESS_SERVICE_URL}/daily-minutes",
             headers={"X-User-Id": user_id, "Content-Type": "application/json"},
             json=body,
         )

@@ -34,6 +34,21 @@ class HomeController extends ChangeNotifier {
     return (_currentMinutes / _goalMinutes).clamp(0, 1).toDouble();
   }
 
+  int _goalMinutesFromDailyPace(String? dailyPace) {
+    switch ((dailyPace ?? '').trim().toLowerCase()) {
+      case 'hiker':
+        return 5;
+      case 'climber':
+        return 10;
+      case 'summiter':
+        return 15;
+      case 'mountaineer':
+        return 20;
+      default:
+        return 10;
+    }
+  }
+
   Future<void> load() async {
     if (_isLoading) return;
 
@@ -50,11 +65,16 @@ class HomeController extends ChangeNotifier {
 
     try {
       final data = await _api.getJson('/home', accessToken: accessToken);
+      final profile = await _api.getJson('/profile', accessToken: accessToken);
 
       _displayName = ((data['display_name'] as String?) ?? 'there').trim();
       if (_displayName.isEmpty) _displayName = 'there';
       _currentMinutes = (data['current_minutes'] as int?) ?? 0;
-      _goalMinutes = (data['goal_minutes'] as int?) ?? 10;
+      final dailyPace = profile['daily_pace'] as String?;
+      final backendGoal = (data['goal_minutes'] as int?) ?? 10;
+      _goalMinutes = dailyPace == null || dailyPace.trim().isEmpty
+          ? backendGoal
+          : _goalMinutesFromDailyPace(dailyPace);
       _currentStreak = (data['current_streak'] as int?) ?? 0;
 
       final activeCourse = data['active_course'];
