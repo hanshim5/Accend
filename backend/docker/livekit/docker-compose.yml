@@ -1,0 +1,10 @@
+# Dev-only LiveKit. Copy API key/secret from container logs into group-service LIVEKIT_* env vars.
+# See: backend/services/group-service/LIVEKIT.md
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    command: ["--dev", "--bind", "0.0.0.0"]
+    ports:
+      - "7880:7880"
+      - "7881:7881/udp"
+      - "7882:7882/udp"

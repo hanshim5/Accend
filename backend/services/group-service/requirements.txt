@@ -3,3 +3,4 @@ uvicorn[standard]==0.30.6
 httpx==0.27.2
 pydantic-settings==2.5.2
 supabase==2.6.0
+livekit-api==0.8.2

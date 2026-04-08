@@ -12,6 +12,7 @@ Purpose:
 from fastapi import FastAPI
 from app.routers.private_lobbies import router as private_lobbies_router
 from app.routers.public_lobbies import router as public_lobbies_router
+from app.routers.voice import router as voice_router
 
 app = FastAPI(title="group-service")
 
@@ -28,6 +29,7 @@ def health():
     return {"ok": True, "service": "group-service"}
 
 
-# Attach the /courses routes
+# Attach the private and public lobby routes
 app.include_router(private_lobbies_router)
 app.include_router(public_lobbies_router)
+app.include_router(voice_router)

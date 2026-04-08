@@ -424,6 +424,25 @@ class GroupSessionController extends ChangeNotifier {
     _isRealtimeSyncing = false;
   }
 
+  /// LiveKit WebRTC (audio). [lobbyKind] is `private` or `public` (must match DB membership).
+  Future<Map<String, dynamic>> getLiveKitToken({
+    required String lobbyId,
+    required String lobbyKind,
+  }) async {
+    final token = _auth.accessToken;
+    if (token == null || token.isEmpty) {
+      throw StateError('Not authenticated');
+    }
+    return _api.postJson(
+      '/voice/livekit/token',
+      accessToken: token,
+      body: {
+        'lobby_id': lobbyId,
+        'lobby_kind': lobbyKind,
+      },
+    );
+  }
+
   @override
   void dispose() {
     unsubscribeFromLobby();

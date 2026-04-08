@@ -16,6 +16,14 @@ class GroupSessionPrivateCreatePage extends StatefulWidget {
 }
 
 class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreatePage> {
+  GroupSessionController? _ctrl;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _ctrl ??= context.read<GroupSessionController>();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -40,7 +48,7 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
 
   @override
   void dispose() {
-    context.read<GroupSessionController>().unsubscribeFromLobby();
+    _ctrl?.unsubscribeFromLobby();
     super.dispose();
   }
 
@@ -212,7 +220,11 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
                     child: ElevatedButton.icon(
                       onPressed: (ctrl.isLoading || ctrl.createPrivateLobby?.lobbyId == null)
                           ? null
-                          : () => Navigator.pushNamed(context, routes.AppRoutes.groupSessionActiveLobby),
+                          : () => Navigator.pushNamed(
+                                context,
+                                routes.AppRoutes.groupSessionActiveLobby,
+                                arguments: 'private',
+                              ),
                       icon: const Icon(Icons.play_arrow_rounded),
                       label: const Text('Start'),
                     ),
@@ -229,7 +241,7 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
                   //   ),
                   // ),
 
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 12),
 
                 ],
               ),

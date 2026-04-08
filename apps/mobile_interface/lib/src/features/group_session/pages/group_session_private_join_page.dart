@@ -16,7 +16,14 @@ class GroupSessionPrivateJoinPage extends StatefulWidget {
 
 
 class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
+  GroupSessionController? _ctrl;
   String? _lobbyCode;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _ctrl ??= context.read<GroupSessionController>();
+  }
 
   @override
   void initState() {
@@ -43,7 +50,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
 
   @override
   void dispose() {
-    context.read<GroupSessionController>().unsubscribeFromLobby();
+    _ctrl?.unsubscribeFromLobby();
     super.dispose();
   }
 
@@ -219,7 +226,11 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
                     child: ElevatedButton.icon(
                       onPressed: (ctrl.isLoading || (_lobbyCode == null))
                           ? null
-                          : () => Navigator.pushNamed(context, routes.AppRoutes.groupSessionActiveLobby),
+                          : () => Navigator.pushNamed(
+                                context,
+                                routes.AppRoutes.groupSessionActiveLobby,
+                                arguments: 'private',
+                              ),
                       icon: const Icon(Icons.play_arrow_rounded),
                       label: const Text('Start'),
                     ),
@@ -236,7 +247,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
                   //   ),
                   // ),
 
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 12),
 
                 ],
               ),

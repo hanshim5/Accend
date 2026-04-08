@@ -225,7 +225,11 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
                     child: ElevatedButton.icon(
                       onPressed: players.isEmpty
                           ? null
-                          : () => Navigator.pushNamed(context, routes.AppRoutes.groupSessionActiveLobby),
+                          : () => Navigator.pushNamed(
+                                context,
+                                routes.AppRoutes.groupSessionActiveLobby,
+                                arguments: 'public',
+                              ),
                       icon: const Icon(Icons.play_arrow_rounded),
                       label: const Text('Start'),
                     ),
