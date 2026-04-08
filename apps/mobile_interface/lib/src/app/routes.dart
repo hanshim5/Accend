@@ -22,6 +22,7 @@ import '../features/group_session/pages/group_session_private_select_page.dart';
 import '../features/group_session/pages/group_session_private_create_page.dart';
 import '../features/group_session/pages/group_session_private_join_page.dart';
 import '../features/group_session/pages/group_session_active_lobby_page.dart';
+import '../features/group_session/pages/group_session_public_match_page.dart';
 
 class AppRoutes {
   static const login = '/login';
@@ -48,6 +49,7 @@ class AppRoutes {
   static const groupSessionPrivateCreate = '/group_session/private-create';
   static const groupSessionPrivateJoin = '/group_session/private-join';
   static const groupSessionActiveLobby = '/group_session/active-lobby';
+  static const groupSessionPublicMatch = '/group_session/public-match';
 
   static Map<String, WidgetBuilder> get table => {
         login: (_) => const LoginPage(),
@@ -74,5 +76,6 @@ class AppRoutes {
         groupSessionPrivateCreate: (_) => const GroupSessionPrivateCreatePage(),
         groupSessionPrivateJoin: (_) => const GroupSessionPrivateJoinPage(),
         groupSessionActiveLobby: (_) => const GroupSessionActiveLobbyPage(),
+        groupSessionPublicMatch: (_) => const GroupSessionPublicMatchPage(),
       };
 }

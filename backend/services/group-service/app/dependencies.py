@@ -16,7 +16,14 @@ Later:
 """
 
 from app.repositories.supabase_private_lobby_repo import SupabasePrivateLobbyRepo
+from app.repositories.supabase_public_lobby_repo import SupabasePublicLobbyRepo
 from app.services.private_lobby_service import PrivateLobbyService
+from app.services.public_lobby_service import PublicLobbyService
+
 
 def get_private_lobby_service() -> PrivateLobbyService:
     return PrivateLobbyService(repo=SupabasePrivateLobbyRepo())
+
+
+def get_public_lobby_service() -> PublicLobbyService:
+    return PublicLobbyService(repo=SupabasePublicLobbyRepo())

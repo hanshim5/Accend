@@ -859,6 +859,125 @@ async def proxy_leave_lobby(
     return r.json()
 
 
+# -----------------------------------
+# Public lobbies (matchmaking)
+# -----------------------------------
+
+
+@app.get("/public_lobbies/me")
+async def proxy_get_my_public_lobbies(
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{settings.GROUP_SERVICE_URL}/public_lobbies/me",
+            headers={"X-User-Id": user_id},
+        )
+        if r.status_code >= 400:
+            raise HTTPException(status_code=r.status_code, detail=r.text)
+
+        return r.json()
+
+
+@app.post("/public_lobbies/create")
+async def proxy_create_public_lobby(
+    body: CreatePrivateLobbyReq,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(
+            f"{settings.GROUP_SERVICE_URL}/public_lobbies/create",
+            headers={"X-User-Id": user_id},
+            json={"username": body.username, "user_id": body.user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.post("/public_lobbies/join")
+async def proxy_join_public_lobby(
+    body: JoinPrivateLobbyReq,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(
+            f"{settings.GROUP_SERVICE_URL}/public_lobbies/join",
+            headers={"X-User-Id": user_id},
+            json={"user_id": body.user_id, "lobby_id": body.lobby_id, "username": body.username},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.post("/public_lobbies/match")
+async def proxy_match_public_lobby(
+    body: CreatePrivateLobbyReq,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(
+            f"{settings.GROUP_SERVICE_URL}/public_lobbies/match",
+            headers={"X-User-Id": user_id},
+            json={"username": body.username, "user_id": body.user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.get("/public_lobbies/{lobby_id}")
+async def proxy_get_public_lobby(
+    lobby_id: str,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{settings.GROUP_SERVICE_URL}/public_lobbies/{lobby_id}",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.delete("/public_lobbies/leave")
+async def proxy_leave_public_lobby(
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.delete(
+            f"{settings.GROUP_SERVICE_URL}/public_lobbies/leave",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
 @app.get("/social/following")
 async def proxy_social_following(
     authorization: str | None = Header(default=None),

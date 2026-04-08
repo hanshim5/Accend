@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../app/constants.dart';
 import '../../../app/routes.dart' as routes;
 import '../widgets/public_button.dart' as public_button;
@@ -68,7 +69,10 @@ class _GroupSessionSelectPageState extends State<GroupSessionSelectPage> {
                     title: "Public Room", 
                     subtitle: "Automatically match-made rooms", 
                     icon: Icons.public, 
-                    onTap: () {print("Public room Pressed");} // leo TODO Need to make it actually do something later
+                    onTap: () {
+                      context.read<GroupSessionController>().resetPrivateLobbyState(notify: false);
+                      Navigator.pushNamed(context, routes.AppRoutes.groupSessionPublicMatch);
+                    },
                   ),
                   
                   const SizedBox(height: 60),

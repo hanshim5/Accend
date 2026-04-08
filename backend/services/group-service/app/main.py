@@ -11,6 +11,7 @@ Purpose:
 
 from fastapi import FastAPI
 from app.routers.private_lobbies import router as private_lobbies_router
+from app.routers.public_lobbies import router as public_lobbies_router
 
 app = FastAPI(title="group-service")
 
@@ -29,3 +30,4 @@ def health():
 
 # Attach the /courses routes
 app.include_router(private_lobbies_router)
+app.include_router(public_lobbies_router)

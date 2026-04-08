@@ -4,6 +4,7 @@ class AuthService {
   AuthService({SupabaseClient? client}) : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
+  SupabaseClient get client => _client;
 
   /// Returns the current logged-in user (or null).
   User? get currentUser => _client.auth.currentUser;
