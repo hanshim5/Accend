@@ -14,6 +14,9 @@ class ProfilePageData {
     this.focusAreas,
     required this.followersCount,
     required this.followingCount,
+    required this.currentStreak,
+    required this.overallAccuracy,
+    required this.lessonsCompleted,
   });
 
   final String id;
@@ -30,6 +33,9 @@ class ProfilePageData {
   final String? focusAreas;
   final int followersCount;
   final int followingCount;
+  final int currentStreak;
+  final double overallAccuracy;
+  final int lessonsCompleted;
 
   String get displayName => (fullName?.trim().isNotEmpty ?? false) ? fullName!.trim() : username;
 
@@ -38,6 +44,7 @@ class ProfilePageData {
   factory ProfilePageData.fromJson(Map<String, dynamic> json) {
     final profile = Map<String, dynamic>.from(json['profile'] as Map? ?? const {});
     final social = Map<String, dynamic>.from(json['social'] as Map? ?? const {});
+    final stats = Map<String, dynamic>.from(json['stats'] as Map? ?? const {});
 
     return ProfilePageData(
       id: profile['id']?.toString() ?? '',
@@ -54,6 +61,9 @@ class ProfilePageData {
       focusAreas: profile['focus_areas']?.toString(),
       followersCount: (social['followers'] as num?)?.toInt() ?? 0,
       followingCount: (social['following'] as num?)?.toInt() ?? 0,
+      currentStreak: (stats['current_streak'] as num?)?.toInt() ?? 0,
+      overallAccuracy: (stats['overall_accuracy'] as num?)?.toDouble() ?? 0.0,
+      lessonsCompleted: (stats['lessons_completed'] as num?)?.toInt() ?? 0,
     );
   }
 }

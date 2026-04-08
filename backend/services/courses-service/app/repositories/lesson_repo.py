@@ -63,3 +63,8 @@ class LessonRepo(Protocol):
     Typically used when generating or inserting multiple lessons and their
     items together.
     """
+
+    def get_completed_lessons_count(self, user_id: UUID) -> int: ...
+    """
+    Return the number of completed lessons across all courses owned by a user.
+    """

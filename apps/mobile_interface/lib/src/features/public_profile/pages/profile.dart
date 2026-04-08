@@ -203,7 +203,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     goals: _selectedGoals,
                   ),
                   const SizedBox(height: 18),
-                  const _StatsPanel(),
+                  _StatsPanel(data: data),
                   const SizedBox(height: 18),
                   _SpecializedFocusSection(
                     selected: _selectedFocusAreas,
@@ -736,7 +736,7 @@ class _ProfileHero extends StatelessWidget {
                   const Icon(Icons.local_fire_department_rounded, color: AppColors.action, size: 18),
                   const SizedBox(width: 6),
                   Text(
-                    '## Day Streak',
+                      '${data.currentStreak} Day Streak',
                     style: GoogleFonts.inter(
                       color: AppColors.textSecondary,
                       fontSize: 14,
@@ -787,7 +787,9 @@ class _ProfileHero extends StatelessWidget {
 }
 
 class _StatsPanel extends StatelessWidget {
-  const _StatsPanel();
+  const _StatsPanel({required this.data});
+
+  final ProfilePageData data;
 
   @override
   Widget build(BuildContext context) {
@@ -805,7 +807,7 @@ class _StatsPanel extends StatelessWidget {
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _StatsSummary(),
+                _StatsSummary(data: data),
                 const SizedBox(height: 14),
                 Container(height: 1, color: Colors.white.withValues(alpha: 0.05)),
                 const SizedBox(height: 12),
@@ -814,7 +816,7 @@ class _StatsPanel extends StatelessWidget {
             )
           : Row(
               children: [
-                const Expanded(flex: 6, child: _StatsSummary()),
+                Expanded(flex: 6, child: _StatsSummary(data: data)),
                 Container(
                   width: 1,
                   height: 96,
@@ -829,7 +831,9 @@ class _StatsPanel extends StatelessWidget {
 }
 
 class _StatsSummary extends StatelessWidget {
-  const _StatsSummary();
+  const _StatsSummary({required this.data});
+
+  final ProfilePageData data;
 
   @override
   Widget build(BuildContext context) {
@@ -853,7 +857,9 @@ class _StatsSummary extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '##',
+                  data.overallAccuracy <= 0
+                      ? '--'
+                      : '${data.overallAccuracy.toStringAsFixed(0)}%',
                   style: GoogleFonts.inter(
                     color: Colors.white,
                     fontSize: 24,
@@ -884,7 +890,7 @@ class _StatsSummary extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '##',
+                    '${data.lessonsCompleted}',
                     style: GoogleFonts.inter(
                       color: Colors.white,
                       fontSize: 18,

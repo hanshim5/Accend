@@ -1,5 +1,6 @@
 from uuid import UUID
 import httpx
+import asyncio
 
 from app.clients.supabase import supabase
 from app.schemas.follow_schema import SocialUserOut
@@ -49,9 +50,17 @@ class SupabaseFollowRepo:
             },
         )
         i_follow_ids = {row["followee_id"] for row in following_rows}
+        metrics = await self._get_social_metrics(follower_ids)
 
         return [
-            self._to_social_user(profiles[follower_id], i_follow=follower_id in i_follow_ids, follows_me=True)
+            self._to_social_user(
+                profiles[follower_id],
+                i_follow=follower_id in i_follow_ids,
+                follows_me=True,
+                current_streak=metrics["streak"].get(follower_id, 0),
+                overall_accuracy=metrics["accuracy"].get(follower_id, 0.0),
+                lessons_completed=metrics["lessons"].get(follower_id, 0),
+            )
             for follower_id in follower_ids
             if follower_id in profiles
         ]
@@ -79,9 +88,17 @@ class SupabaseFollowRepo:
             },
         )
         follows_me_ids = {row["follower_id"] for row in follower_rows}
+        metrics = await self._get_social_metrics(followee_ids)
 
         return [
-            self._to_social_user(profiles[followee_id], i_follow=True, follows_me=followee_id in follows_me_ids)
+            self._to_social_user(
+                profiles[followee_id],
+                i_follow=True,
+                follows_me=followee_id in follows_me_ids,
+                current_streak=metrics["streak"].get(followee_id, 0),
+                overall_accuracy=metrics["accuracy"].get(followee_id, 0.0),
+                lessons_completed=metrics["lessons"].get(followee_id, 0),
+            )
             for followee_id in followee_ids
             if followee_id in profiles
         ]
@@ -127,12 +144,16 @@ class SupabaseFollowRepo:
             },
         )
         follows_me_ids = {row["follower_id"] for row in follower_rows}
+        metrics = await self._get_social_metrics(candidate_ids)
 
         return [
             self._to_social_user(
                 row,
                 i_follow=row["id"] in i_follow_ids,
                 follows_me=row["id"] in follows_me_ids,
+                current_streak=metrics["streak"].get(row["id"], 0),
+                overall_accuracy=metrics["accuracy"].get(row["id"], 0.0),
+                lessons_completed=metrics["lessons"].get(row["id"], 0),
             )
             for row in rows
             if row.get("id")
@@ -212,7 +233,16 @@ class SupabaseFollowRepo:
     def _in_clause(self, values: list[str]) -> str:
         return "in.(" + ",".join(values) + ")"
 
-    def _to_social_user(self, row: dict, *, i_follow: bool, follows_me: bool) -> SocialUserOut:
+    def _to_social_user(
+        self,
+        row: dict,
+        *,
+        i_follow: bool,
+        follows_me: bool,
+        current_streak: int,
+        overall_accuracy: float,
+        lessons_completed: int,
+    ) -> SocialUserOut:
         level_label = row.get("skill_assess") or row.get("level") or None
         display_name = row.get("full_name") or row.get("username") or "Unknown"
 
@@ -224,6 +254,59 @@ class SupabaseFollowRepo:
             native_language=row.get("native_language"),
             learning_goal=row.get("learning_goal"),
             focus_areas=row.get("focus_areas"),
+            current_streak=max(0, int(current_streak)),
+            overall_accuracy=max(0.0, min(100.0, float(overall_accuracy))),
+            lessons_completed=max(0, int(lessons_completed)),
             i_follow=i_follow,
             follows_me=follows_me,
         )
+
+    async def _get_social_metrics(self, user_ids: list[str]) -> dict[str, dict[str, float | int]]:
+        if not user_ids:
+            return {
+                "streak": {},
+                "accuracy": {},
+                "lessons": {},
+            }
+
+        streak_req = supabase.get(
+            "streaks",
+            params={
+                "select": "user_id,current_streak",
+                "user_id": self._in_clause(user_ids),
+            },
+        )
+        lessons_req = supabase.get(
+            "user_stats",
+            params={
+                "select": "user_id,lessons_completed,overall_accuracy",
+                "user_id": self._in_clause(user_ids),
+            },
+        )
+
+        streak_rows, lessons_rows = await asyncio.gather(
+            streak_req,
+            lessons_req,
+        )
+
+        streak_map: dict[str, int] = {
+            str(row.get("user_id")): int(row.get("current_streak", 0) or 0)
+            for row in streak_rows
+            if row.get("user_id")
+        }
+        lessons_map: dict[str, int] = {
+            str(row.get("user_id")): int(row.get("lessons_completed", 0) or 0)
+            for row in lessons_rows
+            if row.get("user_id")
+        }
+        accuracy_map: dict[str, float] = {
+            str(row.get("user_id")): float(row.get("overall_accuracy", 0.0) or 0.0)
+            for row in lessons_rows
+            if row.get("user_id")
+        }
+
+        return {
+            "streak": streak_map,
+            "accuracy": accuracy_map,
+            "lessons": lessons_map,
+        }

@@ -195,26 +195,28 @@ class _SocialUserProfilePopup extends StatelessWidget {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 childAspectRatio: 1.72,
-                children: const [
+                children: [
                   _MetricCard(
                     icon: Icons.local_fire_department_rounded,
                     iconColor: Color(0xFFF97316),
                     label: 'STREAK',
-                    value: '## Days',
+                    value: '${user.currentStreak} Days',
                   ),
                   _MetricCard(
                     icon: Icons.insights_rounded,
                     iconColor: AppColors.accent,
                     label: 'ACCURACY',
-                    value: '##%',
+                    value: user.overallAccuracy <= 0
+                        ? '--'
+                        : '${user.overallAccuracy.toStringAsFixed(0)}%',
                   ),
                   _MetricCard(
                     icon: Icons.translate_rounded,
                     iconColor: Color(0xFFCBD5E1),
                     label: 'LESSONS COMPLETED',
-                    value: '##',
+                    value: '${user.lessonsCompleted}',
                   ),
-                  _MetricCard(
+                  const _MetricCard(
                     icon: Icons.military_tech_rounded,
                     iconColor: Color(0xFFFACC15),
                     label: 'METERS CLIMBED',

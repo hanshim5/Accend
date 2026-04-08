@@ -344,3 +344,32 @@ class SupabaseLessonRepo:
             )
 
         return out
+
+    def get_completed_lessons_count(self, user_id: UUID) -> int:
+        """
+        Count completed lessons across all courses owned by the user.
+        """
+        course_rows = rest_get(
+            table="courses",
+            params={
+                "select": "id",
+                "user_id": f"eq.{str(user_id)}",
+            },
+        )
+        if not course_rows:
+            return 0
+
+        course_ids = [str(row.get("id", "")).strip() for row in course_rows]
+        course_ids = [course_id for course_id in course_ids if course_id]
+        if not course_ids:
+            return 0
+
+        done_rows = rest_get(
+            table="lessons",
+            params={
+                "select": "id",
+                "course_id": f"in.({','.join(course_ids)})",
+                "is_completed": "eq.true",
+            },
+        )
+        return len(done_rows)

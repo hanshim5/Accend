@@ -97,3 +97,9 @@ class LessonService:
         - Could integrate AI validation or post-processing.
         """
         return self.repo.create_curriculum(course_id, data)
+
+    def get_completed_lessons_count(self, user_id: UUID) -> int:
+        """
+        Return completed lesson count across all user-owned courses.
+        """
+        return self.repo.get_completed_lessons_count(user_id)

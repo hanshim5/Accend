@@ -1,17 +1,23 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/pronunciation_feedback.dart';
 
 /// API gateway base URL used for local development.
 ///
+/// Prefers the shared GATEWAY_URL from assets/.env.mobile so physical devices,
+/// emulators, and adb reverse can all be configured without changing code.
+///
 /// - Android emulator cannot reach `localhost`; the host machine is at 10.0.2.2.
 /// - iOS simulator and desktop can use localhost directly.
 /// - In production this should be injected from configuration, not hard-coded.
 String get _gatewayBaseUrl =>
-    Platform.isAndroid ? 'http://10.0.2.2:8080' : 'http://localhost:8080';
+  (dotenv.env['GATEWAY_URL']?.isNotEmpty ?? false)
+    ? dotenv.env['GATEWAY_URL']!
+    : (Platform.isAndroid ? 'http://10.0.2.2:8080' : 'http://localhost:8080');
 
 /// Returns mock feedback for the feedback card (fallback when API fails or is unused).
 ///
@@ -128,8 +134,10 @@ Future<PronunciationFeedbackMock?> fetchPronunciationFeedback({
   // Any non-200 or network error returns null; the controller will fall back
   // to getMockFeedback so the UI never blocks on a failed API call.
   try {
-    final streamed = await request.send();
-    final response = await http.Response.fromStream(streamed);
+    final streamed = await request.send().timeout(const Duration(seconds: 15));
+    final response = await http.Response.fromStream(streamed).timeout(
+      const Duration(seconds: 15),
+    );
     if (response.statusCode != 200) return null;
     return _feedbackFromAssessmentJson(response.body);
   } catch (_) {

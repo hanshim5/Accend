@@ -7,6 +7,9 @@ class SocialUser {
     this.nativeLanguage,
     this.learningGoalCsv,
     this.focusAreasCsv,
+    required this.currentStreak,
+    required this.overallAccuracy,
+    required this.lessonsCompleted,
     required this.iFollow,
     required this.followsMe,
   });
@@ -18,6 +21,9 @@ class SocialUser {
   final String? nativeLanguage;
   final String? learningGoalCsv;
   final String? focusAreasCsv;
+  final int currentStreak;
+  final double overallAccuracy;
+  final int lessonsCompleted;
   final bool iFollow;
   final bool followsMe;
 
@@ -30,6 +36,9 @@ class SocialUser {
       nativeLanguage: json['native_language'] as String?,
       learningGoalCsv: json['learning_goal'] as String?,
       focusAreasCsv: json['focus_areas'] as String?,
+      currentStreak: (json['current_streak'] as num?)?.toInt() ?? 0,
+      overallAccuracy: (json['overall_accuracy'] as num?)?.toDouble() ?? 0.0,
+      lessonsCompleted: (json['lessons_completed'] as num?)?.toInt() ?? 0,
       iFollow: json['i_follow'] == true,
       followsMe: json['follows_me'] == true,
     );
@@ -40,6 +49,9 @@ class SocialUser {
     String? nativeLanguage,
     String? learningGoalCsv,
     String? focusAreasCsv,
+    int? currentStreak,
+    double? overallAccuracy,
+    int? lessonsCompleted,
     bool? iFollow,
     bool? followsMe,
   }) {
@@ -51,6 +63,9 @@ class SocialUser {
       nativeLanguage: nativeLanguage ?? this.nativeLanguage,
       learningGoalCsv: learningGoalCsv ?? this.learningGoalCsv,
       focusAreasCsv: focusAreasCsv ?? this.focusAreasCsv,
+      currentStreak: currentStreak ?? this.currentStreak,
+      overallAccuracy: overallAccuracy ?? this.overallAccuracy,
+      lessonsCompleted: lessonsCompleted ?? this.lessonsCompleted,
       iFollow: iFollow ?? this.iFollow,
       followsMe: followsMe ?? this.followsMe,
     );

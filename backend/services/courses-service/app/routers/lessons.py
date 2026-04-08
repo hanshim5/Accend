@@ -76,6 +76,18 @@ def list_lessons(
     return svc.list_lessons_with_items(course_id)
 
 
+@router.get("/lessons/completed-count")
+def completed_lessons_count(
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: LessonService = Depends(get_lesson_service),
+):
+    """
+    Count completed lessons across all courses owned by the authenticated user.
+    """
+    user_id = _get_user_id(x_user_id)
+    return {"lessons_completed": svc.get_completed_lessons_count(user_id)}
+
+
 @router.post("/courses/{course_id}/lessons", response_model=LessonWithItemsOut)
 def create_lesson(
     course_id: UUID,

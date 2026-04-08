@@ -84,3 +84,35 @@ class SupabasePhonemeRepo(PhonemeRepo):
             return
 
         await supabase.upsert(TABLE, rows)
+
+    async def get_cached_overall_accuracy(self, user_id: str) -> float | None:
+        try:
+            rows = await supabase.get(
+                "user_stats",
+                params={
+                    "select": "overall_accuracy",
+                    "user_id": f"eq.{user_id}",
+                    "limit": "1",
+                },
+            )
+        except httpx.HTTPStatusError:
+            return None
+
+        if not rows:
+            return None
+
+        value = rows[0].get("overall_accuracy")
+        if value is None:
+            return None
+        return float(value)
+
+    async def upsert_cached_overall_accuracy(self, user_id: str, overall_accuracy: float) -> None:
+        await supabase.upsert(
+            "user_stats",
+            [
+                {
+                    "user_id": user_id,
+                    "overall_accuracy": round(overall_accuracy, 2),
+                }
+            ],
+        )
