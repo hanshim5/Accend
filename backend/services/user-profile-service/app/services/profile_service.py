@@ -235,6 +235,9 @@ class ProfileService:
             cleaned_native_language = None
 
         cleaned_learning_goal = self._normalize_learning_goals(learning_goal)
+        if learning_goal is not None and cleaned_learning_goal is None:
+            bad_request("At least one learning goal is required")
+
         cleaned_feedback_tone = self._normalize_choice(feedback_tone)
         cleaned_accent = self._normalize_choice(accent)
         cleaned_daily_pace = self._normalize_choice(daily_pace)

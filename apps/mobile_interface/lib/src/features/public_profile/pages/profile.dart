@@ -18,6 +18,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final _fullNameCtrl = TextEditingController();
   String? _fullNameError;
+  String? _goalsError;
 
   bool _detailsExpanded = true;
   bool _preferencesExpanded = false;
@@ -279,7 +280,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             ..._selectedGoals.map(
                               (goal) => _GoalChip(
                                 label: goal,
-                                onRemove: () => setState(() => _selectedGoals.remove(goal)),
+                                onRemove: () => _removeGoal(goal),
                               ),
                             ),
                             OutlinedButton.icon(
@@ -297,6 +298,17 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           ],
                         ),
+                        if (_goalsError != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _goalsError!,
+                            style: GoogleFonts.manrope(
+                              color: AppColors.failure,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         _SelectableField(
                           label: 'Accent',
@@ -432,6 +444,13 @@ class _ProfilePageState extends State<ProfilePage> {
     return backend[normalized] ?? normalized.replaceAll(' ', '_');
   }
 
+  String? _validateGoals() {
+    if (_selectedGoals.isEmpty) {
+      return 'Select at least 1 goal.';
+    }
+    return null;
+  }
+
   String? _matchLanguage(String? value) {
     if (value == null || value.trim().isEmpty) {
       return null;
@@ -474,6 +493,19 @@ class _ProfilePageState extends State<ProfilePage> {
       if (_selectedGoals.every((goal) => _normalizeGoal(goal) != normalized)) {
         _selectedGoals.add(_canonicalGoalLabel(selected));
       }
+      _goalsError = null;
+    });
+  }
+
+  void _removeGoal(String goal) {
+    if (_selectedGoals.length <= 1) {
+      setState(() => _goalsError = 'Select at least 1 goal.');
+      return;
+    }
+
+    setState(() {
+      _selectedGoals.remove(goal);
+      _goalsError = null;
     });
   }
 
@@ -516,16 +548,28 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _saveChanges(BuildContext context, PublicProfileController controller) async {
     final fullNameError = _validateFullName(_fullNameCtrl.text);
+    final goalsError = _validateGoals();
+
     if (fullNameError != null) {
-      setState(() => _fullNameError = fullNameError);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(fullNameError),
-          backgroundColor: AppColors.failure,
-        ),
-      );
+      setState(() {
+        _fullNameError = fullNameError;
+        _goalsError = goalsError;
+      });
       return;
     }
+
+    if (goalsError != null) {
+      setState(() {
+        _fullNameError = null;
+        _goalsError = goalsError;
+      });
+      return;
+    }
+
+    setState(() {
+      _fullNameError = null;
+      _goalsError = null;
+    });
 
     try {
       await controller.saveProfileDetails(
