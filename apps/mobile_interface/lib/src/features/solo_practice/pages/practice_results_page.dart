@@ -23,6 +23,7 @@ class PracticeResultsPage extends StatefulWidget {
     required this.feedbacks,
     required this.items,
     this.lesson,
+    this.sessionDuration = Duration.zero,
   });
 
   final List<PronunciationFeedbackMock> feedbacks;
@@ -33,6 +34,7 @@ class PracticeResultsPage extends StatefulWidget {
   /// The completed lesson. When provided, the server is notified of completion
   /// on mount (best-effort, non-blocking).
   final Lesson? lesson;
+  final Duration sessionDuration;
 
   @override
   State<PracticeResultsPage> createState() => _PracticeResultsPageState();
@@ -48,6 +50,7 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
     super.initState();
     _notifyLessonComplete();
     _submitPhonemeScores();
+    _submitDailyMinutes();
   }
 
   void _notifyLessonComplete() {
@@ -75,6 +78,16 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
       context
           .read<ProgressService>()
           .submitPhonemeScores(widget.feedbacks);
+    });
+  }
+
+  /// Fire-and-forget: add this session's active practice time to today's goal.
+  void _submitDailyMinutes() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<ProgressService>().submitDailyMinutes(
+            secondsDelta: widget.sessionDuration.inSeconds,
+          );
     });
   }
 

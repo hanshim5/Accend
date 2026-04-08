@@ -35,6 +35,7 @@ from app.schemas.profile_schema import (
     UsernameAvailableResponse,
     ProfileInitRequest,
     ProfileInitResponse,
+    ProfileDetailsUpdate,
     ProfileReadResponse,
     ProfileOnboardingUpdate,
 )
@@ -136,6 +137,19 @@ async def patch_onboarding(
     - Supports multi-step onboarding flow.
     """
     await svc.update_onboarding(
+        user_id=x_user_id or "",
+        **body.dict(exclude_unset=True),
+    )
+    return ProfileInitResponse(ok=True)
+
+
+@router.patch("/profiles/me")
+async def patch_profile_details(
+    body: ProfileDetailsUpdate,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: ProfileService = Depends(get_profile_service),
+) -> ProfileInitResponse:
+    await svc.update_profile_details(
         user_id=x_user_id or "",
         **body.dict(exclude_unset=True),
     )

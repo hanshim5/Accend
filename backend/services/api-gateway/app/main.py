@@ -31,6 +31,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 import httpx
+import asyncio
 
 from app.config import settings
 from app.auth import verify_supabase_jwt
@@ -206,6 +207,85 @@ async def proxy_profile_get(
     return r.json()
 
 
+def _is_active_course(course: dict) -> bool:
+    status = str(course.get("status", "")).strip().lower()
+    progress = int(course.get("progress_percent", 0) or 0)
+    if status in {"complete", "completed"}:
+        return False
+    return progress < 100
+
+
+def _goal_minutes_from_daily_pace(daily_pace: object) -> int:
+    pace = str(daily_pace or "").strip().lower()
+    return {
+        "hiker": 5,
+        "climber": 10,
+        "summiter": 15,
+        "mountaineer": 20,
+    }.get(pace, 10)
+
+
+@app.get("/home")
+async def proxy_home_preload(
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        profile_resp = await client.get(
+            f"{settings.USER_PROFILE_SERVICE_URL}/profiles/me",
+            headers={"X-User-Id": user_id},
+        )
+        if profile_resp.status_code >= 400:
+            raise HTTPException(status_code=profile_resp.status_code, detail=profile_resp.text)
+
+        goals_resp = await client.get(
+            f"{settings.PROGRESS_SERVICE_URL}/goals/progress",
+            headers={"X-User-Id": user_id},
+        )
+        if goals_resp.status_code >= 400:
+            raise HTTPException(status_code=goals_resp.status_code, detail=goals_resp.text)
+
+        courses_resp = await client.get(
+            f"{settings.COURSES_SERVICE_URL}/courses",
+            headers={"X-User-Id": user_id},
+        )
+        if courses_resp.status_code >= 400:
+            raise HTTPException(status_code=courses_resp.status_code, detail=courses_resp.text)
+
+    profile = profile_resp.json()
+    goals = goals_resp.json()
+    courses = courses_resp.json()
+    if not isinstance(courses, list):
+        courses = []
+
+    active_courses = [c for c in courses if isinstance(c, dict) and _is_active_course(c)]
+    active_courses.sort(key=lambda c: int(c.get("progress_percent", 0) or 0))
+    target = active_courses[0] if active_courses else None
+
+    full_name = (profile.get("full_name") if isinstance(profile, dict) else None) or ""
+    username = (profile.get("username") if isinstance(profile, dict) else None) or ""
+    daily_pace = profile.get("daily_pace") if isinstance(profile, dict) else None
+
+    active_course = None
+    if target:
+        active_course = {
+            "id": target.get("id"),
+            "title": target.get("title"),
+            "progress_percent": int(target.get("progress_percent", 0) or 0),
+            "status": target.get("status"),
+        }
+
+    return {
+        "display_name": (full_name.strip() or username.strip() or "there"),
+        "current_streak": int(goals.get("current_streak", 0) or 0),
+        "longest_streak": int(goals.get("longest_streak", 0) or 0),
+        "current_minutes": int(goals.get("current_minutes", 0) or 0),
+        "goal_minutes": _goal_minutes_from_daily_pace(daily_pace),
+        "active_course": active_course,
+    }
+
+
 @app.post("/profile/init")
 async def proxy_profile_init(
     body: dict,
@@ -269,6 +349,67 @@ async def proxy_profile_onboarding(
         raise HTTPException(status_code=r.status_code, detail=r.text)
 
     return r.json()
+
+
+@app.patch("/profile")
+async def proxy_profile_patch(
+    body: dict,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Update editable profile details.
+
+    This route is intended for profile page edits such as full_name,
+    native_language, learning_goal, feedback_tone, accent, and daily_pace.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.patch(
+            f"{settings.USER_PROFILE_SERVICE_URL}/profiles/me",
+            headers={"X-User-Id": user_id},
+            json=body,
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.get("/profile/page")
+async def profile_page_preload(
+    authorization: str | None = Header(default=None),
+):
+    """
+    Preload profile page data in one request for the mobile client.
+
+    Aggregates:
+    - user-profile-service /profiles/me
+    - follow-service /counts
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        profile_req = client.get(
+            f"{settings.USER_PROFILE_SERVICE_URL}/profiles/me",
+            headers={"X-User-Id": user_id},
+        )
+        counts_req = client.get(
+            f"{settings.FOLLOW_SERVICE_URL}/counts",
+            headers={"X-User-Id": user_id},
+        )
+        profile_res, counts_res = await asyncio.gather(profile_req, counts_req)
+
+    if profile_res.status_code >= 400:
+        raise HTTPException(status_code=profile_res.status_code, detail=profile_res.text)
+    if counts_res.status_code >= 400:
+        raise HTTPException(status_code=counts_res.status_code, detail=counts_res.text)
+
+    return {
+        "profile": profile_res.json(),
+        "social": counts_res.json(),
+    }
 
 
 # -----------------------------------
@@ -890,6 +1031,27 @@ async def proxy_social_following(
     return r.json()
 
 
+@app.get("/social/counts")
+async def proxy_social_counts(
+    authorization: str | None = Header(default=None),
+):
+    """
+    Fetch follower/following counts from follow-service.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{settings.FOLLOW_SERVICE_URL}/counts",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
 @app.get("/social/search")
 async def proxy_social_search(
     q: str,
@@ -1000,6 +1162,43 @@ async def proxy_phoneme_batch_update(
             f"{settings.PROGRESS_SERVICE_URL}/phonemes/batch",
             headers={"X-User-Id": user_id, "Content-Type": "application/json"},
             json=body,
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.post("/progress/daily-minutes")
+async def proxy_daily_minutes_update(
+    body: dict,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Add a practice-session time delta to today's daily minutes.
+
+    Expected body:
+    - seconds_delta: int (elapsed active seconds in current session chunk)
+    """
+    user_id = verify_supabase_jwt(authorization)
+    seconds_delta = int(body.get("seconds_delta", 0) or 0)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        profile_resp = await client.get(
+            f"{settings.USER_PROFILE_SERVICE_URL}/profiles/me",
+            headers={"X-User-Id": user_id},
+        )
+        if profile_resp.status_code >= 400:
+            raise HTTPException(status_code=profile_resp.status_code, detail=profile_resp.text)
+        profile = profile_resp.json()
+        daily_pace = profile.get("daily_pace") if isinstance(profile, dict) else None
+        goal_minutes = _goal_minutes_from_daily_pace(daily_pace)
+
+        r = await client.post(
+            f"{settings.PROGRESS_SERVICE_URL}/daily-minutes",
+            headers={"X-User-Id": user_id, "Content-Type": "application/json"},
+            json={"seconds_delta": seconds_delta, "goal_minutes": goal_minutes},
         )
 
     if r.status_code >= 400:

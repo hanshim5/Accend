@@ -22,12 +22,25 @@ class CoursesListPage extends StatefulWidget {
 }
 
 class _CoursesListPageState extends State<CoursesListPage> {
+  String? _initialCourseId;
+  bool _initialJumpHandled = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CoursesController>().loadCourses();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialCourseId != null) return;
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is String && args.trim().isNotEmpty) {
+      _initialCourseId = args.trim();
+    }
   }
 
   void _onNavTap(int index) {
@@ -44,9 +57,53 @@ class _CoursesListPageState extends State<CoursesListPage> {
     }
   }
 
+  Future<void> _openCourse(Course course) async {
+    final ctrl = context.read<CoursesController>();
+
+    try {
+      final lessons = await ctrl.fetchLessons(course.id);
+      if (!mounted) return;
+
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => StartLessonPopup(
+          course: course,
+          lessons: lessons,
+          onStart: (lesson) {
+            Navigator.of(context).pop();
+            Navigator.of(context).pushNamed(
+              AppRoutes.soloPractice,
+              arguments: lesson,
+            );
+          },
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load lessons: $e')),
+      );
+    }
+  }
+
+  void _maybeHandleInitialCourseJump(CoursesController ctrl) {
+    if (_initialJumpHandled || _initialCourseId == null || ctrl.isLoading) return;
+    _initialJumpHandled = true;
+    for (final course in ctrl.courses) {
+      if (course.id == _initialCourseId) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _openCourse(course);
+        });
+        return;
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctrl = context.watch<CoursesController>();
+    _maybeHandleInitialCourseJump(ctrl);
 
     return Scaffold(
       backgroundColor: AppColors.primaryBg,
@@ -107,39 +164,7 @@ class _CoursesListPageState extends State<CoursesListPage> {
 
               return _CoursesGrid(
                 courses: ctrl.courses,
-                onTapCourse: (course) async {
-                  final ctrl = context.read<CoursesController>();
-
-                  try {
-                    final lessons = await ctrl.fetchLessons(course.id);
-
-                    if (!context.mounted) return;
-
-                    await showDialog(
-                      context: context,
-                      barrierDismissible: true,
-                      builder: (_) => StartLessonPopup(
-                        course: course,
-                        lessons: lessons,
-                        onStart: (lesson) {
-                          Navigator.of(context).pop();
-                          Navigator.of(context).pushNamed(
-                            AppRoutes.soloPractice,
-                            arguments: lesson,
-                          );
-                        },
-                      ),
-                    );
-                  } catch (e) {
-                    if (!context.mounted) return;
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Could not load lessons: $e'),
-                      ),
-                    );
-                  }
-                },
+                onTapCourse: _openCourse,
               );
             },
           ),

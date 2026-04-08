@@ -18,7 +18,7 @@ Schema Types:
 - Response models → data returned to client
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class UsernameAvailableResponse(BaseModel):
@@ -86,7 +86,6 @@ class ProfileReadResponse(BaseModel):
     username: str
     email: str
     onboarding_complete: bool
-    email: str
     native_language: str | None = None
     full_name: str | None = None
     learning_goal: str | None = None
@@ -94,6 +93,7 @@ class ProfileReadResponse(BaseModel):
     accent: str | None = None
     daily_pace: str | None = None
     skill_assess: str | None = None
+    focus_areas: str | None = None
 
 
 class ProfileOnboardingUpdate(BaseModel):
@@ -118,3 +118,20 @@ class ProfileOnboardingUpdate(BaseModel):
     daily_pace: str | None = None
     skill_assess: str | None = None
     mark_complete: bool = False
+
+
+class ProfileDetailsUpdate(BaseModel):
+    full_name: str | None = None
+    native_language: str | None = None
+    learning_goal: str | None = None
+    feedback_tone: str | None = None
+    accent: str | None = None
+    daily_pace: str | None = None
+    focus_areas: str | None = None
+
+    @field_validator("learning_goal")
+    @classmethod
+    def validate_learning_goal(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            raise ValueError("At least one learning goal is required")
+        return value

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../app/constants.dart';
 import '../../../app/routes.dart' as routes;
-import '../controllers/group_session_controller.dart';
 import '../widgets/public_button.dart' as public_button;
 import '../widgets/private_button.dart' as private_button;
 import '../../../common/widgets/bottom_nav_bar.dart' as bot_nav_bar;

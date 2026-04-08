@@ -87,4 +87,26 @@ class ProgressService {
       // Best-effort — never interrupt the results UI.
     }
   }
+
+  /// Best-effort logging of active practice duration for today's daily goal.
+  ///
+  /// [secondsDelta] should represent active session seconds (not wall time).
+  Future<void> submitDailyMinutes({
+    required int secondsDelta,
+  }) async {
+    if (secondsDelta <= 0) return;
+
+    final token = _auth.accessToken;
+    if (token == null) return;
+
+    try {
+      await _api.postJson(
+        '/progress/daily-minutes',
+        accessToken: token,
+        body: {'seconds_delta': secondsDelta},
+      );
+    } catch (_) {
+      // Best-effort — never interrupt user flow.
+    }
+  }
 }

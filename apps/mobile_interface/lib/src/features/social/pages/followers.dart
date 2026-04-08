@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../controllers/social_controller.dart';
 import '../widgets/social_user_card.dart';
+import '../widgets/social_user_profile_popup.dart';
 
 class FollowersTab extends StatelessWidget {
 	const FollowersTab({super.key});
@@ -67,6 +68,17 @@ class FollowersTab extends StatelessWidget {
 														}
 														controller.follow(user.id);
 													},
+																	onCardTap: () => showSocialUserProfilePopup(
+																		context: context,
+																		user: user,
+																		onPrimaryAction: () {
+																			if (user.iFollow) {
+																				controller.unfollow(user.id);
+																				return;
+																			}
+																			controller.follow(user.id);
+																		},
+																	),
 												);
 											},
 										),

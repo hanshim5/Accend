@@ -60,6 +60,34 @@ class ProfileService:
         """
         return bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", value.strip()))
 
+    def _normalize_choice(self, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip().lower()
+        if cleaned == "":
+            return None
+        return cleaned.replace(" ", "_")
+
+    def _normalize_learning_goals(self, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        raw_parts = re.split(r"[,;/]", value)
+        normalized_parts: list[str] = []
+        seen: set[str] = set()
+
+        for part in raw_parts:
+            normalized = self._normalize_choice(part)
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            normalized_parts.append(normalized)
+
+        if not normalized_parts:
+            return None
+
+        return ", ".join(normalized_parts)
+
     async def get_profile(self, user_id: str) -> dict:
         """
         Retrieve a user's profile.
@@ -176,10 +204,53 @@ class ProfileService:
 
         await self.repo.update_onboarding(
             user_id=user_id,
-            learning_goal=learning_goal,
-            feedback_tone=feedback_tone,
-            accent=accent,
-            daily_pace=daily_pace,
-            skill_assess=skill_assess,
+            learning_goal=self._normalize_learning_goals(learning_goal),
+            feedback_tone=self._normalize_choice(feedback_tone),
+            accent=self._normalize_choice(accent),
+            daily_pace=self._normalize_choice(daily_pace),
+            skill_assess=self._normalize_choice(skill_assess),
             mark_complete=mark_complete,
+        )
+
+    async def update_profile_details(
+        self,
+        user_id: str,
+        full_name: str | None = None,
+        native_language: str | None = None,
+        learning_goal: str | None = None,
+        feedback_tone: str | None = None,
+        accent: str | None = None,
+        daily_pace: str | None = None,
+        focus_areas: str | None = None,
+    ) -> None:
+        if not user_id:
+            bad_request("user_id missing")
+
+        cleaned_full_name = full_name.strip() if full_name is not None else None
+        if cleaned_full_name == "":
+            cleaned_full_name = None
+
+        cleaned_native_language = native_language.strip() if native_language is not None else None
+        if cleaned_native_language == "":
+            cleaned_native_language = None
+
+        cleaned_learning_goal = self._normalize_learning_goals(learning_goal)
+        if learning_goal is not None and cleaned_learning_goal is None:
+            bad_request("At least one learning goal is required")
+
+        cleaned_feedback_tone = self._normalize_choice(feedback_tone)
+        cleaned_accent = self._normalize_choice(accent)
+        cleaned_daily_pace = self._normalize_choice(daily_pace)
+
+        cleaned_focus_areas = self._normalize_learning_goals(focus_areas)
+
+        await self.repo.update_profile_details(
+            user_id=user_id,
+            full_name=cleaned_full_name,
+            native_language=cleaned_native_language,
+            learning_goal=cleaned_learning_goal,
+            feedback_tone=cleaned_feedback_tone,
+            accent=cleaned_accent,
+            daily_pace=cleaned_daily_pace,
+            focus_areas=cleaned_focus_areas,
         )

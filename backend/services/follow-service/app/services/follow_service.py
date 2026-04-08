@@ -7,6 +7,10 @@ class FollowService:
     def __init__(self, repo: FollowRepo):
         self.repo = repo
 
+    async def get_counts(self, user_id: UUID):
+        followers, following = await self.repo.get_counts(user_id)
+        return {"followers": followers, "following": following}
+
     async def list_followers(self, user_id: UUID):
         return await self.repo.list_followers(user_id)
 

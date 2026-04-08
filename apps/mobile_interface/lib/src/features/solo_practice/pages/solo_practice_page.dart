@@ -26,14 +26,18 @@ class SoloPracticePage extends StatefulWidget {
   State<SoloPracticePage> createState() => _SoloPracticePageState();
 }
 
-class _SoloPracticePageState extends State<SoloPracticePage> {
+class _SoloPracticePageState extends State<SoloPracticePage> with WidgetsBindingObserver {
   late final SoloPracticeController _controller;
   final AudioPlayer _audioPlayer = AudioPlayer();
   String? _recordingPath;
   bool _isSubmitting = false;
+  DateTime? _activeStartedAt;
+  Duration _accumulatedActive = Duration.zero;
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pauseActiveTimer();
     _audioPlayer.dispose();
     super.dispose();
   }
@@ -41,9 +45,24 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = SoloPracticeController(
       items: widget.lesson?.items,
     );
+    _resumeActiveTimer();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _resumeActiveTimer();
+      return;
+    }
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _pauseActiveTimer();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -128,12 +147,14 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
     if (hasMore) {
       setState(() {});
     } else {
+      _pauseActiveTimer();
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
           builder: (_) => PracticeResultsPage(
             feedbacks: _controller.sessionFeedbacks,
             items: _controller.items,
             lesson: widget.lesson,
+            sessionDuration: _accumulatedActive,
           ),
         ),
       );
@@ -165,6 +186,17 @@ class _SoloPracticePageState extends State<SoloPracticePage> {
     final file = File(path);
     // Best-effort delete; ignore failures.
     file.delete().ignore();
+  }
+
+  void _resumeActiveTimer() {
+    _activeStartedAt ??= DateTime.now();
+  }
+
+  void _pauseActiveTimer() {
+    final startedAt = _activeStartedAt;
+    if (startedAt == null) return;
+    _accumulatedActive += DateTime.now().difference(startedAt);
+    _activeStartedAt = null;
   }
 
   // ---------------------------------------------------------------------------
