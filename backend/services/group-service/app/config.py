@@ -12,20 +12,41 @@ How:
 - also reads from `.env` file because we set env_file=".env"
 
 Important:
-- This is service-level config. Each service can have its own .env
-  or share backend/.env via docker-compose env_file.
+- Loads `backend/.env` then `group-service/.env` (later overrides) so LIVEKIT_*
+  can live in the monorepo `backend/.env` when cwd is not group-service.
 """
+
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# This file: group-service/app/config.py
+_SERVICE_ROOT = Path(__file__).resolve().parent.parent
+_BACKEND_ROOT = _SERVICE_ROOT.parent.parent
+
+_env_candidates = (
+    _BACKEND_ROOT / ".env",
+    _SERVICE_ROOT / ".env",
+)
+_env_files = tuple(p for p in _env_candidates if p.is_file())
+
 
 class Settings(BaseSettings):
-    # Reads from .env if present and ignores unknown keys
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=_env_files if _env_files else (".env",),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # Required env vars
     SUPABASE_URL: str
     SUPABASE_SERVICE_ROLE_KEY: str
+
+    # LiveKit (self-hosted): keys from `livekit-server --keys` or docker logs; URL is what clients use (wss://…)
+    LIVEKIT_API_KEY: str = ""
+    LIVEKIT_API_SECRET: str = ""
+    # Example: wss://localhost:7880 or wss://livekit.example.com (Android emulator: ws://10.0.2.2:7880)
+    LIVEKIT_PUBLIC_WS_URL: str = ""
 
 
 # Create a singleton settings object so imports can use it

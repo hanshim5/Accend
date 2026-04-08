@@ -27,6 +27,8 @@ Notes:
 """
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from typing import Literal
+
 from pydantic import BaseModel, Field
 import httpx
 import asyncio
@@ -970,6 +972,31 @@ async def proxy_leave_public_lobby(
         r = await client.delete(
             f"{settings.GROUP_SERVICE_URL}/public_lobbies/leave",
             headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+class LiveKitTokenGatewayReq(BaseModel):
+    lobby_id: str = Field(min_length=1)
+    lobby_kind: Literal["private", "public"] = "private"
+
+
+@app.post("/voice/livekit/token")
+async def proxy_livekit_token(
+    body: LiveKitTokenGatewayReq,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.post(
+            f"{settings.GROUP_SERVICE_URL}/voice/livekit/token",
+            headers={"X-User-Id": user_id},
+            json={"lobby_id": body.lobby_id, "lobby_kind": body.lobby_kind},
         )
 
     if r.status_code >= 400:
