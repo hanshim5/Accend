@@ -10,6 +10,7 @@ import 'theme.dart';
 import 'package:mobile_interface/src/common/services/api_client.dart';
 import 'package:mobile_interface/src/common/services/auth_service.dart';
 import 'package:mobile_interface/src/features/onboarding/controllers/onboarding_controller.dart';
+import 'package:mobile_interface/src/features/public_profile/controllers/public_profile_controller.dart';
 import 'package:mobile_interface/src/features/social/controllers/social_controller.dart';
 
 import 'package:mobile_interface/src/features/courses/controllers/courses_controller.dart';
@@ -55,6 +56,12 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<SocialController>(
           create: (ctx) => SocialController(
+            api: ctx.read<ApiClient>(),
+            auth: ctx.read<AuthService>(),
+          ),
+        ),
+        ChangeNotifierProvider<PublicProfileController>(
+          create: (ctx) => PublicProfileController(
             api: ctx.read<ApiClient>(),
             auth: ctx.read<AuthService>(),
           ),

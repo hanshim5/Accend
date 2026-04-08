@@ -4,6 +4,7 @@ import '../../../common/widgets/colored_button.dart';
 import '../../../app/routes.dart';
 import '../../../features/home/widgets/home_introduction.dart';
 import '../controllers/home_controller.dart';
+import '../widgets/home_top_bar.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -46,11 +47,15 @@ class _HomePageState extends State<HomePage> {
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) => Scaffold(
-        appBar: AppBar(title: Text("Home - ${_controller.displayName}")),
         body: SafeArea(
           child: SingleChildScrollView(
             child: Column(
               children: [
+              HomeTopBar(
+                name: _controller.displayName,
+                imagePath: 'assets/images/profile.png',
+              ),
+              const SizedBox(height: 20),
               if (_controller.isLoading)
                 const Padding(
                   padding: EdgeInsets.only(bottom: 20),
@@ -81,7 +86,7 @@ class _HomePageState extends State<HomePage> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   '  Practice Modes',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,

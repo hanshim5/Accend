@@ -22,10 +22,12 @@ class _OnboardingLanguageDropdownState
     extends State<OnboardingLanguageDropdown> {
   bool _open = false;
   final _search = TextEditingController();
+  final _scrollController = ScrollController();
 
   @override
   void dispose() {
     _search.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -114,8 +116,10 @@ class _OnboardingLanguageDropdownState
                           ),
                         )
                       : Scrollbar(
+                          controller: _scrollController,
                           thumbVisibility: true,
                           child: ListView.builder(
+                            controller: _scrollController,
                             shrinkWrap: true,
                             itemCount: filtered.length,
                             itemBuilder: (context, index) {

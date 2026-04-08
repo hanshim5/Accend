@@ -29,6 +29,7 @@ Notes:
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 import httpx
+import asyncio
 
 from app.config import settings
 from app.auth import verify_supabase_jwt
@@ -335,6 +336,67 @@ async def proxy_profile_onboarding(
         raise HTTPException(status_code=r.status_code, detail=r.text)
 
     return r.json()
+
+
+@app.patch("/profile")
+async def proxy_profile_patch(
+    body: dict,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Update editable profile details.
+
+    This route is intended for profile page edits such as full_name,
+    native_language, learning_goal, feedback_tone, accent, and daily_pace.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.patch(
+            f"{settings.USER_PROFILE_SERVICE_URL}/profiles/me",
+            headers={"X-User-Id": user_id},
+            json=body,
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.get("/profile/page")
+async def profile_page_preload(
+    authorization: str | None = Header(default=None),
+):
+    """
+    Preload profile page data in one request for the mobile client.
+
+    Aggregates:
+    - user-profile-service /profiles/me
+    - follow-service /counts
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        profile_req = client.get(
+            f"{settings.USER_PROFILE_SERVICE_URL}/profiles/me",
+            headers={"X-User-Id": user_id},
+        )
+        counts_req = client.get(
+            f"{settings.FOLLOW_SERVICE_URL}/counts",
+            headers={"X-User-Id": user_id},
+        )
+        profile_res, counts_res = await asyncio.gather(profile_req, counts_req)
+
+    if profile_res.status_code >= 400:
+        raise HTTPException(status_code=profile_res.status_code, detail=profile_res.text)
+    if counts_res.status_code >= 400:
+        raise HTTPException(status_code=counts_res.status_code, detail=counts_res.text)
+
+    return {
+        "profile": profile_res.json(),
+        "social": counts_res.json(),
+    }
 
 
 # -----------------------------------
@@ -803,6 +865,27 @@ async def proxy_social_following(
     async with httpx.AsyncClient(timeout=10) as client:
         r = await client.get(
             f"{settings.FOLLOW_SERVICE_URL}/following",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.get("/social/counts")
+async def proxy_social_counts(
+    authorization: str | None = Header(default=None),
+):
+    """
+    Fetch follower/following counts from follow-service.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{settings.FOLLOW_SERVICE_URL}/counts",
             headers={"X-User-Id": user_id},
         )
 

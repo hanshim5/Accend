@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from app.dependencies import get_follow_service
-from app.schemas.follow_schema import FollowWriteResponse, SocialUserOut
+from app.schemas.follow_schema import FollowCountsOut, FollowWriteResponse, SocialUserOut
 from app.services.follow_service import FollowService
 
 
@@ -34,6 +34,14 @@ async def list_following(
     svc: FollowService = Depends(get_follow_service),
 ):
     return await svc.list_following(_get_user_id(x_user_id))
+
+
+@router.get("/counts", response_model=FollowCountsOut)
+async def get_counts(
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: FollowService = Depends(get_follow_service),
+):
+    return await svc.get_counts(_get_user_id(x_user_id))
 
 
 @router.get("/search", response_model=list[SocialUserOut])

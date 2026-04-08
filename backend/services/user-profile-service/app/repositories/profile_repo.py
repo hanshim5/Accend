@@ -81,6 +81,18 @@ class ProfileRepo(Protocol):
         skill_assess: str | None = None,
         mark_complete: bool = False,
     ) -> None: ...
+
+    async def update_profile_details(
+        self,
+        user_id: str,
+        full_name: str | None = None,
+        native_language: str | None = None,
+        learning_goal: str | None = None,
+        feedback_tone: str | None = None,
+        accent: str | None = None,
+        daily_pace: str | None = None,
+        focus_areas: str | None = None,
+    ) -> None: ...
     """
     Update onboarding-related fields for a user's profile.
 
