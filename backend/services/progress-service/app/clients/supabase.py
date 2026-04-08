@@ -67,7 +67,7 @@ class SupabaseClient:
 
         return resp.json()
 
-    async def upsert(self, table: str, rows: list[dict]) -> None:
+    async def upsert(self, table: str, rows: list[dict], on_conflict: str | None = None) -> None:
         """
         Upsert rows into a Supabase table.
 
@@ -88,9 +88,10 @@ class SupabaseClient:
             **self.headers,
             "Prefer": "resolution=merge-duplicates",
         }
+        params = {"on_conflict": on_conflict} if on_conflict else None
 
         async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(url, headers=headers, json=rows)
+            resp = await client.post(url, headers=headers, params=params, json=rows)
 
         if resp.status_code >= 400:
             raise httpx.HTTPStatusError(

@@ -29,7 +29,7 @@ from __future__ import annotations
 from uuid import UUID
 from math import floor
 
-from app.clients.supabase import rest_get, rest_post, rest_patch
+from app.clients.supabase import rest_get, rest_post, rest_patch, rest_upsert
 from app.schemas.lesson_schema import (
     LessonCreate,
     LessonOut,
@@ -177,7 +177,7 @@ class SupabaseLessonRepo:
         # Return the created lesson in nested API response shape.
         return LessonWithItemsOut(**lesson.model_dump(), items=created_items)
 
-    def complete_lesson_and_update_course(self, course_id: UUID, lesson_id: UUID) -> LessonOut:
+    def complete_lesson_and_update_course(self, user_id: UUID, course_id: UUID, lesson_id: UUID) -> LessonOut:
         """
         Mark a lesson as completed and recompute cached course progress.
 
@@ -252,6 +252,9 @@ class SupabaseLessonRepo:
             payload={"progress_percent": progress, "status": status},
             select="id",
         )
+
+        lessons_completed = self.get_completed_lessons_count(user_id)
+        self._upsert_learning_stats(user_id, lessons_completed)
 
         return lesson
 
@@ -344,3 +347,149 @@ class SupabaseLessonRepo:
             )
 
         return out
+
+    def get_completed_lessons_count(self, user_id: UUID) -> int:
+        """
+        Count completed lessons across all courses owned by the user.
+        """
+        course_rows = rest_get(
+            table="courses",
+            params={
+                "select": "id",
+                "user_id": f"eq.{str(user_id)}",
+            },
+        )
+        if not course_rows:
+            return 0
+
+        course_ids = [str(row.get("id", "")).strip() for row in course_rows]
+        course_ids = [course_id for course_id in course_ids if course_id]
+        if not course_ids:
+            return 0
+
+        done_rows = rest_get(
+            table="lessons",
+            params={
+                "select": "id",
+                "course_id": f"in.({','.join(course_ids)})",
+                "is_completed": "eq.true",
+            },
+        )
+        return len(done_rows)
+
+    def get_learning_stats(self, user_id: UUID) -> dict[str, int]:
+        """
+        Return lesson-driven stats for the user.
+
+        meters_climbed prefers cached user_stats when available and falls back
+        to lessons_completed * 100 for older rows.
+
+        level is always derived from meters_climbed and synced to profiles.level.
+        """
+        lessons_completed = self.get_completed_lessons_count(user_id)
+        stats_rows = rest_get(
+            table="user_stats",
+            params={
+                "select": "meters_climbed",
+                "user_id": f"eq.{str(user_id)}",
+                "limit": "1",
+            },
+        )
+
+        raw_meters = stats_rows[0].get("meters_climbed") if stats_rows else None
+        meters_climbed = lessons_completed * 100 if raw_meters is None else max(0, int(raw_meters))
+        level = self._calculate_level_from_meters(meters_climbed)
+        self._sync_profile_level(user_id=str(user_id), level=level)
+
+        return {
+            "lessons_completed": lessons_completed,
+            "meters_climbed": meters_climbed,
+            "level": level,
+        }
+
+    def backfill_profile_levels(self) -> dict[str, int]:
+        """
+        Backfill profiles.level for all existing profiles.
+
+        Source of truth:
+        - derived from user_stats.meters_climbed
+        - falls back to lessons_completed * 100 when meters are missing
+        - default to level 1 when no stats exist
+        """
+        profiles_rows = rest_get(
+            table="profiles",
+            params={"select": "id,level"},
+        )
+
+        stats_rows = rest_get(
+            table="user_stats",
+            params={"select": "user_id,lessons_completed,meters_climbed"},
+        )
+        stats_by_user: dict[str, dict] = {
+            str(row.get("user_id")): row
+            for row in stats_rows
+            if row.get("user_id")
+        }
+
+        processed = 0
+        updated_profiles = 0
+        updated_user_stats = 0
+
+        for profile in profiles_rows:
+            user_id = str(profile.get("id") or "").strip()
+            if not user_id:
+                continue
+
+            processed += 1
+            stats = stats_by_user.get(user_id)
+
+            if stats:
+                meters = (
+                    max(0, int(stats.get("meters_climbed")))
+                    if stats.get("meters_climbed") is not None
+                    else max(0, int(stats.get("lessons_completed", 0) or 0)) * 100
+                )
+                target_level = self._calculate_level_from_meters(meters)
+            else:
+                existing_level = profile.get("level")
+                target_level = max(1, int(existing_level)) if existing_level is not None else 1
+
+            current_level = profile.get("level")
+            current_level = int(current_level) if current_level is not None else None
+            if current_level != target_level:
+                self._sync_profile_level(user_id=user_id, level=target_level)
+                updated_profiles += 1
+
+        return {
+            "processed": processed,
+            "updated_profiles": updated_profiles,
+            "updated_user_stats": updated_user_stats,
+        }
+
+    def _upsert_learning_stats(self, user_id: UUID, lessons_completed: int) -> None:
+        meters_climbed = max(0, int(lessons_completed)) * 100
+        level = self._calculate_level_from_meters(meters_climbed)
+        rest_upsert(
+            table="user_stats",
+            payload={
+                "user_id": str(user_id),
+                "lessons_completed": max(0, int(lessons_completed)),
+                "meters_climbed": meters_climbed,
+            },
+            select="user_id,lessons_completed,meters_climbed",
+            on_conflict="user_id",
+        )
+        self._sync_profile_level(user_id=str(user_id), level=level)
+
+    def _sync_profile_level(self, user_id: str, level: int) -> None:
+        rest_patch(
+            table="profiles",
+            match={"id": f"eq.{user_id}"},
+            payload={"level": max(1, int(level))},
+            select="id,level",
+        )
+
+    @staticmethod
+    def _calculate_level_from_meters(meters_climbed: int) -> int:
+        safe_meters = max(0, int(meters_climbed))
+        return (safe_meters // 1000) + 1

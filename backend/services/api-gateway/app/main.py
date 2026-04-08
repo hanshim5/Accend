@@ -387,6 +387,9 @@ async def profile_page_preload(
     Aggregates:
     - user-profile-service /profiles/me
     - follow-service /counts
+    - progress-service /goals/progress (streak)
+    - progress-service /phonemes/overall-accuracy
+    - courses-service /lessons/completed-count
     """
     user_id = verify_supabase_jwt(authorization)
 
@@ -399,16 +402,47 @@ async def profile_page_preload(
             f"{settings.FOLLOW_SERVICE_URL}/counts",
             headers={"X-User-Id": user_id},
         )
-        profile_res, counts_res = await asyncio.gather(profile_req, counts_req)
+        goals_req = client.get(
+            f"{settings.PROGRESS_SERVICE_URL}/goals/progress",
+            headers={"X-User-Id": user_id},
+        )
+        accuracy_req = client.get(
+            f"{settings.PROGRESS_SERVICE_URL}/phonemes/overall-accuracy",
+            headers={"X-User-Id": user_id},
+        )
+        lessons_completed_req = client.get(
+            f"{settings.COURSES_SERVICE_URL}/lessons/completed-count",
+            headers={"X-User-Id": user_id},
+        )
+        profile_res, counts_res, goals_res, accuracy_res, lessons_completed_res = await asyncio.gather(
+            profile_req,
+            counts_req,
+            goals_req,
+            accuracy_req,
+            lessons_completed_req,
+        )
 
     if profile_res.status_code >= 400:
         raise HTTPException(status_code=profile_res.status_code, detail=profile_res.text)
     if counts_res.status_code >= 400:
         raise HTTPException(status_code=counts_res.status_code, detail=counts_res.text)
+    if goals_res.status_code >= 400:
+        raise HTTPException(status_code=goals_res.status_code, detail=goals_res.text)
+    if accuracy_res.status_code >= 400:
+        raise HTTPException(status_code=accuracy_res.status_code, detail=accuracy_res.text)
+    if lessons_completed_res.status_code >= 400:
+        raise HTTPException(status_code=lessons_completed_res.status_code, detail=lessons_completed_res.text)
 
     return {
         "profile": profile_res.json(),
         "social": counts_res.json(),
+        "stats": {
+            "current_streak": int(goals_res.json().get("current_streak", 0) or 0),
+            "overall_accuracy": float(accuracy_res.json().get("overall_accuracy", 0.0) or 0.0),
+            "lessons_completed": int(lessons_completed_res.json().get("lessons_completed", 0) or 0),
+            "meters_climbed": int(lessons_completed_res.json().get("meters_climbed", 0) or 0),
+            "level": int(lessons_completed_res.json().get("level", 1) or 1),
+        },
     }
 
 

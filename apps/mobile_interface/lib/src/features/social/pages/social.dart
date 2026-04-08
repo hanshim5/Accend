@@ -26,7 +26,7 @@ class _SocialPageState extends State<SocialPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<SocialController>().load();
+      context.read<SocialController>().load(force: true);
     });
   }
 

@@ -145,6 +145,41 @@ def rest_post(table: str, payload: dict[str, Any] | list[dict[str, Any]], select
     return data if isinstance(data, list) else []
 
 
+def rest_upsert(
+    table: str,
+    payload: dict[str, Any] | list[dict[str, Any]],
+    select: str,
+    *,
+    on_conflict: str | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Insert or merge rows into a table using PostgREST upsert semantics.
+
+    Args:
+    - table: Table name
+    - payload: Single row dict or list of row dicts
+    - select: Columns to return after upsert
+    - on_conflict: Optional unique column(s) used for merge resolution
+    """
+    url = f"{settings.SUPABASE_URL}/rest/v1/{table}"
+    client = get_http()
+
+    headers = {
+        **_headers(),
+        "Prefer": "return=representation,resolution=merge-duplicates",
+    }
+    params = {"select": select}
+    if on_conflict:
+        params["on_conflict"] = on_conflict
+
+    resp = client.post(url, headers=headers, params=params, json=payload)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Supabase REST UPSERT failed ({resp.status_code}): {resp.text}")
+
+    data = resp.json()
+    return data if isinstance(data, list) else []
+
+
 def rest_patch(table: str, match: dict[str, str], payload: dict[str, Any], select: str) -> list[dict[str, Any]]:
     """
     Update rows in a table and return updated rows.

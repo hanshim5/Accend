@@ -59,3 +59,18 @@ async def batch_update_phonemes(
     )
 
     return PhonemesBatchUpdateResponse(updated=updated)
+
+
+@router.get("/phonemes/overall-accuracy")
+async def get_overall_phoneme_accuracy(
+    x_user_id: str | None = Header(default=None),
+):
+    """
+    Return weighted overall phoneme accuracy for the authenticated user.
+    """
+    if not x_user_id:
+        raise HTTPException(status_code=401, detail="X-User-Id header required")
+
+    service = PhonemeService(repo=SupabasePhonemeRepo())
+    overall_accuracy = await service.get_overall_accuracy(user_id=x_user_id)
+    return {"overall_accuracy": overall_accuracy}

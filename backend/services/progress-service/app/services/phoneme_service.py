@@ -75,6 +75,7 @@ class PhonemeService:
             bad_request("phoneme_scores must not be empty")
 
         existing = await self.repo.get_scores_for_user(user_id)
+        merged_scores = dict(existing)
 
         rows: list[dict] = []
 
@@ -106,7 +107,52 @@ class PhonemeService:
                     "total_attempts": total_attempts,
                 }
             )
+            merged_scores[symbol] = {
+                "score": round(merged_score, 4),
+                "attempts": total_attempts,
+            }
 
         await self.repo.upsert_scores(rows)
+        overall_accuracy = self._compute_weighted_overall(merged_scores)
+        await self.repo.upsert_cached_overall_accuracy(user_id, overall_accuracy)
 
         return len(rows)
+
+    async def get_overall_accuracy(self, user_id: str) -> float:
+        """
+        Compute the user's weighted overall phoneme accuracy in [0, 100].
+
+        Uses current_avg_accuracy weighted by total_attempts across all stored
+        phoneme rows for the user.
+        """
+        if not user_id:
+            bad_request("user_id missing")
+
+        cached = await self.repo.get_cached_overall_accuracy(user_id)
+        if cached is not None:
+            return round(float(cached), 2)
+
+        existing = await self.repo.get_scores_for_user(user_id)
+        overall_accuracy = self._compute_weighted_overall(existing)
+        await self.repo.upsert_cached_overall_accuracy(user_id, overall_accuracy)
+        return overall_accuracy
+
+    @staticmethod
+    def _compute_weighted_overall(scores: dict[str, dict]) -> float:
+        if not scores:
+            return 0.0
+
+        weighted_sum = 0.0
+        total_attempts = 0
+        for row in scores.values():
+            attempts = int(row.get("attempts", 0) or 0)
+            if attempts <= 0:
+                continue
+            score = float(row.get("score", 0.0) or 0.0)
+            weighted_sum += score * attempts
+            total_attempts += attempts
+
+        if total_attempts <= 0:
+            return 0.0
+
+        return round(weighted_sum / total_attempts, 2)
