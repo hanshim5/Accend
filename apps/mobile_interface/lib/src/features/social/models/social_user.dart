@@ -3,6 +3,7 @@ class SocialUser {
     required this.id,
     required this.displayName,
     required this.username,
+    this.profileImageUrl,
     required this.level,
     this.nativeLanguage,
     this.learningGoalCsv,
@@ -18,6 +19,7 @@ class SocialUser {
   final String id;
   final String displayName;
   final String username;
+  final String? profileImageUrl;
   final int level;
   final String? nativeLanguage;
   final String? learningGoalCsv;
@@ -36,6 +38,7 @@ class SocialUser {
       id: json['id'] as String,
       displayName: (json['display_name'] ?? json['username'] ?? 'Unknown') as String,
       username: (json['username'] ?? 'unknown') as String,
+      profileImageUrl: json['profile_image_url'] as String?,
       level: ((json['level'] as num?)?.toInt() ?? 1).clamp(1, 1000000),
       nativeLanguage: json['native_language'] as String?,
       learningGoalCsv: json['learning_goal'] as String?,
@@ -50,6 +53,7 @@ class SocialUser {
   }
 
   SocialUser copyWith({
+    String? profileImageUrl,
     int? level,
     String? nativeLanguage,
     String? learningGoalCsv,
@@ -65,6 +69,7 @@ class SocialUser {
       id: id,
       displayName: displayName,
       username: username,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       level: level ?? this.level,
       nativeLanguage: nativeLanguage ?? this.nativeLanguage,
       learningGoalCsv: learningGoalCsv ?? this.learningGoalCsv,

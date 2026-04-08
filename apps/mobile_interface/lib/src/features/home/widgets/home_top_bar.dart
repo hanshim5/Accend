@@ -81,9 +81,19 @@ class HomeTopBar extends StatelessWidget {
                   color: Color(0xFF10233F),
                 ),
                 child: ClipOval(
-                  child: isNetworkImage
-                      ? Image.network(imagePath, fit: BoxFit.cover)
-                      : Image.asset(imagePath, fit: BoxFit.cover),
+                  child: (isNetworkImage && imagePath.trim().isNotEmpty)
+                      ? Image.network(
+                          imagePath,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Image.asset(
+                            'assets/images/profile.png',
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : Image.asset(
+                          imagePath.trim().isNotEmpty ? imagePath : 'assets/images/profile.png',
+                          fit: BoxFit.cover,
+                        ),
                 ),
               ),
             ),

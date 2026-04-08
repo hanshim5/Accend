@@ -14,6 +14,7 @@ class HomeController extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   String _displayName = 'there';
+  String? _profileImageUrl;
   String? _activeCourseId;
   String _activeCourseTitle = 'No active course yet';
   int _currentMinutes = 0;
@@ -23,6 +24,7 @@ class HomeController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   String get displayName => _displayName;
+  String? get profileImageUrl => _profileImageUrl;
   String? get activeCourseId => _activeCourseId;
   String get activeCourseTitle => _activeCourseTitle;
   bool get hasActiveCourse => _activeCourseId != null && _activeCourseId!.isNotEmpty;
@@ -69,6 +71,11 @@ class HomeController extends ChangeNotifier {
 
       _displayName = ((data['display_name'] as String?) ?? 'there').trim();
       if (_displayName.isEmpty) _displayName = 'there';
+        final imageFromHome = (data['profile_image_url'] as String?)?.trim();
+        final imageFromProfile = (profile['profile_image_url'] as String?)?.trim();
+        _profileImageUrl = (imageFromHome != null && imageFromHome.isNotEmpty)
+          ? imageFromHome
+          : ((imageFromProfile != null && imageFromProfile.isNotEmpty) ? imageFromProfile : null);
       _currentMinutes = (data['current_minutes'] as int?) ?? 0;
       final dailyPace = profile['daily_pace'] as String?;
       final backendGoal = (data['goal_minutes'] as int?) ?? 10;

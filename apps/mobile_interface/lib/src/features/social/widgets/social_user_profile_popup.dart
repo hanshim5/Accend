@@ -69,7 +69,10 @@ class _SocialUserProfilePopup extends StatelessWidget {
                   splashRadius: 20,
                 ),
               ),
-              _PopupAvatar(initials: _initialsFromName(user.displayName)),
+              _PopupAvatar(
+                initials: _initialsFromName(user.displayName),
+                imageUrl: user.profileImageUrl,
+              ),
               const SizedBox(height: 10),
               Text(
                 user.displayName,
@@ -332,9 +335,10 @@ class _SocialUserProfilePopup extends StatelessWidget {
 }
 
 class _PopupAvatar extends StatelessWidget {
-  const _PopupAvatar({required this.initials});
+  const _PopupAvatar({required this.initials, this.imageUrl});
 
   final String initials;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -358,13 +362,40 @@ class _PopupAvatar extends StatelessWidget {
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
-        child: Text(
-          initials,
-          style: GoogleFonts.montserrat(
-            color: Colors.white,
-            fontSize: 30,
-            fontWeight: FontWeight.w700,
-          ),
+        child: ClipOval(
+          child: (imageUrl != null && imageUrl!.trim().isNotEmpty)
+              ? Image.network(
+                  imageUrl!,
+                  width: 86,
+                  height: 86,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _PopupAvatarInitials(initials: initials),
+                )
+              : _PopupAvatarInitials(initials: initials),
+        ),
+      ),
+    );
+  }
+}
+
+class _PopupAvatarInitials extends StatelessWidget {
+  const _PopupAvatarInitials({required this.initials});
+
+  final String initials;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 86,
+      height: 86,
+      alignment: Alignment.center,
+      color: const Color(0xFF23324A),
+      child: Text(
+        initials,
+        style: GoogleFonts.montserrat(
+          color: Colors.white,
+          fontSize: 30,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

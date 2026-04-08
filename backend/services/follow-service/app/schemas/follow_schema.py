@@ -5,6 +5,7 @@ class SocialUserOut(BaseModel):
     id: str
     display_name: str
     username: str
+    profile_image_url: str | None = None
     level: int = 1
     level_label: str | None = None
     native_language: str | None = None

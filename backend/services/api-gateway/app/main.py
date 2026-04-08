@@ -278,6 +278,7 @@ async def proxy_home_preload(
 
     return {
         "display_name": (full_name.strip() or username.strip() or "there"),
+        "profile_image_url": (profile.get("profile_image_url") if isinstance(profile, dict) else None),
         "current_streak": int(goals.get("current_streak", 0) or 0),
         "longest_streak": int(goals.get("longest_streak", 0) or 0),
         "current_minutes": int(goals.get("current_minutes", 0) or 0),

@@ -38,7 +38,10 @@ class SocialUserCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            _Avatar(initials: _initialsFromName(user.displayName)),
+            _Avatar(
+              initials: _initialsFromName(user.displayName),
+              imageUrl: user.profileImageUrl,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -126,9 +129,10 @@ class SocialUserCard extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.initials});
+  const _Avatar({required this.initials, this.imageUrl});
 
   final String initials;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -149,13 +153,40 @@ class _Avatar extends StatelessWidget {
             shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
-          child: Text(
-            initials,
-            style: GoogleFonts.montserrat(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
+          child: ClipOval(
+            child: (imageUrl != null && imageUrl!.trim().isNotEmpty)
+                ? Image.network(
+                    imageUrl!,
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _AvatarInitials(initials: initials),
+                  )
+                : _AvatarInitials(initials: initials),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AvatarInitials extends StatelessWidget {
+  const _AvatarInitials({required this.initials});
+
+  final String initials;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 48,
+      height: 48,
+      alignment: Alignment.center,
+      color: const Color(0xFF23324A),
+      child: Text(
+        initials,
+        style: GoogleFonts.montserrat(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
