@@ -100,12 +100,15 @@ Return ONLY valid JSON (no markdown, no backticks, no explanation) in EXACTLY th
   ]
 }
 
-Rules:
+Non-negotiable Rules:
 - 3 to 6 lessons
 - 3 to 8 items per lesson
 - Keep item text short and practical (phrases/words/sentences)
 - Use null for ipa/hint when not provided
 - No extra keys anywhere
+- Always use the English language
+- Avoid any acronyms
+- No placeholders for lessons
 """.strip()
 
 

@@ -4,14 +4,15 @@ import 'package:mobile_interface/src/common/services/api_client.dart';
 import 'package:mobile_interface/src/common/services/auth_service.dart';
 
 class HomeController extends ChangeNotifier {
-  HomeController({ApiClient? api, AuthService? auth})
-      : _api = api ?? ApiClient(),
-        _auth = auth ?? AuthService();
+  HomeController({required ApiClient api, required AuthService auth})
+      : _api = api,
+        _auth = auth;
 
   final ApiClient _api;
   final AuthService _auth;
 
   bool _isLoading = false;
+  bool _hasStaticData = false;
   String? _error;
   String _displayName = 'there';
   String? _activeCourseId;
@@ -21,6 +22,7 @@ class HomeController extends ChangeNotifier {
   int _currentStreak = 0;
 
   bool get isLoading => _isLoading;
+  bool get hasStaticData => _hasStaticData;
   String? get error => _error;
   String get displayName => _displayName;
   String? get activeCourseId => _activeCourseId;
@@ -49,6 +51,10 @@ class HomeController extends ChangeNotifier {
     }
   }
 
+  /// Loads home data. On the first call it fetches both /home and /profile and
+  /// caches the static fields (display name, active course, goal minutes).
+  /// On subsequent calls it only fetches /home and refreshes the dynamic fields
+  /// (current_minutes, current_streak), saving the /profile round-trip.
   Future<void> load() async {
     if (_isLoading) return;
 
@@ -65,25 +71,35 @@ class HomeController extends ChangeNotifier {
 
     try {
       final data = await _api.getJson('/home', accessToken: accessToken);
-      final profile = await _api.getJson('/profile', accessToken: accessToken);
 
-      _displayName = ((data['display_name'] as String?) ?? 'there').trim();
-      if (_displayName.isEmpty) _displayName = 'there';
+      // Dynamic fields — always refresh on every visit.
       _currentMinutes = (data['current_minutes'] as int?) ?? 0;
-      final dailyPace = profile['daily_pace'] as String?;
-      final backendGoal = (data['goal_minutes'] as int?) ?? 10;
-      _goalMinutes = dailyPace == null || dailyPace.trim().isEmpty
-          ? backendGoal
-          : _goalMinutesFromDailyPace(dailyPace);
       _currentStreak = (data['current_streak'] as int?) ?? 0;
 
-      final activeCourse = data['active_course'];
-      if (activeCourse is Map<String, dynamic>) {
-        _activeCourseId = (activeCourse['id'] as String?)?.trim();
-        _activeCourseTitle = ((activeCourse['title'] as String?) ?? 'Untitled course').trim();
-      } else {
-        _activeCourseId = null;
-        _activeCourseTitle = 'No active course yet';
+      // Static fields — fetched once and cached for the session.
+      if (!_hasStaticData) {
+        final profile = await _api.getJson('/profile', accessToken: accessToken);
+
+        _displayName = ((data['display_name'] as String?) ?? 'there').trim();
+        if (_displayName.isEmpty) _displayName = 'there';
+
+        final dailyPace = profile['daily_pace'] as String?;
+        final backendGoal = (data['goal_minutes'] as int?) ?? 10;
+        _goalMinutes = dailyPace == null || dailyPace.trim().isEmpty
+            ? backendGoal
+            : _goalMinutesFromDailyPace(dailyPace);
+
+        final activeCourse = data['active_course'];
+        if (activeCourse is Map<String, dynamic>) {
+          _activeCourseId = (activeCourse['id'] as String?)?.trim();
+          _activeCourseTitle =
+              ((activeCourse['title'] as String?) ?? 'Untitled course').trim();
+        } else {
+          _activeCourseId = null;
+          _activeCourseTitle = 'No active course yet';
+        }
+
+        _hasStaticData = true;
       }
     } catch (e) {
       _error = e.toString();
@@ -92,5 +108,19 @@ class HomeController extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  /// Clears all cached data. Call this when the user logs out so the next
+  /// login starts with a fresh full fetch.
+  void clear() {
+    _hasStaticData = false;
+    _displayName = 'there';
+    _activeCourseId = null;
+    _activeCourseTitle = 'No active course yet';
+    _currentMinutes = 0;
+    _goalMinutes = 10;
+    _currentStreak = 0;
+    _error = null;
+    notifyListeners();
   }
 }

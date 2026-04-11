@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../app/routes.dart';
 import '../../../common/services/api_client.dart';
 import '../../../common/services/auth_service.dart';
+import '../../home/controllers/home_controller.dart';
 import '../../onboarding/controllers/onboarding_controller.dart';
 
 class LoginController extends ChangeNotifier {
@@ -11,11 +12,13 @@ class LoginController extends ChangeNotifier {
     required this.auth,
     required this.api,
     required this.onboarding,
+    required this.home,
   });
 
   final AuthService auth;
   final ApiClient api;
   final OnboardingController onboarding;
+  final HomeController home;
 
   final TextEditingController identifierController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
@@ -69,6 +72,10 @@ class LoginController extends ChangeNotifier {
         password: password,
       );
 
+      // Fire-and-forget: start fetching home data during the navigation
+      // transition so it's ready (or already loading) when the home page mounts.
+      home.load();
+
       if (!context.mounted) return;
       Navigator.pushReplacementNamed(context, AppRoutes.home);
     } catch (e) {
@@ -86,6 +93,7 @@ class LoginController extends ChangeNotifier {
 
     try {
       await auth.signOut();
+      home.clear();
       identifierController.clear();
       passwordController.clear();
 

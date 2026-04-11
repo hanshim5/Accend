@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../app/constants.dart';
 import '../../../common/services/api_client.dart';
 import '../../../common/services/auth_service.dart';
+import '../../home/controllers/home_controller.dart';
 import '../../onboarding/controllers/onboarding_controller.dart';
 import '../controllers/login_controller.dart';
 import '../widgets/login_form_card.dart';
@@ -18,6 +19,7 @@ class LoginPage extends StatelessWidget {
         auth: ctx.read<AuthService>(),
         api: ctx.read<ApiClient>(),
         onboarding: ctx.read<OnboardingController>(),
+        home: ctx.read<HomeController>(),
       ),
       child: const _LoginView(),
     );

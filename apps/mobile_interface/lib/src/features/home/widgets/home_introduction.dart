@@ -66,22 +66,28 @@ class GoalCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    Row(
-                      children: [
-                        Text("🔥", style: TextStyle(fontSize: streakEmojiSize)),
-                        SizedBox(width: 4 * scale),
-                        Text(
-                          "$streak Day Streak",
-                          style: TextStyle(
-                            color: const Color(0xFF98A2B3),
-                            fontSize: bodySize,
+                    Flexible(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text("🔥", style: TextStyle(fontSize: streakEmojiSize)),
+                          SizedBox(width: 4 * scale),
+                          Flexible(
+                            child: Text(
+                              "$streak Day Streak",
+                              style: TextStyle(
+                                color: const Color(0xFF98A2B3),
+                                fontSize: bodySize,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                SizedBox(height: 6 * scale),
+                SizedBox(height: 4 * scale),
                 Text(
                   title,
                   maxLines: 1,
@@ -92,7 +98,7 @@ class GoalCard extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 12 * scale),
+                const Spacer(),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -112,7 +118,7 @@ class GoalCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                SizedBox(height: 6 * scale),
+                SizedBox(height: 5 * scale),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(
@@ -122,7 +128,7 @@ class GoalCard extends StatelessWidget {
                     valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF16C6F3)),
                   ),
                 ),
-                SizedBox(height: 12 * scale),
+                const Spacer(),
                 Center(
                   child: SizedBox(
                     width: keepGoingWidth,
