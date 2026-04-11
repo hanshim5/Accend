@@ -25,6 +25,22 @@ class PublicProfileController extends ChangeNotifier {
   bool get hasLoaded => _hasLoaded;
   String? get error => _error;
 
+  Future<void> logOut() async {
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _auth.signOut();
+      _data = null;
+      _hasLoaded = false;
+    } catch (e) {
+      _error = 'Unable to log out right now. Please try again.';
+      rethrow;
+    } finally {
+      notifyListeners();
+    }
+  }
+
   Future<void> load({bool force = false}) async {
     if (_isLoading) return;
     if (_hasLoaded && !force) return;
