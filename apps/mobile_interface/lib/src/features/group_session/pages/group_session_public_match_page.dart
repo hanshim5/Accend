@@ -123,36 +123,48 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
     }
 
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-              child: Column(
-                children: [
-                  Stack(
-                    children: [
-                      IconButton(
-                        onPressed: () async {
-                          await ctrl.leavePublicLobby();
-                          if (context.mounted) Navigator.pop(context);
-                        },
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      ),
-                      Align(
-                        alignment: Alignment.center,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text('Public Lobby', style: t.textTheme.headlineMedium),
-                        ),
-                      ),
-                    ],
+      body: Column(
+        children: [
+          Container(
+            height: 69,
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: Color(0xFF0F172A),
+              border: Border(
+                bottom: BorderSide(color: Color(0xFF1E293B), width: 2),
+              ),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                  left: 4,
+                  child: IconButton(
+                    onPressed: () async {
+                      await ctrl.leavePublicLobby();
+                      if (context.mounted) Navigator.of(context).pushReplacementNamed(routes.AppRoutes.groupSessionSelect);
+                    },
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
                   ),
-                  const SizedBox(height: 10),
-                  Divider(color: AppColors.border, thickness: 5),
-                  const SizedBox(height: 18),
-                  Align(
+                ),
+                const Text(
+                  'Public Lobby',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SafeArea(
+              top: false,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                    child: Column(
+                      children: [
+                        Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
                       'Lobby:',
@@ -234,12 +246,15 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
                       label: const Text('Start'),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                ],
+                        const SizedBox(height: 12),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

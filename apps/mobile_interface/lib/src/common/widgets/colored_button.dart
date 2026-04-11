@@ -8,6 +8,7 @@ class ColoredButton extends StatelessWidget {
   final dynamic firstColor;
   final dynamic secondColor;
   final dynamic shadow;
+  final double? height;
 
   const ColoredButton({
     super.key,
@@ -18,17 +19,25 @@ class ColoredButton extends StatelessWidget {
     required this.firstColor,
     required this.secondColor,
     required this.shadow,
+    this.height,
   });
 
   @override
   Widget build(BuildContext context) {
+    final resolvedHeight = height ?? 180;
+    final isCompact = resolvedHeight < 160;
+    final titleSize = isCompact ? 20.0 : 22.0;
+    final subtitleSize = isCompact ? 14.0 : 16.0;
+    final circleSize = isCompact ? 78.0 : 100.0;
+    final iconSize = isCompact ? 46.0 : 60.0;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 180,
-        padding: EdgeInsets.symmetric(horizontal: 24),
+        height: resolvedHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(25),
+          borderRadius: BorderRadius.circular(isCompact ? 22 : 25),
           gradient: LinearGradient(
             colors: [
               Color(firstColor),
@@ -56,16 +65,16 @@ class ColoredButton extends StatelessWidget {
                     title,
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 22,
+                      fontSize: titleSize,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  SizedBox(height: 6),
+                  const SizedBox(height: 6),
                   Text(
                     subtitle,
                     style: TextStyle(
                       color: Colors.white70,
-                      fontSize: 16,
+                      fontSize: subtitleSize,
                     ),
                   ),
                 ],
@@ -74,8 +83,8 @@ class ColoredButton extends StatelessWidget {
 
             /// Icon circle
             Container(
-              width: 100,
-              height: 100,
+              width: circleSize,
+              height: circleSize,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.25),
                 shape: BoxShape.circle,
@@ -83,7 +92,7 @@ class ColoredButton extends StatelessWidget {
               child: Icon(
                 icon,
                 color: Colors.white,
-                size: 60,
+                size: iconSize,
               ),
             ),
           ],

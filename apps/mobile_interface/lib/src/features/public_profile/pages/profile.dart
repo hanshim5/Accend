@@ -20,6 +20,7 @@ class _ProfilePageState extends State<ProfilePage> {
   final _fullNameCtrl = TextEditingController();
   String? _fullNameError;
   String? _goalsError;
+  bool _isLoggingOut = false;
 
   bool _detailsExpanded = true;
   bool _preferencesExpanded = false;
@@ -358,7 +359,15 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _SecondaryAction(label: 'Log Out', onPressed: () {}),
+                          _SecondaryAction(
+                            label: _isLoggingOut ? 'Logging Out...' : 'Log Out',
+                            onPressed: _isLoggingOut
+                                ? () {}
+                                : () => _confirmAndLogOut(
+                                      context,
+                                      context.read<PublicProfileController>(),
+                                    ),
+                          ),
                           const SizedBox(height: 10),
                           _DangerAction(label: 'Delete Account', onPressed: () {}),
                         ],
@@ -376,6 +385,75 @@ class _ProfilePageState extends State<ProfilePage> {
         onDestinationSelected: (i) => _onNavTap(context, i),
       ),
     );
+  }
+
+  Future<void> _confirmAndLogOut(
+    BuildContext context,
+    PublicProfileController controller,
+  ) async {
+    final shouldLogOut = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Text(
+            'Log out?',
+            style: GoogleFonts.inter(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          content: Text(
+            'You will need to sign in again to access your account.',
+            style: GoogleFonts.inter(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(color: AppColors.textSecondary),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(
+                'Log Out',
+                style: GoogleFonts.inter(
+                  color: AppColors.failure,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogOut != true || !context.mounted) return;
+
+    setState(() => _isLoggingOut = true);
+    try {
+      await controller.logOut();
+      if (!context.mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(controller.error ?? 'Unable to log out right now.'),
+          backgroundColor: AppColors.failure,
+        ),
+      );
+    } finally {
+      if (context.mounted) {
+        setState(() => _isLoggingOut = false);
+      }
+    }
   }
 
   void _hydrateFormIfNeeded(ProfilePageData data) {

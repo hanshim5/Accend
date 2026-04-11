@@ -16,7 +16,7 @@ class HomeTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 18),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
       decoration: const BoxDecoration(
         color: AppColors.primaryBg,
         border: Border(

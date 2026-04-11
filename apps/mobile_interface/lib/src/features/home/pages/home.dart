@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../app/constants.dart';
 import '../../../common/widgets/bottom_nav_bar.dart';
 import '../../../common/widgets/colored_button.dart';
 import '../../../app/routes.dart';
@@ -47,79 +49,113 @@ class _HomePageState extends State<HomePage> {
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) => Scaffold(
+        backgroundColor: AppColors.primaryBg,
         body: SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
+          child: Column(
+            children: [
               HomeTopBar(
                 name: _controller.displayName,
                 imagePath: 'assets/images/profile.png',
               ),
-              const SizedBox(height: 20),
-              if (_controller.isLoading)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 20),
-                  child: CircularProgressIndicator(),
-                ),
-              GoalCard(
-                title: _controller.activeCourseTitle,
-                currentMinutes: _controller.currentMinutes,
-                totalMinutes: _controller.goalMinutes,
-                streak: _controller.currentStreak,
-                progress: _controller.progress,
-                isLoading: _controller.isLoading || !_controller.hasActiveCourse,
-                onKeepGoing: () {
-                  if (!_controller.hasActiveCourse) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('No active course to continue yet.')),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const verticalPadding = 24.0;
+                    const gapAfterGoal = 10.0;
+                    const gapAfterTitle = 8.0;
+                    const gapBetweenButtons = 10.0;
+                    const titleBlockHeight = 26.0;
+
+                    var goalHeight = (constraints.maxHeight * 0.27).clamp(132.0, 156.0);
+                    var buttonHeight = ((constraints.maxHeight - verticalPadding - gapAfterGoal - gapAfterTitle - gapBetweenButtons - titleBlockHeight - goalHeight) / 2)
+                        .clamp(128.0, 170.0);
+
+                    if (goalHeight >= buttonHeight) {
+                      goalHeight = (buttonHeight - 12).clamp(112.0, 144.0);
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_controller.isLoading)
+                            const Padding(
+                              padding: EdgeInsets.only(bottom: 8),
+                              child: LinearProgressIndicator(minHeight: 2),
+                            ),
+                          SizedBox(
+                            height: goalHeight,
+                            child: GoalCard(
+                              title: _controller.activeCourseTitle,
+                              currentMinutes: _controller.currentMinutes,
+                              totalMinutes: _controller.goalMinutes,
+                              streak: _controller.currentStreak,
+                              progress: _controller.progress,
+                              compact: true,
+                              isLoading: _controller.isLoading || !_controller.hasActiveCourse,
+                              onKeepGoing: () {
+                                if (!_controller.hasActiveCourse) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('No active course to continue yet.')),
+                                  );
+                                  return;
+                                }
+                                Navigator.of(context).pushNamed(
+                                  AppRoutes.courses,
+                                  arguments: _controller.activeCourseId,
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: gapAfterGoal),
+                          Text(
+                            'Practice Modes',
+                            style: GoogleFonts.montserrat(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: gapAfterTitle),
+                          SizedBox(
+                            height: buttonHeight,
+                            child: ColoredButton(
+                              title: 'Solo Practice',
+                              subtitle: 'Personalized AI drills',
+                              icon: Icons.headphones,
+                              onTap: () {
+                                Navigator.of(context).pushNamed(AppRoutes.courses);
+                              },
+                              firstColor: 0xFF06B6D5,
+                              secondColor: 0xFF49DC7E,
+                              shadow: 0xFF06B6D5,
+                              height: buttonHeight,
+                            ),
+                          ),
+                          const SizedBox(height: gapBetweenButtons),
+                          SizedBox(
+                            height: buttonHeight,
+                            child: ColoredButton(
+                              icon: Icons.group,
+                              title: 'Group Practice',
+                              subtitle: 'Join a live conversation group',
+                              onTap: () {
+                                Navigator.of(context).pushNamed(AppRoutes.groupSessionSelect);
+                              },
+                              firstColor: 0xFF06B6D5,
+                              secondColor: 0xFF984ADD,
+                              shadow: 0xFF06B6D5,
+                              height: buttonHeight,
+                            ),
+                          ),
+                        ],
+                      ),
                     );
-                    return;
-                  }
-                  Navigator.of(context).pushNamed(
-                    AppRoutes.courses,
-                    arguments: _controller.activeCourseId,
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '  Practice Modes',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                  },
                 ),
               ),
-              const SizedBox(height: 12),
-              ColoredButton(
-                title: 'Solo Practice',
-                subtitle: 'Personalized AI drills',
-                icon: Icons.headphones,
-                onTap: () {
-                  Navigator.of(context).pushNamed(AppRoutes.courses);
-                },
-                firstColor: 0xFF06B6D5,
-                secondColor: 0xFF49DC7E,
-                shadow: 0xFF06B6D5,
-              ),
-              const SizedBox(height: 24),
-              ColoredButton(
-                icon: Icons.group,
-                title: 'Group Practice',
-                subtitle: 'Join a live conversation group',
-                onTap: () {
-                  Navigator.of(context).pushNamed(AppRoutes.groupSessionSelect);
-                },
-                firstColor: 0xFF06B6D5,
-                secondColor: 0xFF984ADD,
-                shadow: 0xFF06B6D5,
-              ),
-              const SizedBox(height: 24),
             ],
-            ),
           ),
         ),
         bottomNavigationBar: BottomNavBar(

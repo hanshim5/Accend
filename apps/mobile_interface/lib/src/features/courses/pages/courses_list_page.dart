@@ -114,7 +114,7 @@ class _CoursesListPageState extends State<CoursesListPage> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () =>
-              Navigator.of(context).pushReplacementNamed(AppRoutes.login),
+            Navigator.of(context).pushReplacementNamed(AppRoutes.home),
         ),
         title: Text(
           "Courses",
