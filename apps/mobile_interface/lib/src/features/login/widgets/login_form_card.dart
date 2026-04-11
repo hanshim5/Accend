@@ -99,6 +99,7 @@ class LoginFormCard extends StatelessWidget {
                   : const Text('Sign In'),
             ),
           ),
+          const SizedBox(height: 10),
 
           Align(
             alignment: Alignment.center,
