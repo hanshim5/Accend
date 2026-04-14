@@ -15,6 +15,55 @@ Color feedbackScoreColor(double? accuracy) {
   return AppColors.failure;
 }
 
+/// Word-level color that balances the aggregate score with phoneme analysis.
+///
+/// Strategy — use [word.accuracy] as the primary signal, then apply phoneme
+/// penalties only for phonemes that are *clearly* wrong (< 60):
+///
+///  • No phoneme data            → [feedbackScoreColor] on [word.accuracy].
+///  • ≥ 2 red phonemes (< 60),
+///    OR red share > 40%         → failure red (multiple clear errors).
+///  • 1 red phoneme              → downgrade one level:
+///                                   green  → action orange
+///                                   orange → stays orange  (already flagged)
+///                                   red    → stays red
+///  • No red phonemes            → [feedbackScoreColor] on [word.accuracy].
+///
+/// Borderline phonemes (60–84) do NOT trigger a downgrade on their own;
+/// the aggregate [word.accuracy] already reflects them naturally.
+Color strictWordColor(WordFeedback word) {
+  if (word.phonemes.isEmpty) return feedbackScoreColor(word.accuracy);
+
+  final accuracies = word.phonemes.map((p) => p.accuracy ?? 100.0).toList();
+  final total = accuracies.length;
+  final redCount = accuracies.where((a) => a < 60).length;
+
+  // Multiple clearly-wrong phonemes → hard red.
+  if (redCount >= 2 || redCount / total > 0.40) return AppColors.failure;
+
+  final base = feedbackScoreColor(word.accuracy);
+
+  // One clearly-wrong phoneme → bump down one level from the base.
+  if (redCount == 1) {
+    return base == AppColors.success ? AppColors.action : base;
+  }
+
+  // A phoneme substitution (user said a different symbol with accuracy < 85)
+  // counts as a meaningful error even if the aggregate score looks good.
+  final hasSubstitution = word.phonemes.any(
+    (p) => p.userSaid != null && p.userSaid != p.symbol && (p.accuracy ?? 100.0) < 85,
+  );
+
+  // Two or more imperfect phonemes (60–84) also prevent a green rating.
+  final orangeCount = accuracies.where((a) => a >= 60 && a < 85).length;
+
+  if ((hasSubstitution || orangeCount >= 2) && base == AppColors.success) {
+    return AppColors.action;
+  }
+
+  return base;
+}
+
 /// Color for a "You said" phoneme chip — green only when the symbol matches
 /// AND accuracy is high (≥ 85).
 Color userSaidPhonemeColor(PhonemeFeedback p) {
@@ -234,7 +283,7 @@ class FeedbackCard extends StatelessWidget {
                     label: Text(
                       w.text,
                       style: bodyStyle.copyWith(
-                        color: feedbackScoreColor(w.accuracy),
+                        color: strictWordColor(w),
                         fontWeight: FontWeight.w600,
                       ),
                     ),

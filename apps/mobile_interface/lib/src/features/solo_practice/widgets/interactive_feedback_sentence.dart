@@ -91,14 +91,14 @@ class InteractiveFeedbackSentence extends StatelessWidget {
               token,
               style: base.copyWith(
                 color: wf != null
-                    ? feedbackScoreColor(wf.accuracy)
+                    ? strictWordColor(wf)
                     : AppColors.textPrimary,
-                // Subtle underline hint that tappable words are interactive.
+                // Subtle underline hints that tappable words are interactive.
                 decoration: wf != null
                     ? TextDecoration.underline
                     : TextDecoration.none,
                 decorationColor: wf != null
-                    ? feedbackScoreColor(wf.accuracy).withOpacity(0.5)
+                    ? strictWordColor(wf).withOpacity(0.5)
                     : null,
                 decorationStyle: TextDecorationStyle.dotted,
               ),
