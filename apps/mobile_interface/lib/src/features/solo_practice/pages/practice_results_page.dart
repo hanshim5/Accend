@@ -171,88 +171,84 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Same vertical space as the old top bar row (no back control).
-                    const SizedBox(height: kToolbarHeight),
-                    const SizedBox(height: AppSpacing.sm),
-
-                    // Trophy glow icon
-                    _TrophyIcon(overallScore: _avgOverall),
-
                     const SizedBox(height: AppSpacing.lg),
 
-                    // Headline
+                    // Headline + lesson name — left-aligned, immediate
                     Text(
                       _greetingHeadline,
                       style: GoogleFonts.inter(
                         color: AppColors.textPrimary,
-                        fontSize: 30,
+                        fontSize: 26,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.5,
                       ),
                     ),
-
-                    const SizedBox(height: 6),
-
-                    // Lesson name
+                    const SizedBox(height: 4),
                     Text(
                       widget.lesson?.title ?? 'Practice Session',
-                      textAlign: TextAlign.center,
                       style: GoogleFonts.publicSans(
                         color: AppColors.textSecondary,
-                        fontSize: 15,
+                        fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
 
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.xl),
 
-                    // Primary overall score (larger, under hero text)
+                    // Hero score — large typographic number, no ring
                     Center(
-                      child: _ScoreRing(
-                        label: 'Overall',
-                        score: _avgOverall,
-                        color: _scoreColor(_avgOverall),
-                        isHighlighted: true,
-                        ringSize: 128,
-                        scoreFontSize: 34,
-                        labelFontSize: 14,
-                        ringStrokeWidth: 8,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${_avgOverall.round().clamp(0, 100)}',
+                            style: GoogleFonts.inter(
+                              color: _scoreColor(_avgOverall),
+                              fontSize: 80,
+                              fontWeight: FontWeight.w800,
+                              height: 1,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'OVERALL',
+                            style: GoogleFonts.publicSans(
+                              color: AppColors.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.4,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.xl),
 
-                    // Secondary metrics in one row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ScoreRing(
-                            label: 'Accuracy',
-                            score: _avgAccuracy,
-                            color: _scoreColor(_avgAccuracy),
-                            compact: true,
+                    // Three flat metric columns — plain numbers, no rings
+                    IntrinsicHeight(
+                      child: Row(
+                        children: [
+                          _MetricColumn(label: 'Accuracy', score: _avgAccuracy),
+                          VerticalDivider(
+                            color: AppColors.border,
+                            width: 1,
+                            thickness: 1,
                           ),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Expanded(
-                          child: _ScoreRing(
-                            label: 'Fluency',
-                            score: _avgFluency,
-                            color: _scoreColor(_avgFluency),
-                            compact: true,
+                          _MetricColumn(label: 'Fluency', score: _avgFluency),
+                          VerticalDivider(
+                            color: AppColors.border,
+                            width: 1,
+                            thickness: 1,
                           ),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Expanded(
-                          child: _ScoreRing(
+                          _MetricColumn(
                             label: 'Completeness',
                             score: _avgCompleteness,
-                            color: _scoreColor(_avgCompleteness),
-                            compact: true,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
 
                     const SizedBox(height: AppSpacing.xl),
@@ -272,7 +268,7 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
                           const Icon(
                             Icons.lightbulb_outline_rounded,
                             color: AppColors.tip,
-                            size: 20,
+                            size: 24,
                           ),
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(
@@ -290,64 +286,62 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
                       ),
                     ),
 
-                    const SizedBox(height: AppSpacing.lg),
-
-                    // Cards completed count
-                    Text(
-                      '${_feedbacks.length} of ${_feedbacks.length} exercise${_feedbacks.length == 1 ? '' : 's'} completed',
-                      style: GoogleFonts.publicSans(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-
-                    // -------------------------------------------------------
-                    // Session breakdown — expandable per-item feedback list
-                    // -------------------------------------------------------
+                    // Session breakdown
                     if (_feedbacks.isNotEmpty && widget.items.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.xl),
 
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Session Breakdown',
-                          style: GoogleFonts.inter(
-                            color: AppColors.textPrimary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.3,
+                      // Header row with exercise count inline
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            'Session Breakdown',
+                            style: GoogleFonts.inter(
+                              color: AppColors.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3,
+                            ),
                           ),
-                        ),
+                          const Spacer(),
+                          Text(
+                            '${_feedbacks.length} exercise${_feedbacks.length == 1 ? '' : 's'}',
+                            style: GoogleFonts.publicSans(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
 
                       const SizedBox(height: AppSpacing.sm),
 
-                      Container(
-                        decoration: BoxDecoration(
+                      // Tiles without heavy outer border — surface bg + clip only
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadii.lg),
+                        child: ColoredBox(
                           color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(AppRadii.lg),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Column(
-                          children: [
-                            for (int i = 0;
-                                i < math.min(widget.items.length, _feedbacks.length);
-                                i++) ...[
-                              if (i > 0)
-                                const Divider(
-                                  height: 1,
-                                  thickness: 1,
-                                  color: AppColors.border,
+                          child: Column(
+                            children: [
+                              for (int i = 0;
+                                  i < math.min(widget.items.length, _feedbacks.length);
+                                  i++) ...[
+                                if (i > 0)
+                                  const Divider(
+                                    height: 1,
+                                    thickness: 1,
+                                    color: AppColors.border,
+                                  ),
+                                _ItemBreakdownTile(
+                                  index: i,
+                                  item: widget.items[i],
+                                  feedback: _feedbacks[i],
                                 ),
-                              _ItemBreakdownTile(
-                                index: i,
-                                item: widget.items[i],
-                                feedback: _feedbacks[i],
-                              ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ],
@@ -435,9 +429,11 @@ class _ItemBreakdownTile extends StatelessWidget {
       // Remove the default ExpansionTile divider lines injected by the theme.
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
+        backgroundColor: Colors.transparent,
+        collapsedBackgroundColor: Colors.transparent,
         tilePadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
-          vertical: AppSpacing.xs,
+          vertical: AppSpacing.sm,
         ),
         childrenPadding: const EdgeInsets.fromLTRB(
           AppSpacing.md,
@@ -569,223 +565,52 @@ class _MiniScoreChip extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Trophy icon with glow
+// Flat metric column — label + bold number, no ring
 // ---------------------------------------------------------------------------
 
-class _TrophyIcon extends StatelessWidget {
-  const _TrophyIcon({required this.overallScore});
-
-  final double overallScore;
-
-  Color get _glowColor {
-    if (overallScore >= 85) return AppColors.success;
-    if (overallScore >= 60) return AppColors.action;
-    return AppColors.accent;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Outer glow ring
-        Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: _glowColor.withValues(alpha: 0.25),
-                blurRadius: 40,
-                spreadRadius: 10,
-              ),
-            ],
-          ),
-        ),
-        // Icon container
-        Container(
-          width: 96,
-          height: 96,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.surface,
-            border: Border.all(
-              color: _glowColor.withValues(alpha: 0.6),
-              width: 2,
-            ),
-          ),
-          child: Icon(
-            Icons.emoji_events_rounded,
-            size: 52,
-            color: _glowColor,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Score ring card
-// ---------------------------------------------------------------------------
-
-class _ScoreRing extends StatelessWidget {
-  const _ScoreRing({
-    required this.label,
-    required this.score,
-    required this.color,
-    this.isHighlighted = false,
-    this.compact = false,
-    this.ringSize = 72,
-    this.scoreFontSize = 20,
-    this.labelFontSize = 12,
-    this.ringStrokeWidth = 6,
-  });
+class _MetricColumn extends StatelessWidget {
+  const _MetricColumn({required this.label, required this.score});
 
   final String label;
   final double score;
-  final Color color;
-  final bool isHighlighted;
-  /// Smaller ring + typography for the three-metric row.
-  final bool compact;
-  final double ringSize;
-  final double scoreFontSize;
-  final double labelFontSize;
-  final double ringStrokeWidth;
+
+  Color get _color {
+    if (score >= 85) return AppColors.success;
+    if (score >= 60) return AppColors.action;
+    return AppColors.failure;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final displayScore = score.round().clamp(0, 100);
-    final effectiveRingSize = compact ? 58.0 : ringSize;
-    final effectiveScoreSize = compact ? 15.0 : scoreFontSize;
-    final effectiveLabelSize = compact ? 10.0 : labelFontSize;
-    final effectiveStroke = compact ? 4.5 : ringStrokeWidth;
-    final verticalPad = compact ? AppSpacing.sm : AppSpacing.md;
-    final horizontalPad = compact ? AppSpacing.xs : AppSpacing.sm;
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        vertical: verticalPad,
-        horizontal: horizontalPad,
-      ),
-      decoration: BoxDecoration(
-        color: isHighlighted
-            ? color.withValues(alpha: 0.08)
-            : AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-        border: Border.all(
-          color: isHighlighted ? color.withValues(alpha: 0.4) : AppColors.border,
-          width: isHighlighted ? 1.5 : 1,
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${score.round().clamp(0, 100)}',
+              style: GoogleFonts.inter(
+                color: _color,
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                height: 1,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: GoogleFonts.publicSans(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.2,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
-      child: Column(
-        children: [
-          SizedBox(
-            width: effectiveRingSize,
-            height: effectiveRingSize,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CustomPaint(
-                  painter: _RingPainter(
-                    progress: (score / 100).clamp(0.0, 1.0),
-                    color: color,
-                    trackColor: AppColors.border,
-                    strokeWidth: effectiveStroke,
-                  ),
-                ),
-                Center(
-                  child: Text(
-                    '$displayScore',
-                    style: GoogleFonts.inter(
-                      color: color,
-                      fontSize: effectiveScoreSize,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          SizedBox(height: compact ? AppSpacing.xs : AppSpacing.sm),
-
-          Text(
-            label,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.publicSans(
-              color: isHighlighted ? AppColors.textPrimary : AppColors.textSecondary,
-              fontSize: effectiveLabelSize,
-              fontWeight: isHighlighted ? FontWeight.w600 : FontWeight.w500,
-              height: 1.2,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
     );
   }
-}
-
-// ---------------------------------------------------------------------------
-// Custom ring painter (arc from top, clockwise)
-// ---------------------------------------------------------------------------
-
-class _RingPainter extends CustomPainter {
-  const _RingPainter({
-    required this.progress,
-    required this.color,
-    required this.trackColor,
-    required this.strokeWidth,
-  });
-
-  final double progress;
-  final Color color;
-  final Color trackColor;
-  final double strokeWidth;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (math.min(size.width, size.height) - strokeWidth) / 2;
-    const startAngle = -math.pi / 2; // top
-
-    final trackPaint = Paint()
-      ..color = trackColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    final progressPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      0,
-      2 * math.pi,
-      false,
-      trackPaint,
-    );
-
-    if (progress > 0) {
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        2 * math.pi * progress,
-        false,
-        progressPaint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_RingPainter oldDelegate) =>
-      oldDelegate.progress != progress ||
-      oldDelegate.color != color ||
-      oldDelegate.trackColor != trackColor;
 }
