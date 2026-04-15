@@ -9,6 +9,9 @@ class Microphone extends StatefulWidget {
     super.key,
     this.onRecordingStarted,
     this.onRecordingStopped,
+    this.idleColor,
+    this.recordingColor,
+    this.iconSize,
   });
 
   /// Called after a successful transition into the recording state.
@@ -16,6 +19,15 @@ class Microphone extends StatefulWidget {
 
   /// Called after recording stops with the final file path (if available).
   final ValueChanged<String>? onRecordingStopped;
+
+  /// Icon color when idle (not recording). Falls back to the theme primary.
+  final Color? idleColor;
+
+  /// Icon color while recording. Falls back to [Colors.red].
+  final Color? recordingColor;
+
+  /// Icon size. Defaults to 48.
+  final double? iconSize;
 
   @override
   State<Microphone> createState() => _MicrophoneState();
@@ -115,11 +127,14 @@ class _MicrophoneState extends State<Microphone> {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      iconSize: 48,
+      iconSize: widget.iconSize ?? 48,
+      padding: EdgeInsets.zero,
       onPressed: _busy ? null : _toggleRecording,
       icon: Icon(
-        _isRecording ? Icons.stop : Icons.mic,
-        color: _isRecording ? Colors.red : Theme.of(context).colorScheme.primary,
+        _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+        color: _isRecording
+            ? (widget.recordingColor ?? Colors.red)
+            : (widget.idleColor ?? Theme.of(context).colorScheme.primary),
       ),
       tooltip: _isRecording ? 'Stop recording' : 'Start recording',
     );

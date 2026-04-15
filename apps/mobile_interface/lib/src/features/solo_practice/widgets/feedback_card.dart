@@ -15,6 +15,55 @@ Color feedbackScoreColor(double? accuracy) {
   return AppColors.failure;
 }
 
+/// Word-level color that balances the aggregate score with phoneme analysis.
+///
+/// Strategy — use [word.accuracy] as the primary signal, then apply phoneme
+/// penalties only for phonemes that are *clearly* wrong (< 60):
+///
+///  • No phoneme data            → [feedbackScoreColor] on [word.accuracy].
+///  • ≥ 2 red phonemes (< 60),
+///    OR red share > 40%         → failure red (multiple clear errors).
+///  • 1 red phoneme              → downgrade one level:
+///                                   green  → action orange
+///                                   orange → stays orange  (already flagged)
+///                                   red    → stays red
+///  • No red phonemes            → [feedbackScoreColor] on [word.accuracy].
+///
+/// Borderline phonemes (60–84) do NOT trigger a downgrade on their own;
+/// the aggregate [word.accuracy] already reflects them naturally.
+Color strictWordColor(WordFeedback word) {
+  if (word.phonemes.isEmpty) return feedbackScoreColor(word.accuracy);
+
+  final accuracies = word.phonemes.map((p) => p.accuracy ?? 100.0).toList();
+  final total = accuracies.length;
+  final redCount = accuracies.where((a) => a < 60).length;
+
+  // Multiple clearly-wrong phonemes → hard red.
+  if (redCount >= 2 || redCount / total > 0.40) return AppColors.failure;
+
+  final base = feedbackScoreColor(word.accuracy);
+
+  // One clearly-wrong phoneme → bump down one level from the base.
+  if (redCount == 1) {
+    return base == AppColors.success ? AppColors.action : base;
+  }
+
+  // A phoneme substitution (user said a different symbol with accuracy < 85)
+  // counts as a meaningful error even if the aggregate score looks good.
+  final hasSubstitution = word.phonemes.any(
+    (p) => p.userSaid != null && p.userSaid != p.symbol && (p.accuracy ?? 100.0) < 85,
+  );
+
+  // Two or more imperfect phonemes (60–84) also prevent a green rating.
+  final orangeCount = accuracies.where((a) => a >= 60 && a < 85).length;
+
+  if ((hasSubstitution || orangeCount >= 2) && base == AppColors.success) {
+    return AppColors.action;
+  }
+
+  return base;
+}
+
 /// Color for a "You said" phoneme chip — green only when the symbol matches
 /// AND accuracy is high (≥ 85).
 Color userSaidPhonemeColor(PhonemeFeedback p) {
@@ -23,6 +72,193 @@ Color userSaidPhonemeColor(PhonemeFeedback p) {
   if (symbolMatches && (p.accuracy ?? 0) >= 85) return AppColors.success;
   final c = feedbackScoreColor(p.accuracy);
   return c == AppColors.success ? AppColors.action : c;
+}
+
+/// Shows the phoneme detail popup for a single [symbol].
+void _showPhonemeDetailDialog({
+  required BuildContext parentContext,
+  required String symbol,
+  double? accuracy,
+  Color? chipColor,
+}) {
+  showDialog<void>(
+    context: parentContext,
+    builder: (_) => PhonemeDetailDialog(
+      symbol: symbol,
+      accuracy: accuracy,
+      chipColor: chipColor ?? AppColors.textPrimary,
+    ),
+  );
+}
+
+/// Shows the word-level phoneme breakdown as a bottom sheet for [word].
+/// Can be called from any widget that has a [BuildContext].
+void showWordPhonemeDialog(BuildContext context, WordFeedback word) {
+  final wordStyle = GoogleFonts.inter(
+    color: AppColors.textPrimary,
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+  );
+  final labelStyle = GoogleFonts.publicSans(
+    color: AppColors.textSecondary,
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.8,
+  );
+  final hintStyle = GoogleFonts.publicSans(
+    color: AppColors.textSecondary,
+    fontSize: 11,
+    fontWeight: FontWeight.w400,
+  );
+  final phonemeStyle = GoogleFonts.inter(
+    fontSize: 22,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.2,
+  );
+
+  // Each phoneme column — wide enough for 2-char SAPI symbols at 22sp.
+  const double colW = 42;
+  // Label column — right-aligned "you" / "target".
+  const double labelW = 52;
+
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.lg)),
+    ),
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.lg,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              // Word title
+              Text(word.text, style: wordStyle),
+              const SizedBox(height: AppSpacing.lg),
+
+              if (word.phonemes.isEmpty)
+                Text('No phoneme data available for this word.', style: hintStyle)
+              else ...[
+                // ── You row ───────────────────────────────────────────────
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: labelW,
+                      child: Text('you', textAlign: TextAlign.right, style: labelStyle),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            for (final p in word.phonemes)
+                              GestureDetector(
+                                onTap: () => _showPhonemeDetailDialog(
+                                  parentContext: sheetContext,
+                                  symbol: p.userSaid ?? p.symbol,
+                                  accuracy: p.accuracy,
+                                  chipColor: userSaidPhonemeColor(p),
+                                ),
+                                child: SizedBox(
+                                  width: colW,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    child: Text(
+                                      p.userSaid ?? p.symbol,
+                                      textAlign: TextAlign.center,
+                                      style: phonemeStyle.copyWith(
+                                        color: userSaidPhonemeColor(p),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // ── Divider aligned to phoneme column only ────────────────
+                Padding(
+                  padding: const EdgeInsets.only(left: labelW + 12),
+                  child: const Divider(color: AppColors.border, height: 1, thickness: 1),
+                ),
+
+                // ── Target row ────────────────────────────────────────────
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: labelW,
+                      child: Text('target', textAlign: TextAlign.right, style: labelStyle),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            for (final p in word.phonemes)
+                              GestureDetector(
+                                onTap: () => _showPhonemeDetailDialog(
+                                  parentContext: sheetContext,
+                                  symbol: p.symbol,
+                                  chipColor: AppColors.textPrimary,
+                                ),
+                                child: SizedBox(
+                                  width: colW,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    child: Text(
+                                      p.symbol,
+                                      textAlign: TextAlign.center,
+                                      style: phonemeStyle.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: AppSpacing.md),
+                Center(
+                  child: Text('Tap to hear pronunciation', style: hintStyle),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 /// Inline feedback card shown after the user submits a recording.
@@ -58,135 +294,6 @@ class FeedbackCard extends StatelessWidget {
       fontWeight: FontWeight.w700,
     );
 
-    /// Show a phoneme-detail popup for a single phoneme [symbol].
-    /// Displays the symbol, articulation instruction, accuracy score, and a
-    /// play button that streams the reference audio from Supabase Storage.
-    void showPhonemeDetailDialog({
-      required BuildContext parentContext,
-      required String symbol,
-      double? accuracy,
-      Color? chipColor,
-    }) {
-      showDialog<void>(
-        context: parentContext,
-        builder: (_) => PhonemeDetailDialog(
-          symbol: symbol,
-          accuracy: accuracy,
-          chipColor: chipColor ?? AppColors.textPrimary,
-        ),
-      );
-    }
-
-    /// Show a popup listing phonemes for a given [word]: top row = what the
-    /// user said (detected), bottom row = what they should have said (reference).
-    /// Tap any phoneme chip to see its full articulation instruction.
-    void showPhonemeDialog(WordFeedback word) {
-      showDialog<void>(
-        context: context,
-        builder: (dialogContext) {
-          return AlertDialog(
-            backgroundColor: AppColors.surface,
-            title: Text(
-              word.text,
-              style: headingStyle,
-            ),
-            content: word.phonemes.isEmpty
-                ? Text(
-                    'No phoneme data available for this word.',
-                    style: bodyStyle,
-                  )
-                : Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'You said:',
-                        style: bodyStyle.copyWith(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final p in word.phonemes)
-                            ActionChip(
-                              onPressed: () => showPhonemeDetailDialog(
-                                parentContext: dialogContext,
-                                symbol: p.userSaid ?? p.symbol,
-                                accuracy: p.accuracy,
-                                chipColor: userSaidPhonemeColor(p),
-                              ),
-                              label: Text(
-                                p.userSaid ?? p.symbol,
-                                style: bodyStyle.copyWith(
-                                  color: userSaidPhonemeColor(p),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              backgroundColor: AppColors.inputFill,
-                              shape: StadiumBorder(
-                                side: BorderSide(color: AppColors.border),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Should be:',
-                        style: bodyStyle.copyWith(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final p in word.phonemes)
-                            ActionChip(
-                              onPressed: () => showPhonemeDetailDialog(
-                                parentContext: dialogContext,
-                                symbol: p.symbol,
-                                chipColor: AppColors.textPrimary,
-                              ),
-                              label: Text(
-                                p.symbol,
-                                style: bodyStyle.copyWith(
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              backgroundColor: AppColors.inputFill,
-                              shape: StadiumBorder(
-                                side: BorderSide(color: AppColors.border),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Tap any phoneme for how to pronounce it.',
-                        style: bodyStyle.copyWith(fontSize: 11, color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          );
-        },
-      );
-    }
-
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(maxWidth: 360),
@@ -218,7 +325,7 @@ class FeedbackCard extends StatelessWidget {
               children: [
                 for (final w in feedback.words)
                   ActionChip(
-                    onPressed: () => showPhonemeDialog(w),
+                    onPressed: () => showWordPhonemeDialog(context, w),
                     backgroundColor: AppColors.inputFill,
                     shape: StadiumBorder(
                       side: BorderSide(color: AppColors.border),
@@ -226,7 +333,7 @@ class FeedbackCard extends StatelessWidget {
                     label: Text(
                       w.text,
                       style: bodyStyle.copyWith(
-                        color: feedbackScoreColor(w.accuracy),
+                        color: strictWordColor(w),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
