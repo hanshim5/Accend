@@ -27,7 +27,8 @@ class SoloPracticePage extends StatefulWidget {
   State<SoloPracticePage> createState() => _SoloPracticePageState();
 }
 
-class _SoloPracticePageState extends State<SoloPracticePage> with WidgetsBindingObserver {
+class _SoloPracticePageState extends State<SoloPracticePage>
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   late final SoloPracticeController _controller;
   final AudioPlayer _audioPlayer = AudioPlayer();
   String? _recordingPath;
@@ -35,11 +36,53 @@ class _SoloPracticePageState extends State<SoloPracticePage> with WidgetsBinding
   DateTime? _activeStartedAt;
   Duration _accumulatedActive = Duration.zero;
 
+  // ── Entrance animation ────────────────────────────────────────────────────
+  late AnimationController _entrance;
+  late Animation<double> _cardFade;
+  late Animation<Offset> _cardSlide;
+  late Animation<double> _bottomFade;
+
+  void _initAnimations() {
+    _entrance = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _cardFade = CurvedAnimation(
+      parent: _entrance,
+      curve: const Interval(0.0, 0.75, curve: Curves.easeOut),
+    );
+    _cardSlide = Tween<Offset>(
+      begin: const Offset(0, 0.06),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _entrance,
+      curve: const Interval(0.0, 0.85, curve: Curves.easeOutCubic),
+    ));
+    _bottomFade = CurvedAnimation(
+      parent: _entrance,
+      curve: const Interval(0.25, 1.0, curve: Curves.easeOut),
+    );
+    _entrance.forward();
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    // Guard: _entrance may not be initialized on the very first hot reload
+    // after this animation code was introduced. Swallow the LateError so the
+    // subsequent _initAnimations() call always succeeds.
+    try {
+      _entrance.dispose();
+    } catch (_) {}
+    _initAnimations();
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _pauseActiveTimer();
     _audioPlayer.dispose();
+    _entrance.dispose();
     super.dispose();
   }
 
@@ -51,6 +94,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> with WidgetsBinding
       items: widget.lesson?.items,
     );
     _resumeActiveTimer();
+    _initAnimations();
   }
 
   @override
@@ -301,7 +345,11 @@ class _SoloPracticePageState extends State<SoloPracticePage> with WidgetsBinding
             // MIDDLE SECTION — prompt card or inline feedback card
             // -----------------------------------------------------------------
             Expanded(
-              child: LayoutBuilder(
+              child: FadeTransition(
+                opacity: _cardFade,
+                child: SlideTransition(
+                  position: _cardSlide,
+                  child: LayoutBuilder(
                 builder: (context, constraints) {
                   // ConstrainedBox(minHeight) + Center ensures the content is
                   // vertically centred when it's shorter than the available
@@ -312,8 +360,20 @@ class _SoloPracticePageState extends State<SoloPracticePage> with WidgetsBinding
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minHeight: constraints.maxHeight),
                       child: Center(
-                        child: _isSubmitting
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 320),
+                          reverseDuration: const Duration(milliseconds: 180),
+                          transitionBuilder: (child, animation) => FadeTransition(
+                            opacity: animation,
+                            child: ScaleTransition(
+                              scale: Tween<double>(begin: 0.96, end: 1.0)
+                                  .animate(animation),
+                              child: child,
+                            ),
+                          ),
+                          child: _isSubmitting
                             ? Column(
+                                key: const ValueKey<String>('loading'),
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   const CircularProgressIndicator(
@@ -331,11 +391,15 @@ class _SoloPracticePageState extends State<SoloPracticePage> with WidgetsBinding
                             : _controller.currentFeedback == null
                                 // ── Pre-submission: plain sentence card ───────
                                 ? Column(
+                                key: ValueKey<String>('pre-${_controller.currentCardIndex}'),
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Container(
                                         width: double.infinity,
-                                        padding: const EdgeInsets.all(AppSpacing.xl),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: AppSpacing.xl,
+                                          vertical: 40,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: AppColors.surface,
                                           borderRadius: BorderRadius.circular(AppRadii.lg),
@@ -388,6 +452,7 @@ class _SoloPracticePageState extends State<SoloPracticePage> with WidgetsBinding
                                   )
                                 // ── Post-submission: in-place color-coded sentence ─
                                 : Padding(
+                                    key: ValueKey<String>('post-${_controller.currentCardIndex}'),
                                     padding: const EdgeInsets.only(top: AppSpacing.md),
                                     child: Container(
                                       width: double.infinity,
@@ -513,82 +578,104 @@ class _SoloPracticePageState extends State<SoloPracticePage> with WidgetsBinding
                                       ),
                                     ),
                                   ),
+                        ), // AnimatedSwitcher
                       ),
                     ),
                   );
                 },
               ),
+                  ), // SlideTransition
+                ), // FadeTransition
             ),
 
             // -----------------------------------------------------------------
             // BOTTOM SECTION — Retry / mic button / Submit
+            // Buttons always occupy Expanded slots on each side of the mic so
+            // the mic stays centred; AnimatedOpacity fades them in/out and
+            // IgnorePointer blocks taps when invisible — no layout jump.
             // -----------------------------------------------------------------
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-
-                  if (showRetrySubmit) ...[
+            FadeTransition(
+              opacity: _bottomFade,
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Row(
+                  children: [
+                    // ── Left: Retry ─────────────────────────────────────────
                     Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isSubmitting ? null : _onRetryPressed,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.surface,
-                          foregroundColor: AppColors.textPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.md),
-                            side: const BorderSide(color: AppColors.border),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-                        ),
-                        child: Text(
-                          'Retry',
-                          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary).copyWith(inherit: false),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                  ],
-
-                  _AnimatedMicButton(
-                    micStateIndex: _controller.micStateIndex,
-                    onPlayRecording: _playRecording,
-                    onRecordingStarted: _onRecordingStarted,
-                    onRecordingStopped: _onRecordingStopped,
-                  ),
-
-                  if (showRetrySubmit) ...[
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isSubmitting ? null : _onSubmitPressed,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.action,
-                          foregroundColor: const Color(0xFF101828),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadii.md),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-                        ),
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: Color(0xFF101828),
-                                ),
-                              )
-                            : Text(
-                                _controller.currentCardIndex == _controller.totalCards - 1 ? 'Finish' : 'Submit',
-                                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF101828)).copyWith(inherit: false),
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOut,
+                        opacity: showRetrySubmit ? 1.0 : 0.0,
+                        child: IgnorePointer(
+                          ignoring: !showRetrySubmit,
+                          child: ElevatedButton(
+                            onPressed: _isSubmitting ? null : _onRetryPressed,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.surface,
+                              foregroundColor: AppColors.textPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                                side: const BorderSide(color: AppColors.border),
                               ),
+                              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                            ),
+                            child: Text(
+                              'Retry',
+                              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary).copyWith(inherit: false),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+
+                    // ── Centre: Mic button (always visible) ─────────────────
+                    _AnimatedMicButton(
+                      micStateIndex: _controller.micStateIndex,
+                      onPlayRecording: _playRecording,
+                      onRecordingStarted: _onRecordingStarted,
+                      onRecordingStopped: _onRecordingStopped,
+                    ),
+
+                    const SizedBox(width: AppSpacing.sm),
+
+                    // ── Right: Submit ────────────────────────────────────────
+                    Expanded(
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOut,
+                        opacity: showRetrySubmit ? 1.0 : 0.0,
+                        child: IgnorePointer(
+                          ignoring: !showRetrySubmit,
+                          child: ElevatedButton(
+                            onPressed: _isSubmitting ? null : _onSubmitPressed,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.action,
+                              foregroundColor: const Color(0xFF101828),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                            ),
+                            child: _isSubmitting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: Color(0xFF101828),
+                                    ),
+                                  )
+                                : Text(
+                                    _controller.currentCardIndex == _controller.totalCards - 1 ? 'Finish' : 'Submit',
+                                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF101828)).copyWith(inherit: false),
+                                  ),
+                          ),
+                        ),
                       ),
                     ),
                   ],
-
-                ],
+                ),
               ),
             ),
 
@@ -710,7 +797,7 @@ class _AnimatedMicButtonState extends State<_AnimatedMicButton>
                 ),
                 child: isPlayback
                     ? IconButton(
-                        iconSize: 44,
+                        iconSize: 52,
                         padding: EdgeInsets.zero,
                         icon: const Icon(
                           Icons.play_arrow_rounded,
@@ -722,7 +809,7 @@ class _AnimatedMicButtonState extends State<_AnimatedMicButton>
                     : Microphone(
                         idleColor: AppColors.accent,
                         recordingColor: AppColors.failure,
-                        iconSize: 40,
+                        iconSize: 52,
                         onRecordingStarted: widget.onRecordingStarted,
                         onRecordingStopped: widget.onRecordingStopped,
                       ),

@@ -40,7 +40,33 @@ class PracticeResultsPage extends StatefulWidget {
   State<PracticeResultsPage> createState() => _PracticeResultsPageState();
 }
 
-class _PracticeResultsPageState extends State<PracticeResultsPage> {
+class _PracticeResultsPageState extends State<PracticeResultsPage>
+    with TickerProviderStateMixin {
+  // -------------------------------------------------------------------------
+  // Animation fields
+  // -------------------------------------------------------------------------
+
+  late AnimationController _entrance;
+  late AnimationController _glow;
+
+  // Entrance animations
+  late Animation<double> _headlineFade;
+  late Animation<Offset> _headlineSlide;
+  late Animation<double> _ruleWidthFactor;
+  late Animation<double> _scoreFade;
+  late Animation<double> _scoreScale;
+  late Animation<double> _scoreCounter;
+  late Animation<double> _metricsFade;
+  late Animation<Offset> _metricsSlide;
+  late Animation<double> _cardFade;
+  late Animation<Offset> _cardSlide;
+  late Animation<double> _breakdownFade;
+  late Animation<Offset> _breakdownSlide;
+  late Animation<Offset> _buttonSlide;
+
+  // Post-entrance glow oscillation
+  late Animation<double> _glowPulse;
+
   // -------------------------------------------------------------------------
   // Lifecycle
   // -------------------------------------------------------------------------
@@ -51,6 +77,108 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
     _notifyLessonComplete();
     _submitPhonemeScores();
     _submitDailyMinutes();
+    _initAnimations();
+  }
+
+  void _initAnimations() {
+    _entrance = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1350),
+    );
+    _glow = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    );
+    _glowPulse = Tween<double>(begin: 0.0, end: 1.0).animate(_glow);
+
+    // ── Local helpers to build interval-based animations cleanly ────────────
+
+    Animation<double> fade(double t0, double t1) => CurvedAnimation(
+          parent: _entrance,
+          curve: Interval(t0, t1, curve: Curves.easeOut),
+        );
+
+    Animation<Offset> slide(double t0, double t1,
+            {Offset from = const Offset(0, 0.07)}) =>
+        Tween<Offset>(begin: from, end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _entrance,
+            curve: Interval(t0, t1, curve: Curves.easeOutCubic),
+          ),
+        );
+
+    // ── Headline (first in, slides from slight left) ─────────────────────────
+    _headlineFade = fade(0.00, 0.22);
+    _headlineSlide =
+        slide(0.00, 0.26, from: const Offset(-0.05, 0));
+
+    // ── Accent rule width expands ─────────────────────────────────────────────
+    _ruleWidthFactor = CurvedAnimation(
+      parent: _entrance,
+      curve: const Interval(0.10, 0.30, curve: Curves.easeOutCubic),
+    );
+
+    // ── Hero score — scale up + count-up ─────────────────────────────────────
+    _scoreFade = fade(0.15, 0.36);
+    _scoreScale = Tween<double>(begin: 0.82, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entrance,
+        curve: const Interval(0.14, 0.50, curve: Curves.easeOutCubic),
+      ),
+    );
+    _scoreCounter = Tween<double>(begin: 0, end: _avgOverall).animate(
+      CurvedAnimation(
+        parent: _entrance,
+        curve: const Interval(0.16, 0.64, curve: Curves.easeOut),
+      ),
+    );
+
+    // ── Sub-metrics ───────────────────────────────────────────────────────────
+    _metricsFade = fade(0.40, 0.62);
+    _metricsSlide = slide(0.40, 0.64);
+
+    // ── Motivational card ─────────────────────────────────────────────────────
+    _cardFade = fade(0.50, 0.72);
+    _cardSlide = slide(0.50, 0.74);
+
+    // ── Session breakdown ─────────────────────────────────────────────────────
+    _breakdownFade = fade(0.58, 0.80);
+    _breakdownSlide = slide(0.58, 0.82);
+
+    // ── CTA button (slides up from below) ────────────────────────────────────
+    _buttonSlide = Tween<Offset>(
+      begin: const Offset(0, 1.2),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _entrance,
+      curve: const Interval(0.72, 0.94, curve: Curves.easeOutCubic),
+    ));
+
+    // Start entrance, then start slow glow oscillation when done.
+    _entrance.forward().then((_) {
+      if (mounted) _glow.repeat(reverse: true);
+    });
+  }
+
+  @override
+  void reassemble() {
+    // Called by Flutter during hot reload. Re-initialise animations so that
+    // newly patched code takes effect without requiring a full restart.
+    // Guard: controllers may be uninitialised on the very first hot reload
+    // after this animation code was introduced.
+    super.reassemble();
+    try {
+      _entrance.dispose();
+      _glow.dispose();
+    } catch (_) {}
+    _initAnimations();
+  }
+
+  @override
+  void dispose() {
+    _entrance.dispose();
+    _glow.dispose();
+    super.dispose();
   }
 
   void _notifyLessonComplete() {
@@ -175,120 +303,207 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
                   children: [
                     const SizedBox(height: AppSpacing.lg),
 
-                    // Headline + lesson name — left-aligned, immediate
-                    Text(
-                      _greetingHeadline,
-                      style: GoogleFonts.inter(
-                        color: AppColors.textPrimary,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.lesson?.title ?? 'Practice Session',
-                      style: GoogleFonts.publicSans(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-
-                    const SizedBox(height: AppSpacing.xl),
-
-                    // Hero score — large typographic number, no ring
-                    Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${_avgOverall.round().clamp(0, 100)}',
-                            style: GoogleFonts.inter(
-                              color: _scoreColor(_avgOverall),
-                              fontSize: 80,
-                              fontWeight: FontWeight.w800,
-                              height: 1,
+                    // Headline + accent rule + lesson name — staggered entrance
+                    FadeTransition(
+                      opacity: _headlineFade,
+                      child: SlideTransition(
+                        position: _headlineSlide,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _greetingHeadline,
+                              style: GoogleFonts.inter(
+                                color: AppColors.textPrimary,
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.5,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'OVERALL',
-                            style: GoogleFonts.publicSans(
-                              color: AppColors.textSecondary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.4,
+                            const SizedBox(height: 6),
+                            // Accent rule — expands from 0 → 36px
+                            AnimatedBuilder(
+                              animation: _ruleWidthFactor,
+                              builder: (_, __) => Container(
+                                width: _ruleWidthFactor.value * 36,
+                                height: 2.5,
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent,
+                                  borderRadius: BorderRadius.circular(2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.accent.withOpacity(0.55),
+                                      blurRadius: 8,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: AppSpacing.xl),
-
-                    // Three flat metric columns — plain numbers, no rings
-                    IntrinsicHeight(
-                      child: Row(
-                        children: [
-                          _MetricColumn(label: 'Accuracy', score: _avgAccuracy),
-                          VerticalDivider(
-                            color: AppColors.border,
-                            width: 1,
-                            thickness: 1,
-                          ),
-                          _MetricColumn(label: 'Fluency', score: _avgFluency),
-                          VerticalDivider(
-                            color: AppColors.border,
-                            width: 1,
-                            thickness: 1,
-                          ),
-                          _MetricColumn(
-                            label: 'Completeness',
-                            score: _avgCompleteness,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: AppSpacing.xl),
-
-                    // Motivational message
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppRadii.lg),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.lightbulb_outline_rounded,
-                            color: AppColors.tip,
-                            size: 24,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(
-                              _motivationalMessage,
+                            const SizedBox(height: 6),
+                            Text(
+                              widget.lesson?.title ?? 'Practice Session',
                               style: GoogleFonts.publicSans(
                                 color: AppColors.textSecondary,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
-                                height: 1.5,
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
 
-                    // Session breakdown
+                    const SizedBox(height: AppSpacing.xl),
+
+                    // Hero score — count-up + scale entrance + post-entrance glow breath
+                    FadeTransition(
+                      opacity: _scoreFade,
+                      child: ScaleTransition(
+                        scale: _scoreScale,
+                        child: Center(
+                          child: AnimatedBuilder(
+                            animation: Listenable.merge([_scoreCounter, _glowPulse]),
+                            builder: (_, __) {
+                              final displayScore = _scoreCounter.value;
+                              final color = _scoreColor(_avgOverall);
+                              // Glow breathes between 0.13 and 0.26 after entrance.
+                              final glowOpacity = 0.13 + _glowPulse.value * 0.13;
+
+                              return Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  // Ambient glow orb — breathes post-entrance
+                                  Container(
+                                    width: 180,
+                                    height: 140,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: color.withOpacity(glowOpacity),
+                                          blurRadius: 80,
+                                          spreadRadius: 24,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        '${displayScore.round().clamp(0, 100)}',
+                                        style: GoogleFonts.inter(
+                                          color: color,
+                                          fontSize: 80,
+                                          fontWeight: FontWeight.w800,
+                                          height: 1,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'OVERALL',
+                                        style: GoogleFonts.publicSans(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 1.4,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: AppSpacing.xl),
+
+                    // Three flat metric columns — staggered up from below
+                    FadeTransition(
+                      opacity: _metricsFade,
+                      child: SlideTransition(
+                        position: _metricsSlide,
+                        child: IntrinsicHeight(
+                          child: Row(
+                            children: [
+                              _MetricColumn(label: 'Accuracy', score: _avgAccuracy),
+                              VerticalDivider(
+                                color: AppColors.border,
+                                width: 1,
+                                thickness: 1,
+                              ),
+                              _MetricColumn(label: 'Fluency', score: _avgFluency),
+                              VerticalDivider(
+                                color: AppColors.border,
+                                width: 1,
+                                thickness: 1,
+                              ),
+                              _MetricColumn(
+                                label: 'Completeness',
+                                score: _avgCompleteness,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: AppSpacing.xl),
+
+                    // Motivational message — fades + slides up
+                    FadeTransition(
+                      opacity: _cardFade,
+                      child: SlideTransition(
+                        position: _cardSlide,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(AppRadii.lg),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.lightbulb_outline_rounded,
+                                color: AppColors.tip,
+                                size: 24,
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  _motivationalMessage,
+                                  style: GoogleFonts.publicSans(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Session breakdown — fades + slides up last
                     if (_feedbacks.isNotEmpty && widget.items.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.xl),
+
+                      FadeTransition(
+                        opacity: _breakdownFade,
+                        child: SlideTransition(
+                          position: _breakdownSlide,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
 
                       // Header row with exercise count inline
                       Row(
@@ -344,6 +559,10 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
                           ),
                         ),
                       ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
 
                     const SizedBox(height: AppSpacing.xl),
@@ -352,12 +571,26 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
               ),
             ),
 
-            // Back to Courses button
-            Padding(
+            // Back to Courses button — slides up from below on entrance
+            SlideTransition(
+              position: _buttonSlide,
+              child: Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.action.withOpacity(0.38),
+                      blurRadius: 22,
+                      spreadRadius: 0,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
                   onPressed: () => Navigator.of(context)
                       .pushNamedAndRemoveUntil(AppRoutes.courses, (_) => false),
                   style: ElevatedButton.styleFrom(
@@ -378,6 +611,8 @@ class _PracticeResultsPageState extends State<PracticeResultsPage> {
                   ),
                 ),
               ),
+            ),
+          ),
             ),
           ],
         ),
