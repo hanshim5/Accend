@@ -53,5 +53,17 @@ class AuthService {
     return user;
   }
 
+  /// Sends a password reset email through Supabase.
+  ///
+  /// For the current simpler flow, Supabase hosts the reset page itself.
+  /// The app only needs to trigger the email.
+  Future<void> sendPasswordResetEmail({
+    required String email,
+  }) async {
+    await _client.auth.resetPasswordForEmail(
+      email.trim(),
+    );
+  }
+
   Future<void> signOut() => _client.auth.signOut();
 }

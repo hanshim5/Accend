@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app/routes.dart';
@@ -6,6 +5,7 @@ import '../../../common/services/api_client.dart';
 import '../../../common/services/auth_service.dart';
 import '../../home/controllers/home_controller.dart';
 import '../../onboarding/controllers/onboarding_controller.dart';
+import '../widgets/forgot_password_dialog.dart';
 
 class LoginController extends ChangeNotifier {
   LoginController({
@@ -72,8 +72,6 @@ class LoginController extends ChangeNotifier {
         password: password,
       );
 
-      // Fire-and-forget: start fetching home data during the navigation
-      // transition so it's ready (or already loading) when the home page mounts.
       home.load();
 
       if (!context.mounted) return;
@@ -113,9 +111,11 @@ class LoginController extends ChangeNotifier {
     Navigator.pushNamed(context, AppRoutes.onboardingUserInfo);
   }
 
-  void forgotPassword(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Forgot password is not wired yet.')),
+  Future<void> forgotPassword(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => const ForgotPasswordDialog(),
     );
   }
 
