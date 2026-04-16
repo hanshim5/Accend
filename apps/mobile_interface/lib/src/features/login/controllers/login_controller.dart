@@ -1,5 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/routes.dart';
 import '../../../common/services/api_client.dart';
@@ -27,6 +29,7 @@ class LoginController extends ChangeNotifier {
   bool isLoading = false;
   bool obscurePassword = true;
   String? errorMessage;
+  StreamSubscription<AuthState>? _oauthSub;
 
   bool get isLoggedIn => auth.currentSession != null;
 
@@ -126,26 +129,40 @@ class LoginController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await auth.signInWithGoogle(
-        webClientId: dotenv.env['GOOGLE_WEB_CLIENT_ID'] ?? '',
-        iosClientId: dotenv.env['GOOGLE_IOS_CLIENT_ID'] ?? '',
-      );
-      home.load();
-      final route = await onboarding.getPostLoginRoute();
-      if (!context.mounted) return;
-      Navigator.pushReplacementNamed(context, route);
-    } on Exception catch (e) {
-      final msg = e.toString();
-      debugPrint('Google sign-in error: $msg');
-      if (msg.contains('cancelled') || msg.contains('canceled') || msg.contains('sign_in_canceled')) {
-        errorMessage = 'Google sign-in was cancelled.';
-      } else {
-        errorMessage = 'Google sign-in failed. Please try again.';
-      }
-    } finally {
+      await auth.signInWithGoogleOAuth();
+
+      // Browser is now open. Listen for the session once the user
+      // completes OAuth and the deep link brings them back.
+      _oauthSub?.cancel();
+      _oauthSub = auth.client.auth.onAuthStateChange.listen((data) async {
+        if (data.event == AuthChangeEvent.signedIn) {
+          _oauthSub?.cancel();
+          _oauthSub = null;
+          try {
+            home.load();
+            final route = await onboarding.getPostLoginRoute();
+            if (context.mounted) {
+              Navigator.pushReplacementNamed(context, route);
+            }
+          } catch (e) {
+            errorMessage = 'Google sign-in failed. Please try again.';
+            notifyListeners();
+          } finally {
+            isLoading = false;
+            notifyListeners();
+          }
+        }
+      });
+    } on Exception catch (_) {
+      errorMessage = 'Google sign-in failed. Please try again.';
       isLoading = false;
       notifyListeners();
+      return;
     }
+
+    // Clear loading while browser is open
+    isLoading = false;
+    notifyListeners();
   }
 
   void signInWithApple(BuildContext context) {
@@ -156,6 +173,7 @@ class LoginController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _oauthSub?.cancel();
     identifierController.dispose();
     passwordController.dispose();
     super.dispose();
