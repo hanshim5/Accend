@@ -9,10 +9,12 @@ class CourseCard extends StatelessWidget {
     super.key,
     required this.course,
     required this.onTap,
+    this.onDelete,
   });
 
   final Course course;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -31,12 +33,14 @@ class CourseCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadii.lg),
       elevation: 10,
       shadowColor: Colors.black.withValues(alpha: 0.35),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.lg),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          child: Column(
+      child: Stack(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(AppRadii.lg),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Image
@@ -117,6 +121,32 @@ class CourseCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+          if (onDelete != null)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: onDelete,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline,
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -144,6 +144,31 @@ class CoursesController extends ChangeNotifier {
         .toList();
   }
 
+  /// Delete a course owned by the authenticated user.
+  ///
+  /// Optimistically removes the course from the local list before the server
+  /// call so the UI updates immediately. If the server call fails, the course
+  /// is restored and the error is rethrown for the caller to surface.
+  Future<void> deleteCourse(String courseId) async {
+    final token = _auth.accessToken;
+    if (token == null) throw Exception('User not authenticated');
+
+    final removed = _courses.firstWhere(
+      (c) => c.id == courseId,
+      orElse: () => throw Exception('Course not found locally'),
+    );
+    _courses.removeWhere((c) => c.id == courseId);
+    notifyListeners();
+
+    try {
+      await _api.deleteVoid('/courses/$courseId', accessToken: token);
+    } catch (e) {
+      _courses.add(removed);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   /// Mark a lesson as complete on the server.
   ///
   /// Best-effort: errors are swallowed so the caller's UI flow is never blocked.

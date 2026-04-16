@@ -506,6 +506,32 @@ async def proxy_list_lessons(
     return r.json()
 
 
+@app.delete("/courses/{course_id}", status_code=204)
+async def proxy_delete_course(
+    course_id: str,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Delete a course owned by the authenticated user.
+
+    Flow:
+    1. Validate JWT and extract user_id.
+    2. Forward DELETE request to courses-service with X-User-Id.
+    3. Return 204 No Content on success.
+    4. Surface 403/404 errors from courses-service unchanged.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.delete(
+            f"{settings.COURSES_SERVICE_URL}/courses/{course_id}",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+
 @app.post("/courses/{course_id}/lessons/{lesson_id}/complete")
 async def proxy_complete_lesson(
     course_id: str,

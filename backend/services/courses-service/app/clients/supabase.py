@@ -180,6 +180,32 @@ def rest_upsert(
     return data if isinstance(data, list) else []
 
 
+def rest_delete(table: str, match: dict[str, str]) -> None:
+    """
+    Delete rows from a table using PostgREST.
+
+    Args:
+    - table: Table name (e.g., "courses")
+    - match: Filtering conditions (PostgREST format)
+        Example: {"id": "eq.<uuid>"}
+
+    Flow:
+    - Applies filters via query params.
+    - Sends DELETE request.
+    - Raises RuntimeError on failure response.
+
+    Notes:
+    - With ON DELETE CASCADE FK constraints in place, deleting a parent row
+      automatically removes all child rows in the same transaction.
+    """
+    url = f"{settings.SUPABASE_URL}/rest/v1/{table}"
+    client = get_http()
+
+    resp = client.delete(url, headers=_headers(), params=match)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Supabase REST DELETE failed ({resp.status_code}): {resp.text}")
+
+
 def rest_patch(table: str, match: dict[str, str], payload: dict[str, Any], select: str) -> list[dict[str, Any]]:
     """
     Update rows in a table and return updated rows.

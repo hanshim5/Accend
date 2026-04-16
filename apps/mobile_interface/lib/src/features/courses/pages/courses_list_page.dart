@@ -57,6 +57,42 @@ class _CoursesListPageState extends State<CoursesListPage> {
     }
   }
 
+  Future<void> _confirmDelete(Course course) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete course?'),
+        content: Text(
+          '"${course.title}" will be permanently removed. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.failure,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await context.read<CoursesController>().deleteCourse(course.id);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete course: $e')),
+      );
+    }
+  }
+
   Future<void> _openCourse(Course course) async {
     final ctrl = context.read<CoursesController>();
 
@@ -165,6 +201,7 @@ class _CoursesListPageState extends State<CoursesListPage> {
               return _CoursesGrid(
                 courses: ctrl.courses,
                 onTapCourse: _openCourse,
+                onDeleteCourse: _confirmDelete,
               );
             },
           ),
@@ -201,10 +238,12 @@ class _CoursesGrid extends StatelessWidget {
   const _CoursesGrid({
     required this.courses,
     required this.onTapCourse,
+    required this.onDeleteCourse,
   });
 
   final List<Course> courses;
   final void Function(Course course) onTapCourse;
+  final void Function(Course course) onDeleteCourse;
 
   @override
   Widget build(BuildContext context) {
@@ -222,6 +261,7 @@ class _CoursesGrid extends StatelessWidget {
         return CourseCard(
           course: course,
           onTap: () => onTapCourse(course),
+          onDelete: () => onDeleteCourse(course),
         );
       },
     );

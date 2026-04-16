@@ -60,3 +60,14 @@ class CourseRepo(Protocol):
     - Initialize default fields (e.g., progress_percent = 0, status = 'not_started').
     - Return the created course.
     """
+
+    def delete_course(self, user_id: UUID, course_id: UUID) -> None: ...
+    """
+    Delete a course owned by the specified user.
+
+    Expected Behavior:
+    - Verify the course exists and belongs to user_id.
+    - Raise LookupError if the course is not found.
+    - Raise PermissionError if the course belongs to a different user.
+    - Delete the course row; cascade FK constraints remove lessons and lesson_items.
+    """

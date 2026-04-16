@@ -138,3 +138,43 @@ def create_course(
 
     user_id = _get_user_id(x_user_id)
     return svc.create_course(user_id, body)
+
+
+@router.delete("/{course_id}", status_code=204)
+def delete_course(
+    course_id: str,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: CourseService = Depends(get_course_service),
+):
+    """
+    Delete a course owned by the authenticated user.
+
+    Endpoint:
+    - DELETE /courses/{course_id}
+
+    Flow:
+    1. Extract and validate user_id from X-User-Id header.
+    2. Call the service layer.
+    3. Service delegates to repository, which checks ownership then deletes.
+    4. Database cascade removes lessons and lesson_items automatically.
+    5. Return 204 No Content on success.
+
+    Error responses:
+    - 400 if course_id is not a valid UUID
+    - 401 if X-User-Id header is missing
+    - 403 if the course belongs to a different user
+    - 404 if no course with that id exists
+    """
+    user_id = _get_user_id(x_user_id)
+
+    try:
+        course_uuid = UUID(course_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid course_id")
+
+    try:
+        svc.delete_course(user_id, course_uuid)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Course not found")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")

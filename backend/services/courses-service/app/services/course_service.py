@@ -75,3 +75,17 @@ class CourseService:
         - Could trigger downstream actions (e.g., auto-generate curriculum).
         """
         return self.repo.create_course(user_id, data)
+
+    def delete_course(self, user_id: UUID, course_id: UUID) -> None:
+        """
+        Delete a course owned by the authenticated user.
+
+        Raises:
+        - LookupError if the course does not exist.
+        - PermissionError if the course belongs to a different user.
+
+        The repository handles the ownership check and deletion.
+        Cascade FK constraints in the database remove child lessons and
+        lesson_items atomically.
+        """
+        self.repo.delete_course(user_id, course_id)

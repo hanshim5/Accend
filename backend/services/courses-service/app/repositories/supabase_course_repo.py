@@ -22,7 +22,7 @@ Security:
 """
 
 from uuid import UUID
-from app.clients.supabase import rest_get, rest_post
+from app.clients.supabase import rest_delete, rest_get, rest_post
 from app.schemas.course_schema import CourseCreate, CourseOut
 
 
@@ -95,3 +95,32 @@ class SupabaseCourseRepo:
 
         # Return validated schema object.
         return CourseOut.model_validate(rows[0])
+
+    def delete_course(self, user_id: UUID, course_id: UUID) -> None:
+        """
+        Delete a course belonging to the specified user.
+
+        Flow:
+        1. Fetch the course row to verify it exists and is owned by this user.
+        2. Raise LookupError if not found; PermissionError if owned by someone else.
+        3. Delete the courses row — ON DELETE CASCADE in the database automatically
+           removes all child lessons and lesson_items in the same transaction.
+        """
+        rows = rest_get(
+            table="courses",
+            params={
+                "select": "id,user_id",
+                "id": f"eq.{str(course_id)}",
+            },
+        )
+
+        if not rows:
+            raise LookupError(f"Course {course_id} not found")
+
+        if rows[0]["user_id"] != str(user_id):
+            raise PermissionError("Course does not belong to this user")
+
+        rest_delete(
+            table="courses",
+            match={"id": f"eq.{str(course_id)}"},
+        )
