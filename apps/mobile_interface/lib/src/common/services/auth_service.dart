@@ -53,15 +53,23 @@ class AuthService {
     return user;
   }
 
-  /// Sends a password reset email through Supabase.
-  ///
-  /// For the current simpler flow, Supabase hosts the reset page itself.
-  /// The app only needs to trigger the email.
+  /// Sends a password reset email with a deep-link redirect back into the app.
   Future<void> sendPasswordResetEmail({
     required String email,
   }) async {
     await _client.auth.resetPasswordForEmail(
       email.trim(),
+      redirectTo: 'accend://reset-password',
+    );
+  }
+
+  /// Updates the current user's password after a recovery flow.
+  ///
+  /// Must be called while the session recovered via [AuthChangeEvent.passwordRecovery]
+  /// is still active.
+  Future<void> updatePassword(String newPassword) async {
+    await _client.auth.updateUser(
+      UserAttributes(password: newPassword),
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../features/login/pages/login_page.dart';
+import '../features/login/pages/reset_password_page.dart';
 
 import '../features/onboarding/pages/onboarding_user_info_page.dart';
 import '../features/onboarding/pages/learning_goal.dart';
@@ -51,6 +52,8 @@ class AppRoutes {
   static const groupSessionActiveLobby = '/group_session/active-lobby';
   static const groupSessionPublicMatch = '/group_session/public-match';
 
+  static const resetPassword = '/reset-password';
+
   static Map<String, WidgetBuilder> get table => {
         login: (_) => const LoginPage(),
 
@@ -77,5 +80,6 @@ class AppRoutes {
         groupSessionPrivateJoin: (_) => const GroupSessionPrivateJoinPage(),
         groupSessionActiveLobby: (_) => const GroupSessionActiveLobbyPage(),
         groupSessionPublicMatch: (_) => const GroupSessionPublicMatchPage(),
+        resetPassword: (_) => const ResetPasswordPage(),
       };
 }

@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mobile_interface/src/features/group_session/pages/group_session_select_page.dart';
 import 'package:mobile_interface/src/features/group_session/pages/group_session_private_select_page.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'constants.dart';
 import 'routes.dart';
@@ -22,8 +25,41 @@ import 'package:mobile_interface/src/common/widgets/bottom_nav_bar.dart';
 import 'package:mobile_interface/src/features/social/pages/social.dart';
 import 'package:mobile_interface/src/features/public_profile/pages/profile.dart';
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  late final StreamSubscription<AuthState> _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      debugPrint('AUTH EVENT: ${data.event}');
+      debugPrint('SESSION: ${data.session?.accessToken != null ? "has session" : "no session"}');
+
+      if (data.event == AuthChangeEvent.passwordRecovery) {
+        debugPrint('Navigating to reset password page');
+        final navigator = _navigatorKey.currentState;
+        if (navigator == null) return;
+        navigator.pushNamedAndRemoveUntil(
+          AppRoutes.resetPassword,
+          (route) => route.settings.name == AppRoutes.login,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSub.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +87,7 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<GroupSessionController>(
           create: (ctx) => GroupSessionController(
-            api: ctx.read<ApiClient>(), 
+            api: ctx.read<ApiClient>(),
             auth: ctx.read<AuthService>(),
           ),
         ),
@@ -75,6 +111,7 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
+        navigatorKey: _navigatorKey,
         title: AppStrings.appName,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark(),
