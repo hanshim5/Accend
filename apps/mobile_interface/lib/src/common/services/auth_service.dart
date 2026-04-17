@@ -1,3 +1,4 @@
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService {
@@ -53,5 +54,67 @@ class AuthService {
     return user;
   }
 
+  /// Sends a password reset email with a deep-link redirect back into the app.
+  Future<void> sendPasswordResetEmail({
+    required String email,
+  }) async {
+    await _client.auth.resetPasswordForEmail(
+      email.trim(),
+      redirectTo: 'accend://reset-password',
+    );
+  }
+
+  /// Updates the current user's password after a recovery flow.
+  ///
+  /// Must be called while the session recovered via [AuthChangeEvent.passwordRecovery]
+  /// is still active.
+  Future<void> updatePassword(String newPassword) async {
+    await _client.auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
+  }
+
   Future<void> signOut() => _client.auth.signOut();
+
+  /// Native sign-in using google_sign_in package (requires Google Play Services).
+  /// Use on real devices or Google Play emulators.
+  Future<void> signInWithGoogleNative({
+    required String webClientId,
+    required String iosClientId,
+  }) async {
+    final googleSignIn = GoogleSignIn.instance;
+    await googleSignIn.initialize(
+      serverClientId: webClientId,
+      clientId: iosClientId,
+    );
+
+    final lightweightUser = await googleSignIn.attemptLightweightAuthentication();
+    final googleUser = lightweightUser ?? await googleSignIn.authenticate();
+
+    const scopes = ['email', 'profile'];
+    final authorization =
+        await googleUser.authorizationClient.authorizationForScopes(scopes) ??
+        await googleUser.authorizationClient.authorizeScopes(scopes);
+
+    final idToken = googleUser.authentication.idToken;
+    if (idToken == null) {
+      throw const AuthException('No ID token received from Google.');
+    }
+
+    await _client.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: authorization.accessToken,
+    );
+  }
+
+  /// Browser-based OAuth sign-in. Works on all devices and emulators.
+  /// Opens a browser; session is delivered via onAuthStateChange.
+  Future<void> signInWithGoogleOAuth() async {
+    await _client.auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: 'accend://login-callback',
+      queryParams: {'prompt': 'select_account'},
+    );
+  }
 }

@@ -43,6 +43,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   audioplayers: ^6.0.0
   livekit_client: ^2.5.0
+  google_sign_in: ^7.0.0
 
 dev_dependencies:
   flutter_test:

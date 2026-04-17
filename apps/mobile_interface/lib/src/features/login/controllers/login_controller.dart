@@ -1,11 +1,14 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/routes.dart';
 import '../../../common/services/api_client.dart';
 import '../../../common/services/auth_service.dart';
 import '../../home/controllers/home_controller.dart';
 import '../../onboarding/controllers/onboarding_controller.dart';
+import '../widgets/forgot_password_dialog.dart';
 
 class LoginController extends ChangeNotifier {
   LoginController({
@@ -26,6 +29,7 @@ class LoginController extends ChangeNotifier {
   bool isLoading = false;
   bool obscurePassword = true;
   String? errorMessage;
+  StreamSubscription<AuthState>? _oauthSub;
 
   bool get isLoggedIn => auth.currentSession != null;
 
@@ -72,8 +76,6 @@ class LoginController extends ChangeNotifier {
         password: password,
       );
 
-      // Fire-and-forget: start fetching home data during the navigation
-      // transition so it's ready (or already loading) when the home page mounts.
       home.load();
 
       if (!context.mounted) return;
@@ -113,16 +115,54 @@ class LoginController extends ChangeNotifier {
     Navigator.pushNamed(context, AppRoutes.onboardingUserInfo);
   }
 
-  void forgotPassword(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Forgot password is not wired yet.')),
+  Future<void> forgotPassword(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => const ForgotPasswordDialog(),
     );
   }
 
-  void signInWithGoogle(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Google sign-in is not wired yet.')),
-    );
+  Future<void> signInWithGoogle(BuildContext context) async {
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      await auth.signInWithGoogleOAuth();
+
+      // Browser is now open. Listen for the session once the user
+      // completes OAuth and the deep link brings them back.
+      _oauthSub?.cancel();
+      _oauthSub = auth.client.auth.onAuthStateChange.listen((data) async {
+        if (data.event == AuthChangeEvent.signedIn) {
+          _oauthSub?.cancel();
+          _oauthSub = null;
+          try {
+            home.load();
+            final route = await onboarding.getPostLoginRoute();
+            if (context.mounted) {
+              Navigator.pushReplacementNamed(context, route);
+            }
+          } catch (e) {
+            errorMessage = 'Google sign-in failed. Please try again.';
+            notifyListeners();
+          } finally {
+            isLoading = false;
+            notifyListeners();
+          }
+        }
+      });
+    } on Exception catch (_) {
+      errorMessage = 'Google sign-in failed. Please try again.';
+      isLoading = false;
+      notifyListeners();
+      return;
+    }
+
+    // Clear loading while browser is open
+    isLoading = false;
+    notifyListeners();
   }
 
   void signInWithApple(BuildContext context) {
@@ -133,6 +173,7 @@ class LoginController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _oauthSub?.cancel();
     identifierController.dispose();
     passwordController.dispose();
     super.dispose();
