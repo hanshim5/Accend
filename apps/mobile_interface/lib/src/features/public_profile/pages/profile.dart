@@ -631,7 +631,9 @@ class _ProfilePageState extends State<ProfilePage> {
     final selected = await showDialog<String>(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => const _AddGoalPopup(),
+      builder: (ctx) => _AddGoalPopup(
+        disabledGoals: _selectedGoals,
+      ),
     );
 
     if (!mounted || selected == null || selected.isEmpty) {
@@ -1593,8 +1595,11 @@ class _GoalChip extends StatelessWidget {
   }
 }
 
+
 class _AddGoalPopup extends StatefulWidget {
-  const _AddGoalPopup();
+  const _AddGoalPopup({Key? key, this.disabledGoals = const []}) : super(key: key);
+
+  final List<String> disabledGoals;
 
   @override
   State<_AddGoalPopup> createState() => _AddGoalPopupState();
@@ -1651,11 +1656,15 @@ class _AddGoalPopupState extends State<_AddGoalPopup> {
               runSpacing: 10,
               children: _goalOptions
                   .map(
-                    (goal) => _GoalOptionTile(
-                      option: goal,
-                      selected: _selected == goal.label,
-                      onTap: () => setState(() => _selected = goal.label),
-                    ),
+                    (goal) {
+                      final isDisabled = widget.disabledGoals.map((g) => g.toLowerCase()).contains(goal.label.toLowerCase());
+                      return _GoalOptionTile(
+                        option: goal,
+                        selected: _selected == goal.label,
+                        disabled: isDisabled,
+                        onTap: isDisabled ? null : () => setState(() => _selected = goal.label),
+                      );
+                    },
                   )
                   .toList(growable: false),
             ),
@@ -1821,25 +1830,41 @@ class _GoalOptionTile extends StatelessWidget {
   const _GoalOptionTile({
     required this.option,
     required this.selected,
-    required this.onTap,
+    this.disabled = false,
+    this.onTap,
   });
 
   final _GoalOption option;
   final bool selected;
-  final VoidCallback onTap;
+  final bool disabled;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final Color tileColor = disabled
+        ? const Color(0xFF23263A)
+        : selected
+            ? const Color(0xFF334155)
+            : const Color(0xFF2D3250);
+    final Color textColor = disabled
+        ? AppColors.textSecondary.withOpacity(0.5)
+        : Colors.white;
+    final Color borderColor = selected
+        ? AppColors.accent
+        : disabled
+            ? AppColors.textSecondary.withOpacity(0.2)
+            : Colors.transparent;
+
     return InkWell(
-      onTap: onTap,
+      onTap: disabled ? null : onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: 84,
         height: 98,
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF334155) : const Color(0xFF2D3250),
+          color: tileColor,
           borderRadius: BorderRadius.circular(16),
-          border: selected ? Border.all(color: AppColors.accent) : null,
+          border: Border.all(color: borderColor),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         child: Column(
@@ -1849,10 +1874,12 @@ class _GoalOptionTile extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: const Color(0x1906B6D4),
+                color: disabled
+                    ? const Color(0x1906B6D4).withOpacity(0.3)
+                    : const Color(0x1906B6D4),
                 borderRadius: BorderRadius.circular(999),
               ),
-              child: Icon(option.icon, size: 20, color: Colors.white),
+              child: Icon(option.icon, size: 20, color: textColor),
             ),
             const SizedBox(height: 8),
             Text(
@@ -1861,7 +1888,7 @@ class _GoalOptionTile extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.visible,
               style: GoogleFonts.inter(
-                color: Colors.white,
+                color: textColor,
                 fontSize: option.label.length > 11 ? 10 : 12,
                 fontWeight: FontWeight.w700,
                 height: 1.1,
