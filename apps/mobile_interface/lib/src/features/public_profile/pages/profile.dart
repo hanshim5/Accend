@@ -9,6 +9,7 @@ import '../../../app/routes.dart';
 import '../controllers/public_profile_controller.dart';
 import '../models/profile_page_data.dart';
 import '../../home/controllers/home_controller.dart';
+import '../../social/controllers/social_controller.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -22,6 +23,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String? _fullNameError;
   String? _goalsError;
   bool _isLoggingOut = false;
+  bool _isDeletingAccount = false;
 
   bool _detailsExpanded = true;
   bool _preferencesExpanded = false;
@@ -370,7 +372,15 @@ class _ProfilePageState extends State<ProfilePage> {
                                     ),
                           ),
                           const SizedBox(height: 10),
-                          _DangerAction(label: 'Delete Account', onPressed: () {}),
+                          _DangerAction(
+                            label: _isDeletingAccount ? 'Deleting...' : 'Delete Account',
+                            onPressed: _isDeletingAccount
+                                ? () {}
+                                : () => _confirmAndDeleteAccount(
+                                      context,
+                                      context.read<PublicProfileController>(),
+                                    ),
+                          ),
                         ],
                       ),
                     ),
@@ -512,8 +522,9 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       await controller.logOut();
       if (!context.mounted) return;
-      // Clear HomeController cache so home page doesn't show old user data
+      // Clear controller caches so old user data doesn't show
       context.read<HomeController>().clear();
+      context.read<SocialController>().clear();
       Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
     } catch (_) {
       if (!context.mounted) return;
@@ -526,6 +537,150 @@ class _ProfilePageState extends State<ProfilePage> {
     } finally {
       if (context.mounted) {
         setState(() => _isLoggingOut = false);
+      }
+    }
+  }
+
+  Future<void> _confirmAndDeleteAccount(
+    BuildContext context,
+    PublicProfileController controller,
+  ) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            width: 342,
+            padding: const EdgeInsets.all(20),
+            decoration: ShapeDecoration(
+              color: AppColors.surface,
+              shape: RoundedRectangleBorder(
+                side: const BorderSide(
+                  width: 1,
+                  color: Color(0x7F334155),
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 16,
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: ShapeDecoration(
+                    color: const Color(0x26FF4444),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.delete_forever,
+                    color: Color(0xFFFF4444),
+                    size: 24,
+                  ),
+                ),
+                Text(
+                  'Delete Account',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(
+                  width: 268,
+                  child: Opacity(
+                    opacity: 0.70,
+                    child: Text(
+                      'This cannot be undone. All your data will be permanently deleted, including your profile, courses, and all activity history.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 250,
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.action,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Keep Account',
+                      style: GoogleFonts.inter(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 250,
+                  height: 44,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(
+                        width: 1,
+                        color: Color(0xFFFF4444),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    child: Text(
+                      'Delete Forever',
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFFFF4444),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (shouldDelete != true || !context.mounted) return;
+
+    setState(() => _isDeletingAccount = true);
+    try {
+      await controller.deleteAccount();
+      if (!context.mounted) return;
+      // Clear controller caches so old user data doesn't show
+      context.read<HomeController>().clear();
+      context.read<SocialController>().clear();
+      Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(controller.error ?? 'Unable to delete account right now.'),
+          backgroundColor: AppColors.failure,
+        ),
+      );
+    } finally {
+      if (context.mounted) {
+        setState(() => _isDeletingAccount = false);
       }
     }
   }
@@ -1600,7 +1755,7 @@ class _GoalChip extends StatelessWidget {
 
 
 class _AddGoalPopup extends StatefulWidget {
-  const _AddGoalPopup({Key? key, this.disabledGoals = const []}) : super(key: key);
+  const _AddGoalPopup({super.key, this.disabledGoals = const []});
 
   final List<String> disabledGoals;
 

@@ -217,6 +217,27 @@ class SupabaseFollowRepo:
             },
         )
 
+    async def delete_account(self, user_id: UUID) -> None:
+        """
+        Delete all follow relationships for a user.
+
+        This deletes:
+        - All rows where user is the follower
+        - All rows where user is the followee
+
+        Called during account deletion cascade.
+        """
+        # Delete all follows where user is the follower
+        await supabase.delete(
+            "user_follows",
+            params={"follower_id": f"eq.{user_id}"},
+        )
+        # Delete all follows where user is the followee
+        await supabase.delete(
+            "user_follows",
+            params={"followee_id": f"eq.{user_id}"},
+        )
+
     async def _get_profiles(self, user_ids: list[str]) -> dict[str, dict]:
         rows = await supabase.get(
             "profiles",

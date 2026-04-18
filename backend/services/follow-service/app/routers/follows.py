@@ -72,3 +72,18 @@ async def unfollow_user(
 ):
     await svc.unfollow(_get_user_id(x_user_id), followee_id)
     return FollowWriteResponse(ok=True)
+
+
+@router.delete("/account", status_code=204)
+async def delete_account(
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: FollowService = Depends(get_follow_service),
+):
+    """
+    Delete all follow relationships for a user.
+
+    Called during account deletion cascade.
+    Removes all follows where user is follower or followee.
+    """
+    await svc.delete_account(_get_user_id(x_user_id))
+    return None

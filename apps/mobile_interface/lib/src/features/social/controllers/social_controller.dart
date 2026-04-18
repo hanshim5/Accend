@@ -115,6 +115,17 @@ class SocialController extends ChangeNotifier {
         .toList(growable: false);
   }
 
+  void clear() {
+    _followers = const [];
+    _following = const [];
+    _followersQuery = '';
+    _followingQuery = '';
+    _isLoading = false;
+    _hasLoaded = false;
+    _error = null;
+    notifyListeners();
+  }
+
   Future<void> _setFollowState({
     required String userId,
     required bool following,

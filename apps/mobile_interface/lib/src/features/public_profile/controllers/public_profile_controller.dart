@@ -114,4 +114,30 @@ class PublicProfileController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> deleteAccount() async {
+    _error = null;
+    notifyListeners();
+
+    final accessToken = _auth.accessToken;
+    if (accessToken == null || accessToken.isEmpty) {
+      _error = 'You must be logged in to delete your account.';
+      notifyListeners();
+      return;
+    }
+
+    try {
+      await _api.deleteVoid('/account', accessToken: accessToken);
+      // After successful deletion, sign out the user
+      await _auth.signOut();
+      _data = null;
+      _hasLoaded = false;
+    } catch (e) {
+      _error = 'Unable to delete account right now. Please try again.';
+      debugPrint('Failed to delete account: $e');
+      rethrow;
+    } finally {
+      notifyListeners();
+    }
+  }
 }

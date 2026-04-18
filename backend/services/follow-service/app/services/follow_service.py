@@ -25,3 +25,13 @@ class FollowService:
 
     async def unfollow(self, follower_id: UUID, followee_id: UUID) -> None:
         await self.repo.unfollow(follower_id, followee_id)
+
+    async def delete_account(self, user_id: UUID) -> None:
+        """
+        Delete all follow relationships for a user (both as follower and followee).
+
+        This is called when a user account is deleted.
+        - Removes all follows where user is the follower
+        - Removes all follows where user is the followee
+        """
+        await self.repo.delete_account(user_id)

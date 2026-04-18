@@ -124,3 +124,16 @@ class SupabaseCourseRepo:
             table="courses",
             match={"id": f"eq.{str(course_id)}"},
         )
+
+    def delete_account(self, user_id: UUID) -> None:
+        """
+        Delete all courses for a user.
+
+        Flow:
+        1. Delete all course rows where user_id matches.
+        2. ON DELETE CASCADE automatically removes all child lessons and lesson_items.
+        """
+        rest_delete(
+            table="courses",
+            match={"user_id": f"eq.{str(user_id)}"},
+        )

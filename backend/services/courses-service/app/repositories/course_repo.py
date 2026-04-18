@@ -71,3 +71,13 @@ class CourseRepo(Protocol):
     - Raise PermissionError if the course belongs to a different user.
     - Delete the course row; cascade FK constraints remove lessons and lesson_items.
     """
+
+    def delete_account(self, user_id: UUID) -> None: ...
+    """
+    Delete all courses for a user.
+
+    Expected Behavior:
+    - Delete all course rows where user_id matches.
+    - Cascade FK constraints remove all child lessons and lesson_items.
+    - Called during account deletion cascade.
+    """

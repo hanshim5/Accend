@@ -223,3 +223,20 @@ class SupabaseProfileRepo(ProfileRepo):
             json=payload,
             params={"id": f"eq.{user_id}"},
         )
+
+    async def delete_profile(self, user_id: str) -> None:
+        """
+        Delete a user's profile.
+
+        Flow:
+        1. Delete the profile row matching user_id.
+        2. Silently succeed if profile does not exist.
+
+        Notes:
+        - This is typically called as part of account deletion cascade.
+        - Uses DELETE with filter on id.
+        """
+        await supabase.delete(
+            "profiles",
+            params={"id": f"eq.{user_id}"},
+        )

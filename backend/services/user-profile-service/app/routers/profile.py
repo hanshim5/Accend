@@ -154,3 +154,24 @@ async def patch_profile_details(
         **body.dict(exclude_unset=True),
     )
     return ProfileInitResponse(ok=True)
+
+
+@router.delete("/profiles/me")
+async def delete_account(
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: ProfileService = Depends(get_profile_service),
+) -> ProfileInitResponse:
+    """
+    Delete the authenticated user's account and profile.
+
+    Flow:
+    1. Extract user_id from X-User-Id header.
+    2. Call service to delete profile.
+    3. Return success response.
+
+    Notes:
+    - Cascading deletion of user data from other services is handled by gateway.
+    - This only deletes the user's profile from this service.
+    """
+    await svc.delete_account(x_user_id or "")
+    return ProfileInitResponse(ok=True)

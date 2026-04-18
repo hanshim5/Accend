@@ -109,3 +109,39 @@ async def supabase_select_one(
         )
 
     return resp.json()
+
+
+async def supabase_auth_delete_user(user_id: str) -> None:
+    """
+    Delete a user from Supabase Auth.
+
+    Args:
+    - user_id: The UUID of the user to delete
+
+    Flow:
+    1. Call Supabase Auth Admin API to delete user.
+    2. This removes the user from the auth_users table.
+    3. Cascading deletes via database triggers should clean up related data.
+
+    Notes:
+    - This uses the service role key to bypass authentication.
+    - User must already be deleted from all service tables before calling this.
+    - This is the final step in account deletion.
+
+    Raises:
+    - httpx.HTTPStatusError if deletion fails
+    """
+    url = f"{settings.SUPABASE_URL}/auth/v1/admin/users/{user_id}"
+
+    headers = _supabase_headers()
+    headers["Content-Type"] = "application/json"
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.delete(url, headers=headers)
+
+    if resp.status_code >= 400:
+        raise httpx.HTTPStatusError(
+            f"Supabase Auth delete error {resp.status_code}",
+            request=resp.request,
+            response=resp,
+        )

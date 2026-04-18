@@ -89,3 +89,12 @@ class CourseService:
         lesson_items atomically.
         """
         self.repo.delete_course(user_id, course_id)
+
+    def delete_account(self, user_id: UUID) -> None:
+        """
+        Delete all courses for a user.
+
+        Called during account deletion cascade.
+        Removes all courses owned by the user.
+        """
+        self.repo.delete_account(user_id)

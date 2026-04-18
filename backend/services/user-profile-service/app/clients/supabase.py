@@ -155,6 +155,45 @@ class SupabaseClient:
                 response=resp,
             )
 
+    async def delete(self, table: str, params: dict) -> None:
+        """
+        Delete rows from a Supabase table.
+
+        Args:
+        - table: Table name
+        - params: PostgREST filter conditions (e.g., {"id": "eq.<user_id>"})
+
+        Example:
+          await supabase.delete(
+              "profiles",
+              params={"id": f"eq.{user_id}"},
+          )
+
+        Flow:
+        1. Build DELETE request with filters.
+        2. Send request to Supabase.
+        3. Raise error if delete fails.
+
+        Notes:
+        - Uses params to specify which rows to delete (WHERE clause).
+        - No response body is expected.
+        """
+        url = f"{self.base_url}/{table}"
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.delete(
+                url,
+                headers=self.headers,
+                params=params,
+            )
+
+        if resp.status_code >= 400:
+            raise httpx.HTTPStatusError(
+                f"Supabase DELETE error {resp.status_code}",
+                request=resp.request,
+                response=resp,
+            )
+
 
 # Singleton instance used across the service.
 # Ensures consistent configuration and avoids repeated instantiation.

@@ -256,3 +256,24 @@ class ProfileService:
             daily_pace=cleaned_daily_pace,
             focus_areas=cleaned_focus_areas,
         )
+
+    async def delete_account(self, user_id: str) -> None:
+        """
+        Delete a user's account and profile.
+
+        Flow:
+        1. Validate user_id is present.
+        2. Delete the user's profile from the database.
+
+        Notes:
+        - Cascading deletion of user data from other services
+          (follows, courses, progress, groups) is handled by the gateway.
+        - This service only deletes its own owned data.
+
+        Raises:
+        - bad_request if user_id is missing
+        """
+        if not user_id:
+            bad_request("user_id missing")
+
+        await self.repo.delete_profile(user_id)
