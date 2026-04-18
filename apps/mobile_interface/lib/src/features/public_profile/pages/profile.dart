@@ -8,6 +8,7 @@ import '../../../common/utils/metric_formatters.dart';
 import '../../../app/routes.dart';
 import '../controllers/public_profile_controller.dart';
 import '../models/profile_page_data.dart';
+import '../../home/controllers/home_controller.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -511,6 +512,8 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       await controller.logOut();
       if (!context.mounted) return;
+      // Clear HomeController cache so home page doesn't show old user data
+      context.read<HomeController>().clear();
       Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
     } catch (_) {
       if (!context.mounted) return;
