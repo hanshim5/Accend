@@ -23,8 +23,11 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateSelectPage> 
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
     return Scaffold(
       backgroundColor: AppColors.primaryBg,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Column(
           children: [
@@ -59,124 +62,140 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateSelectPage> 
               ),
             ),
             Expanded(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-                    child: Column(
-                      children: [
-                        const Spacer(),
-                        private_button.PrivateButton(
-                          title: "Create Lobby",
-                          subtitle: "Create or join with a code",
-                          icon: Icons.add_circle_outline_rounded,
-                          onTap: () {
-                            Navigator.pushNamed(context, routes.AppRoutes.groupSessionPrivateCreate);
-                          },
-                        ),
-                        const SizedBox(height: 18),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              height: 2,
-                              width: 100,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              'Or',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // When the keyboard is closed, give the column a "viewport height" minimum so we
+                  // can vertically center content like the old `Spacer()` layout — without using
+                  // flex children inside a scroll view (unbounded height -> assert).
+                  final minHeight = bottomInset > 0 ? 0.0 : constraints.maxHeight;
+
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.only(bottom: bottomInset),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: minHeight,
+                        maxWidth: 420,
+                      ),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                          child: Column(
+                            mainAxisAlignment: bottomInset > 0
+                                ? MainAxisAlignment.start
+                                : MainAxisAlignment.center,
+                            children: [
+                              private_button.PrivateButton(
+                                title: "Create Lobby",
+                                subtitle: "Create or join with a code",
+                                icon: Icons.add_circle_outline_rounded,
+                                onTap: () {
+                                  Navigator.pushNamed(context, routes.AppRoutes.groupSessionPrivateCreate);
+                                },
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Container(
-                              height: 2,
-                              width: 100,
-                              color: Colors.white,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (error != null)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 4.0),
-                                child: Text(
-                                  error!,
-                                  style: const TextStyle(color: Colors.red, fontSize: 12),
-                                ),
-                              ),
-                            TextField(
-                              controller: _lobbyCode,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                hintText: 'e.g. 112233',
-                                enabledBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: error != null ? Colors.red : Colors.grey,
-                                    width: 2,
+                              const SizedBox(height: 18),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    height: 2,
+                                    width: 100,
+                                    color: Colors.white,
                                   ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: error != null ? Colors.red : Colors.blue,
-                                    width: 2,
+                                  const SizedBox(width: 10),
+                                  const Text(
+                                    'Or',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                    ),
                                   ),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+                                  const SizedBox(width: 10),
+                                  Container(
+                                    height: 2,
+                                    width: 100,
+                                    color: Colors.white,
+                                  ),
+                                ],
                               ),
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(6),
-                              ],
-                            ),
-                          ],
+                              const SizedBox(height: 18),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (error != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 4.0),
+                                      child: Text(
+                                        error!,
+                                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                                      ),
+                                    ),
+                                  TextField(
+                                    controller: _lobbyCode,
+                                    keyboardType: TextInputType.number,
+                                    decoration: InputDecoration(
+                                      hintText: 'e.g. 112233',
+                                      enabledBorder: OutlineInputBorder(
+                                        borderSide: BorderSide(
+                                          color: error != null ? Colors.red : Colors.grey,
+                                          width: 2,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderSide: BorderSide(
+                                          color: error != null ? Colors.red : Colors.blue,
+                                          width: 2,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      LengthLimitingTextInputFormatter(6),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 18),
+                              private_button.PrivateButton(
+                                title: "Join Lobby",
+                                subtitle: "Create or join with a code",
+                                icon: Icons.arrow_circle_right_outlined,
+                                onTap: () {
+                                  final code = _lobbyCode.text.trim();
+
+                                  if (int.tryParse(code) == null) {
+                                    setState(() {
+                                      error = "Missing lobby code";
+                                    });
+                                    return;
+                                  }
+
+                                  if (code.length != 6) {
+                                    setState(() {
+                                      error = "Lobby code must be exactly 6 digits";
+                                    });
+                                    return;
+                                  }
+
+                                  setState(() {
+                                    error = null;
+                                  });
+
+                                  Navigator.pushNamed(
+                                    context,
+                                    routes.AppRoutes.groupSessionPrivateJoin,
+                                    arguments: _lobbyCode.text.trim(),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 18),
-                        private_button.PrivateButton(
-                          title: "Join Lobby",
-                          subtitle: "Create or join with a code",
-                          icon: Icons.arrow_circle_right_outlined,
-                          onTap: () {
-                            final code = _lobbyCode.text.trim();
-
-                            if (int.tryParse(code) == null) {
-                              setState(() {
-                                error = "Missing lobby code";
-                              });
-                              return;
-                            }
-
-                            if (code.length != 6) {
-                              setState(() {
-                                error = "Lobby code must be exactly 6 digits";
-                              });
-                              return;
-                            }
-
-                            setState(() {
-                              error = null;
-                            });
-
-                            Navigator.pushNamed(
-                              context,
-                              routes.AppRoutes.groupSessionPrivateJoin,
-                              arguments: _lobbyCode.text.trim(),
-                            );
-                          },
-                        ),
-                        const Spacer(),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ],

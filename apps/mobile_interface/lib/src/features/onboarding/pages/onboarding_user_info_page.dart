@@ -194,9 +194,11 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Scaffold(
       backgroundColor: AppColors.primaryBg,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -244,6 +246,7 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
                   const SizedBox(height: 18),
                   Expanded(
                     child: SingleChildScrollView(
+                      padding: EdgeInsets.only(bottom: bottomInset),
                       child: Column(
                         children: [
                           OnboardingLabeledField(

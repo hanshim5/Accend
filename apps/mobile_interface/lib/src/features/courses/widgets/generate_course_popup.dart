@@ -41,6 +41,7 @@ class _GenerateCoursePopupState extends State<GenerateCoursePopup> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Dialog(
       backgroundColor: AppColors.surface,
@@ -49,86 +50,88 @@ class _GenerateCoursePopupState extends State<GenerateCoursePopup> {
       ),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.accent, width: 2),
+        padding: EdgeInsets.fromLTRB(18, 18, 18, 14 + bottomInset),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.accent, width: 2),
+                ),
+                child: const Icon(Icons.add, color: AppColors.accent),
               ),
-              child: const Icon(Icons.add, color: AppColors.accent),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Generate New Course?',
-              textAlign: TextAlign.center,
-              style: textTheme.titleMedium?.copyWith(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+              const SizedBox(height: 12),
+              Text(
+                'Generate New Course?',
+                textAlign: TextAlign.center,
+                style: textTheme.titleMedium?.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Ready to start a new journey? Enter a topic and our AI will craft a course for you.',
-              textAlign: TextAlign.center,
-              style: textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-                height: 1.35,
+              const SizedBox(height: 8),
+              Text(
+                'Ready to start a new journey? Enter a topic and our AI will craft a course for you.',
+                textAlign: TextAlign.center,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.35,
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _promptCtrl,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _submit(),
-              style: textTheme.bodyLarge?.copyWith(
-                color: AppColors.textPrimary,
+              const SizedBox(height: 14),
+              TextField(
+                controller: _promptCtrl,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _submit(),
+                style: textTheme.bodyLarge?.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+                decoration: const InputDecoration(
+                  hintText: 'Enter a topic (e.g. Conversations)',
+                ),
               ),
-              decoration: const InputDecoration(
-                hintText: 'Enter a topic (e.g. Conversations)',
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _error!,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: AppColors.failure,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _submit,
+                  child: const Text("Yes, Let's Go!"),
+                ),
               ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerLeft,
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
                 child: Text(
-                  _error!,
+                  'MAYBE LATER',
                   style: textTheme.bodyMedium?.copyWith(
-                    color: AppColors.failure,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
             ],
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _submit,
-                child: const Text("Yes, Let's Go!"),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'MAYBE LATER',
-                style: textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
