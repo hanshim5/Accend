@@ -94,6 +94,13 @@ class ProfileRepo(Protocol):
         daily_pace: str | None = None,
         focus_areas: str | None = None,
     ) -> None: ...
+
+    async def update_streak(
+        self,
+        user_id: str,
+        current_streak: int,
+        longest_streak: int,
+    ) -> None: ...
     """
     Update onboarding-related fields for a user's profile.
 
