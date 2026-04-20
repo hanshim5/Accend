@@ -16,6 +16,7 @@ class SocialUserOut(BaseModel):
     meters_climbed: int = 0
     i_follow: bool
     follows_me: bool
+    profile_image_url: str | None = None
 
 
 class FollowWriteResponse(BaseModel):

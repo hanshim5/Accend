@@ -57,7 +57,7 @@ class SupabaseProfileRepo(ProfileRepo):
         rows = await supabase.get(
             "profiles",
             params={
-                "select": "id,username,onboarding_complete,email,native_language,full_name,learning_goal,feedback_tone,accent,daily_pace,skill_assess,focus_areas",
+                "select": "id,username,onboarding_complete,email,native_language,full_name,learning_goal,feedback_tone,accent,daily_pace,skill_assess,focus_areas,profile_image_url,current_streak,longest_streak",
                 "id": f"eq.{user_id}",
                 "limit": "1",
             },
@@ -187,6 +187,21 @@ class SupabaseProfileRepo(ProfileRepo):
             params={"id": f"eq.{user_id}"},
         )
 
+    async def update_streak(
+        self,
+        user_id: str,
+        current_streak: int,
+        longest_streak: int,
+    ) -> None:
+        await supabase.patch(
+            "profiles",
+            json={
+                "current_streak": max(0, int(current_streak)),
+                "longest_streak": max(0, int(longest_streak)),
+            },
+            params={"id": f"eq.{user_id}"},
+        )
+
     async def update_profile_details(
         self,
         user_id: str,
@@ -221,6 +236,13 @@ class SupabaseProfileRepo(ProfileRepo):
         await supabase.patch(
             "profiles",
             json=payload,
+            params={"id": f"eq.{user_id}"},
+        )
+
+    async def update_profile_image(self, user_id: str, profile_image_url: str) -> None:
+        await supabase.patch(
+            "profiles",
+            json={"profile_image_url": profile_image_url},
             params={"id": f"eq.{user_id}"},
         )
 

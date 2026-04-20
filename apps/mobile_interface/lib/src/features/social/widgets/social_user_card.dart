@@ -38,7 +38,7 @@ class SocialUserCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            _Avatar(initials: _initialsFromName(user.displayName)),
+            _Avatar(initials: _initialsFromName(user.displayName), imageUrl: user.profileImageUrl),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -126,9 +126,10 @@ class SocialUserCard extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.initials});
+  const _Avatar({required this.initials, this.imageUrl});
 
   final String initials;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -144,18 +145,26 @@ class _Avatar extends StatelessWidget {
         child: Container(
           width: 48,
           height: 48,
-          decoration: const BoxDecoration(
-            color: Color(0xFF23324A),
+          decoration: BoxDecoration(
+            color: const Color(0xFF23324A),
             shape: BoxShape.circle,
+            image: imageUrl != null && imageUrl!.isNotEmpty
+                ? DecorationImage(
+                    image: NetworkImage(imageUrl!),
+                    fit: BoxFit.cover,
+                  )
+                : null,
           ),
           alignment: Alignment.center,
-          child: Text(
-            initials,
-            style: GoogleFonts.montserrat(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          child: imageUrl == null || imageUrl!.isEmpty
+              ? Text(
+                  initials,
+                  style: GoogleFonts.montserrat(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                )
+              : null,
         ),
       ),
     );

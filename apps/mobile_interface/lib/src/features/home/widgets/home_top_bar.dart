@@ -3,14 +3,12 @@ import 'package:mobile_interface/src/app/constants.dart';
 
 class HomeTopBar extends StatelessWidget {
   final String name;
-  final String imagePath;
-  final bool isNetworkImage;
+  final String? imageUrl;
 
   const HomeTopBar({
     super.key,
     required this.name,
-    required this.imagePath,
-    this.isNetworkImage = false,
+    this.imageUrl,
   });
 
   @override
@@ -81,14 +79,39 @@ class HomeTopBar extends StatelessWidget {
                   color: Color(0xFF10233F),
                 ),
                 child: ClipOval(
-                  child: isNetworkImage
-                      ? Image.network(imagePath, fit: BoxFit.cover)
-                      : Image.asset(imagePath, fit: BoxFit.cover),
+                  child: imageUrl != null && imageUrl!.isNotEmpty
+                      ? Image.network(imageUrl!, fit: BoxFit.cover, width: 44, height: 44)
+                      : _buildInitials(name),
                 ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildInitials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    String initials;
+    if (parts.isEmpty) {
+      initials = '?';
+    } else if (parts.length == 1) {
+      initials = parts.first[0].toUpperCase();
+    } else {
+      initials = (parts.first[0] + parts.last[0]).toUpperCase();
+    }
+    return Container(
+      width: 44,
+      height: 44,
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
+        ),
       ),
     );
   }

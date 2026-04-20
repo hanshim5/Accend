@@ -318,6 +318,44 @@ async def proxy_profile_init(
     return r.json()
 
 
+@app.get("/profile/image")
+async def proxy_profile_image_get(
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{settings.USER_PROFILE_SERVICE_URL}/profiles/me/image",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.patch("/profile/image")
+async def proxy_profile_image_patch(
+    body: dict,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.patch(
+            f"{settings.USER_PROFILE_SERVICE_URL}/profiles/me/image",
+            headers={"X-User-Id": user_id},
+            json=body,
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
 @app.patch("/profile/onboarding")
 async def proxy_profile_onboarding(
     body: dict,
@@ -390,6 +428,7 @@ async def profile_page_preload(
     - progress-service /goals/progress (streak)
     - progress-service /phonemes/overall-accuracy
     - courses-service /lessons/completed-count
+    - progress-service /daily-activity (last 5 days)
     """
     user_id = verify_supabase_jwt(authorization)
 
@@ -414,12 +453,17 @@ async def profile_page_preload(
             f"{settings.COURSES_SERVICE_URL}/lessons/completed-count",
             headers={"X-User-Id": user_id},
         )
-        profile_res, counts_res, goals_res, accuracy_res, lessons_completed_res = await asyncio.gather(
+        activity_req = client.get(
+            f"{settings.PROGRESS_SERVICE_URL}/daily-activity",
+            headers={"X-User-Id": user_id},
+        )
+        profile_res, counts_res, goals_res, accuracy_res, lessons_completed_res, activity_res = await asyncio.gather(
             profile_req,
             counts_req,
             goals_req,
             accuracy_req,
             lessons_completed_req,
+            activity_req,
         )
 
     if profile_res.status_code >= 400:
@@ -443,6 +487,7 @@ async def profile_page_preload(
             "meters_climbed": int(lessons_completed_res.json().get("meters_climbed", 0) or 0),
             "level": int(lessons_completed_res.json().get("level", 1) or 1),
         },
+        "activity": activity_res.json() if activity_res.status_code < 400 else [],
     }
 
 

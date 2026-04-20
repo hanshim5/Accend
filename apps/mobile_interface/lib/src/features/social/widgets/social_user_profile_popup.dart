@@ -69,7 +69,7 @@ class _SocialUserProfilePopup extends StatelessWidget {
                   splashRadius: 20,
                 ),
               ),
-              _PopupAvatar(initials: _initialsFromName(user.displayName)),
+              _PopupAvatar(initials: _initialsFromName(user.displayName), imageUrl: user.profileImageUrl),
               const SizedBox(height: 10),
               Text(
                 user.displayName,
@@ -332,9 +332,10 @@ class _SocialUserProfilePopup extends StatelessWidget {
 }
 
 class _PopupAvatar extends StatelessWidget {
-  const _PopupAvatar({required this.initials});
+  const _PopupAvatar({required this.initials, this.imageUrl});
 
   final String initials;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -353,19 +354,27 @@ class _PopupAvatar extends StatelessWidget {
         ],
       ),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF23324A),
+        decoration: BoxDecoration(
+          color: const Color(0xFF23324A),
           shape: BoxShape.circle,
+          image: imageUrl != null && imageUrl!.isNotEmpty
+              ? DecorationImage(
+                  image: NetworkImage(imageUrl!),
+                  fit: BoxFit.cover,
+                )
+              : null,
         ),
         alignment: Alignment.center,
-        child: Text(
-          initials,
-          style: GoogleFonts.montserrat(
-            color: Colors.white,
-            fontSize: 30,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+        child: imageUrl == null || imageUrl!.isEmpty
+            ? Text(
+                initials,
+                style: GoogleFonts.montserrat(
+                  color: Colors.white,
+                  fontSize: 30,
+                  fontWeight: FontWeight.w700,
+                ),
+              )
+            : null,
       ),
     );
   }

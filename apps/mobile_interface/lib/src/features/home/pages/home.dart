@@ -48,7 +48,7 @@ class _HomePageState extends State<HomePage> {
           children: [
             HomeTopBar(
               name: controller.displayName,
-              imagePath: 'assets/images/profile.png',
+              imageUrl: controller.profileImageUrl,
             ),
             Expanded(
               child: LayoutBuilder(

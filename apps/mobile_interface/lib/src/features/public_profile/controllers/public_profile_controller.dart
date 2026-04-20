@@ -24,6 +24,8 @@ class PublicProfileController extends ChangeNotifier {
   bool get isSaving => _isSaving;
   bool get hasLoaded => _hasLoaded;
   String? get error => _error;
+  ApiClient get apiClient => _api;
+  AuthService get authService => _auth;
 
   Future<void> logOut() async {
     _error = null;

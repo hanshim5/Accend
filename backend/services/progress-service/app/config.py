@@ -38,6 +38,7 @@ class Settings(BaseSettings):
 
     SUPABASE_URL: str
     SUPABASE_SERVICE_ROLE_KEY: str
+    USER_PROFILE_SERVICE_URL: str = "http://user-profile-service:8000"
 
     class Config:
         env_file = ".env"

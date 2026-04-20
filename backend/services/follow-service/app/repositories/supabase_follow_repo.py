@@ -7,7 +7,7 @@ from app.utils.errors import bad_request, not_found
 
 
 class SupabaseFollowRepo:
-    _profile_select = "id,username,full_name,level,native_language,learning_goal,focus_areas"
+    _profile_select = "id,username,full_name,level,native_language,learning_goal,focus_areas,profile_image_url"
 
     async def get_counts(self, user_id: UUID) -> tuple[int, int]:
         followers_rows = await supabase.get(
@@ -293,6 +293,7 @@ class SupabaseFollowRepo:
             meters_climbed=max(0, int(meters_climbed)),
             i_follow=i_follow,
             follows_me=follows_me,
+            profile_image_url=row.get("profile_image_url"),
         )
 
     async def _sync_missing_profile_levels(

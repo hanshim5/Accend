@@ -15,6 +15,7 @@ class HomeController extends ChangeNotifier {
   bool _hasStaticData = false;
   String? _error;
   String _displayName = 'there';
+  String? _profileImageUrl;
   String? _activeCourseId;
   String _activeCourseTitle = 'No active course yet';
   int _currentMinutes = 0;
@@ -25,6 +26,7 @@ class HomeController extends ChangeNotifier {
   bool get hasStaticData => _hasStaticData;
   String? get error => _error;
   String get displayName => _displayName;
+  String? get profileImageUrl => _profileImageUrl;
   String? get activeCourseId => _activeCourseId;
   String get activeCourseTitle => _activeCourseTitle;
   bool get hasActiveCourse => _activeCourseId != null && _activeCourseId!.isNotEmpty;
@@ -83,6 +85,8 @@ class HomeController extends ChangeNotifier {
         _displayName = ((data['display_name'] as String?) ?? 'there').trim();
         if (_displayName.isEmpty) _displayName = 'there';
 
+        _profileImageUrl = profile['profile_image_url'] as String?;
+
         final dailyPace = profile['daily_pace'] as String?;
         final backendGoal = (data['goal_minutes'] as int?) ?? 10;
         _goalMinutes = dailyPace == null || dailyPace.trim().isEmpty
@@ -115,6 +119,7 @@ class HomeController extends ChangeNotifier {
   void clear() {
     _hasStaticData = false;
     _displayName = 'there';
+    _profileImageUrl = null;
     _activeCourseId = null;
     _activeCourseTitle = 'No active course yet';
     _currentMinutes = 0;

@@ -94,6 +94,13 @@ class ProfileRepo(Protocol):
         daily_pace: str | None = None,
         focus_areas: str | None = None,
     ) -> None: ...
+
+    async def update_streak(
+        self,
+        user_id: str,
+        current_streak: int,
+        longest_streak: int,
+    ) -> None: ...
     """
     Update onboarding-related fields for a user's profile.
 
@@ -109,6 +116,8 @@ class ProfileRepo(Protocol):
     - Perform partial update (only provided fields).
     - Mark onboarding as complete if specified.
     """
+
+    async def update_profile_image(self, user_id: str, profile_image_url: str) -> None: ...
 
     async def delete_profile(self, user_id: str) -> None: ...
     """
