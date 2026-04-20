@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/constants.dart';
-import '../models/pronunciation_feedback.dart';
+import '../../../common/models/pronunciation_feedback.dart';
+import '../../../common/widgets/phoneme_feedback.dart';
 
 /// Maps a word/phoneme accuracy score to a semantic color.
 /// ≥ 85 → success green, ≥ 60 → action orange, else failure red.
