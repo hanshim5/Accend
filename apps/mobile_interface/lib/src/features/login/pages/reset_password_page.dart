@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../app/constants.dart';
 import '../../../app/routes.dart';
 import '../../../common/services/auth_service.dart';
+import '../../home/controllers/home_controller.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({super.key});
@@ -35,10 +36,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     try {
       await context.read<AuthService>().updatePassword(_passwordController.text);
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password updated successfully.')),
       );
-      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (_) => false);
+
+      context.read<HomeController>().load();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (_) => false);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
