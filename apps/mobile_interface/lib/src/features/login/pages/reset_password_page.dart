@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../app/constants.dart';
 import '../../../app/routes.dart';
 import '../../../common/services/auth_service.dart';
+import '../../home/controllers/home_controller.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({super.key});
@@ -35,10 +36,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     try {
       await context.read<AuthService>().updatePassword(_passwordController.text);
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password updated successfully.')),
       );
-      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (_) => false);
+
+      context.read<HomeController>().load();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (_) => false);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -55,9 +60,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Scaffold(
       backgroundColor: AppColors.primaryBg,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: AppColors.primaryBg,
         elevation: 0,
@@ -70,7 +77,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+            padding: EdgeInsets.fromLTRB(28, 24, 28, 24 + bottomInset),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 320),
               child: Form(

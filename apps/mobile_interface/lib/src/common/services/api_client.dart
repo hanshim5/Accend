@@ -189,6 +189,34 @@ class ApiException implements Exception {
   final int statusCode;
   final String body;
 
+  /// Extract the innermost "detail" string from the response body, handling
+  /// both single-encoded and double-encoded JSON from the gateway.
+  String get detail {
+    try {
+      var decoded = jsonDecode(body);
+      // Unwrap up to two levels of {"detail": ...} nesting.
+      for (var i = 0; i < 2; i++) {
+        if (decoded is Map<String, dynamic> && decoded.containsKey('detail')) {
+          final d = decoded['detail'];
+          if (d is String) {
+            try {
+              decoded = jsonDecode(d);
+            } catch (_) {
+              return d;
+            }
+          } else {
+            decoded = d;
+          }
+        } else {
+          break;
+        }
+      }
+      if (decoded is String) return decoded;
+      if (decoded is Map<String, dynamic>) return decoded.toString();
+    } catch (_) {}
+    return body;
+  }
+
   @override
   String toString() => 'ApiException($statusCode): $body';
 }

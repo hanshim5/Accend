@@ -216,16 +216,45 @@ class _CoursesListPageState extends State<CoursesListPage> {
   }
 
   Future<void> _openGenerateCoursePopup(BuildContext context) async {
-    await showDialog(
+    final ctrl = context.read<CoursesController>();
+
+    await showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
-      builder: (_) => GenerateCoursePopup(
+      barrierLabel: 'Dismiss',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 280),
+      transitionBuilder: (ctx, animation, _, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutQuart,
+          reverseCurve: Curves.easeInQuart,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.88, end: 1.0).animate(curved),
+            child: child,
+          ),
+        );
+      },
+      pageBuilder: (ctx, _, __) => GenerateCoursePopup(
         onSubmitPrompt: (prompt) {
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => ChangeNotifierProvider.value(
-                value: context.read<CoursesController>(),
+                value: ctrl,
                 child: GenerateCoursePage(prompt: prompt),
+              ),
+            ),
+          );
+        },
+        onSubmitMetrics: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ChangeNotifierProvider.value(
+                value: ctrl,
+                child: const GenerateCoursePage(),
               ),
             ),
           );

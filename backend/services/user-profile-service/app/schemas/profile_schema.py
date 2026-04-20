@@ -94,6 +94,8 @@ class ProfileReadResponse(BaseModel):
     daily_pace: str | None = None
     skill_assess: str | None = None
     focus_areas: str | None = None
+    current_streak: int = 0
+    longest_streak: int = 0
     profile_image_url: str | None = None
 
 
@@ -145,3 +147,8 @@ class ProfileDetailsUpdate(BaseModel):
         if value is None or not value.strip():
             raise ValueError("At least one learning goal is required")
         return value
+
+
+class ProfileStreakUpdate(BaseModel):
+    current_streak: int = 0
+    longest_streak: int = 0

@@ -1,6 +1,6 @@
 import '../../../common/services/api_client.dart';
 import '../../../common/services/auth_service.dart';
-import '../../solo_practice/models/pronunciation_feedback.dart';
+import '../../../common/models/pronunciation_feedback.dart';
 
 /// Aggregated score for a single phoneme across a practice session.
 class _PhonemeAggregate {

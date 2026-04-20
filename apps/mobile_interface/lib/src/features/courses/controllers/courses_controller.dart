@@ -78,6 +78,55 @@ class CoursesController extends ChangeNotifier {
     }
   }
 
+  /// Generate a course from the user's lowest-accuracy phonemes.
+  ///
+  /// Calls POST /ai/generate-course-from-metrics — no prompt needed.
+  /// The backend reads user_phoneme_metrics and builds a targeted course.
+  ///
+  /// Returns null and sets [generateError] if generation fails.
+  /// A 422 response means the user has no phoneme practice data yet.
+  Future<GeneratedCourseResult?> generateCourseFromMetrics() async {
+    _isGenerating = true;
+    _generateError = null;
+    notifyListeners();
+
+    try {
+      final token = _auth.accessToken;
+      if (token == null) throw Exception('User not authenticated');
+
+      final res = await _api.postJson(
+        '/ai/generate-course-from-metrics',
+        accessToken: token,
+      );
+
+      final rawCourse = res['course'];
+      if (rawCourse is! Map<String, dynamic>) {
+        throw Exception('Invalid generate-course-from-metrics response: missing course');
+      }
+
+      final rawLessons = res['lessons'] as List<dynamic>? ?? const [];
+
+      final createdCourse = Course.fromJson(rawCourse);
+      final createdLessons = rawLessons
+          .cast<Map<String, dynamic>>()
+          .map((e) => Lesson.fromJson(e))
+          .toList();
+
+      await loadCourses();
+
+      return GeneratedCourseResult(
+        course: createdCourse,
+        lessons: createdLessons,
+      );
+    } catch (e) {
+      _generateError = e is ApiException ? 'ApiException(${e.statusCode}): ${e.detail}' : e.toString();
+      return null;
+    } finally {
+      _isGenerating = false;
+      notifyListeners();
+    }
+  }
+
   /// Generate a course through the Gateway and return the created course
   /// plus persisted lessons so the UI can transition into a success state
   /// and immediately offer "Start Course".
@@ -119,7 +168,7 @@ class CoursesController extends ChangeNotifier {
         lessons: createdLessons,
       );
     } catch (e) {
-      _generateError = e.toString();
+      _generateError = e is ApiException ? 'ApiException(${e.statusCode}): ${e.detail}' : e.toString();
       return null;
     } finally {
       _isGenerating = false;

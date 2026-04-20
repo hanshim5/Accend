@@ -7,12 +7,17 @@ import '../controllers/courses_controller.dart';
 import '../widgets/start_lesson_popup.dart';
 
 class GenerateCoursePage extends StatefulWidget {
+  /// Prompt-based generation: the user's free-text topic.
+  /// Omit (leave null) for phoneme-metrics-based generation.
   const GenerateCoursePage({
     super.key,
-    required this.prompt,
+    this.prompt,
   });
 
-  final String prompt;
+  final String? prompt;
+
+  /// True when generating from phoneme metrics rather than a user prompt.
+  bool get isMetricsMode => prompt == null;
 
   @override
   State<GenerateCoursePage> createState() => _GenerateCoursePageState();
@@ -30,6 +35,28 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
   String? _error;
   bool _started = false;
 
+  /// True when the error is specifically "no phoneme data" (HTTP 422).
+  /// In this case "Try Again" is hidden — retrying won't help.
+  bool get _isNoDataError =>
+      widget.isMetricsMode && ((_error ?? '').contains('422'));
+
+  /// True when the AI backend is temporarily overloaded (HTTP 503).
+  bool get _isServiceUnavailable => (_error ?? '').contains('503');
+
+  /// User-facing error message — never shows raw JSON or exception strings.
+  String get _displayError {
+    if (_isNoDataError) return '';
+    if (_isServiceUnavailable) {
+      return 'The AI is temporarily busy due to high demand. Please try again in a moment.';
+    }
+    final raw = _error ?? '';
+    // Strip the "ApiException(NNN): " prefix if present, show just the detail.
+    final prefixPattern = RegExp(r'^ApiException\(\d+\):\s*');
+    return prefixPattern.hasMatch(raw)
+        ? raw.replaceFirst(prefixPattern, '')
+        : 'There was an error generating your course. Please try again.';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -43,7 +70,10 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
     _started = true;
 
     final ctrl = context.read<CoursesController>();
-    final result = await ctrl.generateCourse(widget.prompt);
+
+    final result = widget.isMetricsMode
+        ? await ctrl.generateCourseFromMetrics()
+        : await ctrl.generateCourse(widget.prompt!);
 
     if (!mounted) return;
 
@@ -54,8 +84,7 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
       });
     } else {
       setState(() {
-        _error =
-            ctrl.generateError ?? 'Could not generate course. Please try again.';
+        _error = ctrl.generateError ?? 'Could not generate course. Please try again.';
         _state = _GenerationState.failure;
       });
     }
@@ -139,7 +168,9 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
         ),
         const SizedBox(height: 10),
         Text(
-          'Our AI is crafting a personalized course for "${widget.prompt}".',
+          widget.isMetricsMode
+              ? 'Our AI is analysing your pronunciation data and crafting a targeted course.'
+              : 'Our AI is crafting a personalized course for "${widget.prompt}".',
           textAlign: TextAlign.center,
           style: textTheme.bodyMedium?.copyWith(
             color: AppColors.textSecondary,
@@ -189,9 +220,7 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
         ),
         const SizedBox(height: 10),
         TextButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
+          onPressed: () => Navigator.of(context).pop(),
           child: Text(
             'BACK TO COURSES',
             style: textTheme.bodyMedium?.copyWith(
@@ -207,17 +236,19 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
   }
 
   Widget _buildFailure(TextTheme textTheme) {
+    final isNoData = _isNoDataError;
+
     return Column(
       key: const ValueKey('failure'),
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const _GenerationLogoRing(
-          color: AppColors.failure,
+        _GenerationLogoRing(
+          color: isNoData ? AppColors.action : AppColors.failure,
           loading: false,
         ),
         const SizedBox(height: 28),
         Text(
-          'Generation Failed',
+          isNoData ? 'No Practice Data Yet' : 'Generation Failed',
           textAlign: TextAlign.center,
           style: textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w800,
@@ -226,8 +257,9 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
         ),
         const SizedBox(height: 10),
         Text(
-          _error ??
-              'There was an error generating your course. Please try again.',
+          isNoData
+              ? 'Complete at least one pronunciation session first. Your phoneme scores will be used to build a course targeted at your weakest sounds.'
+              : _displayError,
           textAlign: TextAlign.center,
           style: textTheme.bodyMedium?.copyWith(
             color: AppColors.textSecondary,
@@ -235,28 +267,28 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
           ),
         ),
         const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _state = _GenerationState.loading;
-                _error = null;
-                _result = null;
-              });
-              _started = false;
-              _runGeneration();
-            },
-            child: const Text('Try Again'),
+        if (!isNoData) ...[
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _state = _GenerationState.loading;
+                  _error = null;
+                  _result = null;
+                });
+                _started = false;
+                _runGeneration();
+              },
+              child: const Text('Try Again'),
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
+          const SizedBox(height: 10),
+        ],
         TextButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
+          onPressed: () => Navigator.of(context).pop(),
           child: Text(
-            'RETURN TO COURSES',
+            isNoData ? 'BACK TO COURSES' : 'RETURN TO COURSES',
             style: textTheme.bodyMedium?.copyWith(
               color: AppColors.textSecondary,
               fontWeight: FontWeight.w800,

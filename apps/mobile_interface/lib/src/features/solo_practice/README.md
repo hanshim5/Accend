@@ -123,5 +123,41 @@ Use this when adding something new (or when AI/tools need to decide where code b
 
 ---
 
+## Scoring & colouring logic
+
+All logic lives in `widgets/feedback_card.dart`.
+
+### Phoneme chip colour (`userSaidPhonemeColor`)
+
+Each phoneme in the "you" row is coloured independently:
+
+| Condition | Colour |
+|---|---|
+| Symbol matches target **and** accuracy ≥ 85 | Green |
+| Symbol doesn't match target (substitution) | Red — always, regardless of accuracy |
+| Accuracy < 60 | Red |
+| Accuracy 60–84 | Orange |
+
+### Word chip colour (`strictWordColor`)
+
+The word chips in `FeedbackCard` are coloured by counting how many phonemes are red or orange. Substitutions count as red.
+
+| Condition | Colour |
+|---|---|
+| 2+ red phonemes | Red |
+| 1 red phoneme | Orange (one-outlier grace — a single bad phoneme doesn't condemn the word) |
+| 2+ orange phonemes | Orange |
+| 0–1 orange, 0 red | Green |
+
+The aggregate `word.accuracy` from Azure is **not** used for chip colouring — it is only displayed as a number next to the word title in the phoneme breakdown sheet.
+
+### Why these rules?
+
+- **Substitutions are always red** because saying the wrong phoneme is a clear error regardless of how Azure scores it acoustically.
+- **The one-outlier grace** (1 red → orange, not red) prevents a single borderline phoneme — often API noise on fricatives like "s" — from making an otherwise correct word look broken.
+- **2-yellow threshold** for orange words absorbs single borderline scores that are within normal Azure scoring variance.
+
+---
+
 # Todo
 - Fix display when user adds/omits words

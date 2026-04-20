@@ -36,6 +36,7 @@ from app.schemas.profile_schema import (
     ProfileInitRequest,
     ProfileInitResponse,
     ProfileDetailsUpdate,
+    ProfileStreakUpdate,
     ProfileReadResponse,
     ProfileOnboardingUpdate,
     ProfileImageUpdate,
@@ -154,6 +155,20 @@ async def patch_profile_details(
     await svc.update_profile_details(
         user_id=x_user_id or "",
         **body.dict(exclude_unset=True),
+    )
+    return ProfileInitResponse(ok=True)
+
+
+@router.patch("/profiles/me/streak")
+async def patch_profile_streak(
+    body: ProfileStreakUpdate,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: ProfileService = Depends(get_profile_service),
+) -> ProfileInitResponse:
+    await svc.update_streak(
+        user_id=x_user_id or "",
+        current_streak=body.current_streak,
+        longest_streak=body.longest_streak,
     )
     return ProfileInitResponse(ok=True)
 

@@ -5,6 +5,7 @@ from datetime import date, datetime, timezone
 import httpx
 
 from app.clients.supabase import supabase
+from app.config import settings
 from app.repositories.goals_repo import GoalsRepo
 
 
@@ -31,22 +32,16 @@ class SupabaseGoalsRepo(GoalsRepo):
         return int(rows[0].get("minutes", 0) or 0)
 
     async def get_streak(self, user_id: str) -> tuple[int, int]:
+        url = f"{settings.USER_PROFILE_SERVICE_URL}/profiles/me"
+        headers = {"X-User-Id": user_id}
         try:
-            rows = await supabase.get(
-                "streaks",
-                params={
-                    "select": "current_streak,longest_streak",
-                    "user_id": f"eq.{user_id}",
-                    "limit": "1",
-                },
-            )
-        except httpx.HTTPStatusError:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(url, headers=headers)
+            if resp.status_code >= 400:
+                return 0, 0
+            row = resp.json()
+        except Exception:
             return 0, 0
-
-        if not rows:
-            return 0, 0
-
-        row = rows[0]
         return int(row.get("current_streak", 0) or 0), int(row.get("longest_streak", 0) or 0)
 
     async def upsert_today_minutes(self, user_id: str, day: date, minutes: int) -> int:
@@ -94,17 +89,16 @@ class SupabaseGoalsRepo(GoalsRepo):
         return result
 
     async def upsert_streak(self, user_id: str, current_streak: int, longest_streak: int) -> None:
+        url = f"{settings.USER_PROFILE_SERVICE_URL}/profiles/me/streak"
+        headers = {"X-User-Id": user_id}
+        payload = {
+            "current_streak": max(0, int(current_streak)),
+            "longest_streak": max(0, int(longest_streak)),
+        }
         try:
-            await supabase.upsert(
-                "streaks",
-                [
-                    {
-                        "user_id": user_id,
-                        "current_streak": max(0, int(current_streak)),
-                        "longest_streak": max(0, int(longest_streak)),
-                        "updated_at": self._utc_now_iso(),
-                    }
-                ],
-            )
-        except httpx.HTTPStatusError:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.patch(url, headers=headers, json=payload)
+            if resp.status_code >= 400:
+                return
+        except Exception:
             return

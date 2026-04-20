@@ -6,13 +6,17 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/constants.dart';
+import '../../../app/routes.dart';
+import '../../../common/pages/session_results_page.dart';
 import '../../../common/services/auth_service.dart';
 import '../../../common/widgets/microphone.dart';
+import '../../courses/controllers/courses_controller.dart';
 import '../../courses/models/lesson.dart';
+import '../../home/controllers/home_controller.dart';
+import '../../progress/services/progress_service.dart';
 import '../controllers/solo_practice_controller.dart';
-import '../widgets/feedback_card.dart';
-import '../widgets/interactive_feedback_sentence.dart';
-import 'practice_results_page.dart';
+import '../../../common/widgets/interactive_feedback_sentence.dart';
+import '../../../common/widgets/phoneme_feedback.dart';
 
 // ---------------------------------------------------------------------------
 // Page
@@ -221,13 +225,33 @@ class _SoloPracticePageState extends State<SoloPracticePage>
       setState(() {});
     } else {
       _pauseActiveTimer();
+      final feedbacks = _controller.sessionFeedbacks;
+      final items = _controller.items;
+      final lesson = widget.lesson;
+      final duration = _accumulatedActive;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => PracticeResultsPage(
-            feedbacks: _controller.sessionFeedbacks,
-            items: _controller.items,
-            lesson: widget.lesson,
-            sessionDuration: _accumulatedActive,
+          builder: (_) => SessionResultsPage(
+            feedbacks: feedbacks,
+            items: items,
+            sessionTitle: lesson?.title ?? 'Practice Session',
+            sessionDuration: duration,
+            ctaLabel: 'Back to Courses',
+            onCtaTap: (ctx) => Navigator.of(ctx)
+                .pushNamedAndRemoveUntil(AppRoutes.courses, (_) => false),
+            onMount: (ctx) {
+              if (lesson != null && !lesson.isCompleted) {
+                ctx.read<CoursesController>().completeLesson(
+                      lesson.courseId,
+                      lesson.id,
+                    );
+              }
+              ctx.read<ProgressService>().submitPhonemeScores(feedbacks);
+              ctx.read<ProgressService>().submitDailyMinutes(
+                    secondsDelta: duration.inSeconds,
+                  );
+              ctx.read<HomeController>().refreshProgressFromServer();
+            },
           ),
         ),
       );

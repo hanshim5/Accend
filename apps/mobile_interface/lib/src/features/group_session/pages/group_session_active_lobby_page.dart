@@ -172,7 +172,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
 
     Navigator.pushReplacementNamed(
       context,
-      AppRoutes.groupSessionPostSession,
+      AppRoutes.groupSessionResults,
       arguments: participants,
     );
   }
