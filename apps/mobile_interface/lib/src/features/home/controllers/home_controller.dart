@@ -162,6 +162,54 @@ class HomeController extends ChangeNotifier {
     }
   }
 
+  /// Full refresh triggered by pull-to-refresh. Re-fetches both `/home` and
+  /// `/profile` so every field (active course, streak, minutes, display name,
+  /// profile image, goal) is up-to-date. Does not toggle [isLoading] — the
+  /// [RefreshIndicator] shows its own spinner.
+  Future<void> refresh() async {
+    final accessToken = _auth.accessToken;
+    if (accessToken == null || accessToken.isEmpty) return;
+
+    try {
+      final results = await Future.wait([
+        _api.getJson('/home', accessToken: accessToken),
+        _api.getJson('/profile', accessToken: accessToken),
+      ]);
+
+      final data = results[0];
+      final profile = results[1];
+
+      _applyDynamicFieldsFromHomeJson(data);
+      await _persistDynamicSnapshot();
+
+      _displayName = ((data['display_name'] as String?) ?? 'there').trim();
+      if (_displayName.isEmpty) _displayName = 'there';
+
+      _profileImageUrl = profile['profile_image_url'] as String?;
+
+      final dailyPace = profile['daily_pace'] as String?;
+      final backendGoal = (data['goal_minutes'] as int?) ?? 10;
+      _goalMinutes = dailyPace == null || dailyPace.trim().isEmpty
+          ? backendGoal
+          : _goalMinutesFromDailyPace(dailyPace);
+
+      final activeCourse = data['active_course'];
+      if (activeCourse is Map<String, dynamic>) {
+        _activeCourseId = (activeCourse['id'] as String?)?.trim();
+        _activeCourseTitle =
+            ((activeCourse['title'] as String?) ?? 'Untitled course').trim();
+      } else {
+        _activeCourseId = null;
+        _activeCourseTitle = 'No active course yet';
+      }
+
+      _hasStaticData = true;
+    } catch (e) {
+      debugPrint('Failed to refresh home data: $e');
+    }
+    notifyListeners();
+  }
+
   /// Refreshes streak and minutes from `GET /home` and updates disk cache.
   /// Does not toggle [isLoading]; safe to call after a lesson completes.
   Future<void> refreshProgressFromServer() async {

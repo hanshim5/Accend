@@ -44,23 +44,35 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: AppColors.primaryBg,
       body: SafeArea(
-        child: Column(
-          children: [
-            HomeTopBar(
-              name: controller.displayName,
-              imageUrl: controller.profileImageUrl,
-            ),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
+        child: RefreshIndicator(
+          onRefresh: () => controller.refresh(),
+          color: AppColors.accent,
+          child: LayoutBuilder(
+            builder: (context, outerConstraints) {
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: outerConstraints.maxHeight,
+                  ),
+                  child: Column(
+                    children: [
+                      HomeTopBar(
+                        name: controller.displayName,
+                        imageUrl: controller.profileImageUrl,
+                      ),
+                      Builder(
+                        builder: (context) {
+                  final topBarHeight = 80.0; // approximate HomeTopBar height
+                  final available = outerConstraints.maxHeight - topBarHeight;
                   const verticalPadding = 24.0;
                   const gapAfterGoal = 10.0;
                   const gapAfterTitle = 8.0;
                   const gapBetweenButtons = 10.0;
                   const titleBlockHeight = 26.0;
 
-                  var goalHeight = (constraints.maxHeight * 0.27).clamp(132.0, 156.0);
-                  var buttonHeight = ((constraints.maxHeight - verticalPadding - gapAfterGoal - gapAfterTitle - gapBetweenButtons - titleBlockHeight - goalHeight) / 2)
+                  var goalHeight = (available * 0.27).clamp(132.0, 156.0);
+                  var buttonHeight = ((available - verticalPadding - gapAfterGoal - gapAfterTitle - gapBetweenButtons - titleBlockHeight - goalHeight) / 2)
                       .clamp(128.0, 170.0);
 
                   if (goalHeight >= buttonHeight) {
@@ -146,10 +158,14 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   );
-                },
-              ),
-            ),
-          ],
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
         ),
       ),
       bottomNavigationBar: BottomNavBar(
