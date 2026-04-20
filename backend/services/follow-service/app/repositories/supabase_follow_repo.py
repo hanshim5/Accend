@@ -330,14 +330,14 @@ class SupabaseFollowRepo:
                 "level": {},
             }
 
-        streak_req = supabase.get(
-            "streaks",
+        streak_rows = await supabase.get(
+            "profiles",
             params={
-                "select": "user_id,current_streak",
-                "user_id": self._in_clause(user_ids),
+                "select": "id,current_streak",
+                "id": self._in_clause(user_ids),
             },
         )
-        streak_rows = await streak_req
+
         try:
             lessons_rows = await supabase.get(
                 "user_stats",
@@ -360,9 +360,9 @@ class SupabaseFollowRepo:
             )
 
         streak_map: dict[str, int] = {
-            str(row.get("user_id")): int(row.get("current_streak", 0) or 0)
+            str(row.get("id")): int(row.get("current_streak", 0) or 0)
             for row in streak_rows
-            if row.get("user_id")
+            if row.get("id")
         }
         lessons_map: dict[str, int] = {
             str(row.get("user_id")): int(row.get("lessons_completed", 0) or 0)
