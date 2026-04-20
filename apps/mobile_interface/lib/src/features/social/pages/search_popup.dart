@@ -304,14 +304,19 @@ class _SearchPopupState extends State<SearchPopup> {
                                     CircleAvatar(
                                       radius: 17,
                                       backgroundColor: const Color(0xFF334155),
-                                      child: Text(
-                                        user.displayName.characters.first.toUpperCase(),
-                                        style: GoogleFonts.inter(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 12,
-                                        ),
-                                      ),
+                                      backgroundImage: user.profileImageUrl != null && user.profileImageUrl!.isNotEmpty
+                                        ? NetworkImage(user.profileImageUrl!)
+                                        : null,
+                                    child: user.profileImageUrl == null || user.profileImageUrl!.isEmpty
+                                        ? Text(
+                                              user.displayName.characters.first.toUpperCase(),
+                                              style: GoogleFonts.inter(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 12,
+                                              ),
+                                            )
+                                        : null,
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(

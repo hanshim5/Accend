@@ -44,6 +44,7 @@ dependencies:
   audioplayers: ^6.0.0
   livekit_client: ^2.5.0
   google_sign_in: ^7.0.0
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

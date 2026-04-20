@@ -110,6 +110,8 @@ class ProfileRepo(Protocol):
     - Mark onboarding as complete if specified.
     """
 
+    async def update_profile_image(self, user_id: str, profile_image_url: str) -> None: ...
+
     async def delete_profile(self, user_id: str) -> None: ...
     """
     Delete a user's profile.

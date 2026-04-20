@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 from fastapi import APIRouter, Header, HTTPException
 
 from app.repositories.supabase_goals_repo import SupabaseGoalsRepo
@@ -45,3 +46,34 @@ async def post_daily_minutes(
         seconds_delta=body.seconds_delta,
         goal_minutes=body.goal_minutes,
     )
+
+
+@router.get("/daily-activity")
+async def get_daily_activity(
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+):
+    """
+    Get the user's activity for the last 5 calendar days.
+    Returns all 5 days, with 0 minutes for days with no activity.
+    Response: [{"date": "YYYY-MM-DD", "minutes": int}, ...]
+    """
+    if not x_user_id:
+        raise HTTPException(status_code=401, detail="X-User-Id header required")
+
+    repo = SupabaseGoalsRepo()
+    all_daily = await repo.list_daily_minutes(user_id=x_user_id)
+    
+    # Create a map of dates to minutes
+    daily_map = {day: int(minutes) for day, minutes in all_daily}
+    
+    # Generate the last 5 calendar days
+    today = date.today()
+    days_range = [today - timedelta(days=i) for i in range(4, -1, -1)]  # Last 5 days in chronological order
+    
+    # Build activity list with all 5 days
+    activity_list = [
+        {"date": day.isoformat(), "minutes": daily_map.get(day, 0)}
+        for day in days_range
+    ]
+    
+    return activity_list

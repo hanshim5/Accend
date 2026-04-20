@@ -94,6 +94,15 @@ class ProfileReadResponse(BaseModel):
     daily_pace: str | None = None
     skill_assess: str | None = None
     focus_areas: str | None = None
+    profile_image_url: str | None = None
+
+
+class ProfileImageUpdate(BaseModel):
+    profile_image_url: str
+
+
+class ProfileImageResponse(BaseModel):
+    profile_image_url: str | None = None
 
 
 class ProfileOnboardingUpdate(BaseModel):

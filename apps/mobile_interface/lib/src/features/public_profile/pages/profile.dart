@@ -8,6 +8,7 @@ import '../../../common/utils/metric_formatters.dart';
 import '../../../app/routes.dart';
 import '../controllers/public_profile_controller.dart';
 import '../models/profile_page_data.dart';
+import '../services/profile_image_service.dart';
 import '../../home/controllers/home_controller.dart';
 import '../../social/controllers/social_controller.dart';
 
@@ -24,6 +25,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String? _goalsError;
   bool _isLoggingOut = false;
   bool _isDeletingAccount = false;
+  bool _isUploadingImage = false;
 
   bool _detailsExpanded = true;
   bool _preferencesExpanded = false;
@@ -209,6 +211,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     data: data,
                     nativeLanguage: _selectedNativeLanguage ?? '',
                     goals: _selectedGoals,
+                    isUploadingImage: _isUploadingImage,
+                    onUploadPressed: _uploadProfileImage,
                   ),
                   const SizedBox(height: 18),
                   _StatsPanel(data: data),
@@ -917,6 +921,44 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
   }
+
+  Future<void> _uploadProfileImage() async {
+    final apiClient = context.read<PublicProfileController>().apiClient;
+    final authService = context.read<PublicProfileController>().authService;
+    
+    final imageService = ProfileImageService(
+      apiClient: apiClient,
+      authService: authService,
+    );
+
+    try {
+      setState(() => _isUploadingImage = true);
+
+      final publicUrl = await imageService.uploadProfileImage();
+
+      if (!context.mounted) return;
+      if (publicUrl != null) {
+        // Reload profile to get the updated image
+        await context.read<PublicProfileController>().load(force: true);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile picture updated successfully!')),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload image: $e'),
+          backgroundColor: AppColors.failure,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingImage = false);
+      }
+    }
+  }
 }
 
 class _Header extends StatelessWidget {
@@ -952,11 +994,15 @@ class _ProfileHero extends StatelessWidget {
     required this.data,
     required this.nativeLanguage,
     required this.goals,
+    this.isUploadingImage = false,
+    this.onUploadPressed,
   });
 
   final ProfilePageData data;
   final String nativeLanguage;
   final List<String> goals;
+  final bool isUploadingImage;
+  final VoidCallback? onUploadPressed;
 
   String _initialsFor(String value) {
     final parts = value
@@ -980,35 +1026,77 @@ class _ProfileHero extends StatelessWidget {
       children: [
         Column(
           children: [
-            Container(
-              width: 96,
-              height: 96,
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.accent, width: 2),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x4C06B6D4),
-                    blurRadius: 18,
+            Stack(
+              children: [
+                Container(
+                  width: 96,
+                  height: 96,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.accent, width: 2),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x4C06B6D4),
+                        blurRadius: 18,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Container(
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFF1E293B),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  _initialsFor(data.displayName),
-                  style: GoogleFonts.montserrat(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF1E293B),
+                      image: data.profileImageUrl != null && data.profileImageUrl!.isNotEmpty
+                          ? DecorationImage(
+                              image: NetworkImage(data.profileImageUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    alignment: Alignment.center,
+                    child: data.profileImageUrl == null || data.profileImageUrl!.isEmpty
+                        ? Text(
+                            _initialsFor(data.displayName),
+                            style: GoogleFonts.montserrat(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          )
+                        : null,
                   ),
                 ),
-              ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: isUploadingImage ? null : onUploadPressed,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.accent,
+                        border: Border.all(color: const Color(0xFF1E293B), width: 2),
+                      ),
+                      child: isUploadingImage
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.camera_alt,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             Container(
@@ -1132,7 +1220,7 @@ class _StatsPanel extends StatelessWidget {
                 const SizedBox(height: 14),
                 Container(height: 1, color: Colors.white.withValues(alpha: 0.05)),
                 const SizedBox(height: 12),
-                const _ActivityBars(),
+                _ActivityBars(data: data),
               ],
             )
           : Row(
@@ -1144,7 +1232,7 @@ class _StatsPanel extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(horizontal: 16),
                   color: Colors.white.withValues(alpha: 0.05),
                 ),
-                const Expanded(flex: 4, child: _ActivityBars()),
+                Expanded(flex: 4, child: _ActivityBars(data: data)),
               ],
             ),
     );
@@ -1267,18 +1355,93 @@ class _StatsSummary extends StatelessWidget {
 }
 
 class _ActivityBars extends StatelessWidget {
-  const _ActivityBars();
+  const _ActivityBars({required this.data});
+
+  final ProfilePageData data;
 
   @override
   Widget build(BuildContext context) {
-    final heights = [28.0, 42.0, 38.0, 48.0, 58.0];
-    final colors = const [
-      Color(0x1AFFFFFF),
-      Color(0x4C06B6D4),
-      Color(0x7F06B6D4),
-      Color(0xB206B6D4),
-      Color(0xFF06B6D4),
-    ];
+    // Always expect 5 days from backend
+    final activity = data.dailyActivity.isEmpty
+        ? []
+        : (data.dailyActivity.length <= 5
+            ? data.dailyActivity
+            : data.dailyActivity.sublist(data.dailyActivity.length - 5));
+
+    // If no activity at all, show empty state
+    if (activity.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'ACTIVITY',
+                style: GoogleFonts.inter(
+                  color: AppColors.textSecondary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const Spacer(),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 84,
+            child: Center(
+              child: Text(
+                'No activity yet',
+                style: GoogleFonts.inter(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Center(
+            child: Text(
+              'LAST 5 DAYS',
+              style: GoogleFonts.inter(
+                color: AppColors.textSecondary,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Calculate heights based on minutes (scale to 0-60px range)
+    // Days with 0 minutes get minimum height
+    final maxMinutes = activity.map((a) => a.minutes).reduce((a, b) => a > b ? a : b).toDouble();
+    final minHeight = 8.0;
+    final maxHeight = 60.0;
+    
+    final heights = activity.map((item) {
+      if (item.minutes == 0) return minHeight;
+      if (maxMinutes == 0) return minHeight;
+      return minHeight + (item.minutes / maxMinutes) * (maxHeight - minHeight);
+    }).toList();
+
+    // Generate opacity based on position (from faded to full)
+    final colors = List.generate(
+      activity.length,
+      (index) {
+        final opacityStep = 1.0 / activity.length;
+        final opacity = (index + 1) * opacityStep;
+        return Color.lerp(
+          const Color(0x1AFFFFFF),
+          const Color(0xFF06B6D4),
+          opacity,
+        )!;
+      },
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1295,7 +1458,6 @@ class _ActivityBars extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.textSecondary, size: 14),
           ],
         ),
         const SizedBox(height: 14),

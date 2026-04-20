@@ -257,6 +257,13 @@ class ProfileService:
             focus_areas=cleaned_focus_areas,
         )
 
+    async def update_profile_image(self, user_id: str, profile_image_url: str) -> None:
+        if not user_id:
+            bad_request("user_id missing")
+        if not profile_image_url or not profile_image_url.strip():
+            bad_request("profile_image_url is required")
+        await self.repo.update_profile_image(user_id, profile_image_url.strip())
+
     async def delete_account(self, user_id: str) -> None:
         """
         Delete a user's account and profile.

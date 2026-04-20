@@ -62,7 +62,11 @@ class AppStrings {
 /// Supabase Storage bucket names and path helpers.
 class AppStorage {
   static const phonemeBucket = 'phoneme-audio';
+  static const profileImagesBucket = 'profile-images';
 
   /// Returns the storage path for a phoneme audio clip, e.g. "iy.m4a".
   static String phonemeAudioPath(String symbol) => '${symbol.toLowerCase()}.m4a';
+
+  /// Returns the storage path for a profile avatar, e.g. "profiles/{userId}/avatar.jpg".
+  static String profileImagePath(String userId, String ext) => 'profiles/$userId/avatar.$ext';
 }
