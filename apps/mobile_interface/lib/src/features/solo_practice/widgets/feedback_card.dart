@@ -17,30 +17,33 @@ Color feedbackScoreColor(double? accuracy) {
 
 /// Word-level color based on phoneme counts.
 ///
-///  • No phoneme data    → [feedbackScoreColor] on [word.accuracy].
-///  • Substitutions count as red, mirroring [userSaidPhonemeColor].
-///  • ≥ 2 red (< 60)    → failure red.
-///  • 1 red             → action orange (one isolated error ≠ red word).
-///  • ≥ 2 yellow (60–84) → action orange (two borderline phonemes = flagged).
-///  • 0–1 yellow, 0 red → success green (single API noise ignored).
+///  • No phoneme data              → [feedbackScoreColor] on [word.accuracy].
+///  • Any substitution             → failure red (wrong phoneme = real error,
+///                                   no grace regardless of count).
+///  • ≥ 2 low-accuracy (< 60)      → failure red.
+///  • 1 low-accuracy (< 60)        → action orange (grace: API noise on
+///                                   fricatives etc. ≠ broken word).
+///  • ≥ 2 borderline (60–84)       → action orange.
+///  • else                         → success green.
 Color strictWordColor(WordFeedback word) {
   if (word.phonemes.isEmpty) return feedbackScoreColor(word.accuracy);
 
-  int redCount = 0;
+  int lowCount = 0;
   int yellowCount = 0;
 
   for (final p in word.phonemes) {
     final isSubstitution = p.userSaid != null && p.userSaid != p.symbol;
+    if (isSubstitution) return AppColors.failure;
     final accuracy = p.accuracy ?? 100.0;
-    if (isSubstitution || accuracy < 60) {
-      redCount++;
+    if (accuracy < 60) {
+      lowCount++;
     } else if (accuracy < 85) {
       yellowCount++;
     }
   }
 
-  if (redCount >= 2) return AppColors.failure;
-  if (redCount == 1) return AppColors.action;
+  if (lowCount >= 2) return AppColors.failure;
+  if (lowCount == 1) return AppColors.action;
   if (yellowCount >= 2) return AppColors.action;
   return AppColors.success;
 }
@@ -133,8 +136,25 @@ void showWordPhonemeDialog(BuildContext context, WordFeedback word) {
               ),
               const SizedBox(height: AppSpacing.md),
 
-              // Word title
-              Text(word.text, style: wordStyle),
+              // Word title + aggregate accuracy score
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(word.text, style: wordStyle),
+                  if (word.accuracy != null) ...[
+                    const SizedBox(width: 10),
+                    Text(
+                      '${word.accuracy!.round()}',
+                      style: GoogleFonts.inter(
+                        color: feedbackScoreColor(word.accuracy),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
               const SizedBox(height: AppSpacing.lg),
 
               if (word.phonemes.isEmpty)
