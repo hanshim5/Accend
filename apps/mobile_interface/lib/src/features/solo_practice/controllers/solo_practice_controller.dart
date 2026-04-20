@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../courses/models/lesson_item.dart';
-import '../models/pronunciation_feedback.dart';
+import '../../../common/models/pronunciation_feedback.dart';
 import '../services/pronunciation_feedback_service.dart';
 
 /// Fallback prompts used when no lesson items are available from the database.

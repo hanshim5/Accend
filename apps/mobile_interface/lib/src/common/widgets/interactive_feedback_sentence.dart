@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../app/constants.dart';
+import '../../app/constants.dart';
 import '../models/pronunciation_feedback.dart';
-import 'feedback_card.dart';
+import 'phoneme_feedback.dart';
 
-/// Renders [referenceText] as a color-coded, tappable sentence.
+/// Renders [referenceText] as a colour-coded, tappable sentence.
 ///
-/// Each word is colored by its pronunciation accuracy (green / orange / red)
+/// Each word is coloured by its pronunciation accuracy (green / orange / red)
 /// derived from [feedback.words]. Tapping a word opens the phoneme drill-down
-/// dialog via [showWordPhonemeDialog].
+/// bottom sheet via [showWordPhonemeDialog].
 ///
 /// Alignment is done sequentially: each whitespace-separated token in
-/// [referenceText] is matched to the next [WordFeedback] entry by normalized
+/// [referenceText] is matched to the next [WordFeedback] entry by normalised
 /// string comparison (case- and punctuation-insensitive). Unmatched tokens
-/// are rendered in the default text color and are not tappable.
+/// are rendered in the default text colour and are not tappable.
 class InteractiveFeedbackSentence extends StatelessWidget {
   const InteractiveFeedbackSentence({
     super.key,
@@ -26,19 +26,12 @@ class InteractiveFeedbackSentence extends StatelessWidget {
   final String referenceText;
   final PronunciationFeedbackMock feedback;
 
-  /// Base style for all words. Defaults to a 24 sp PublicSans regular weight.
+  /// Base style for all words. Defaults to 24 sp PublicSans regular.
   final TextStyle? textStyle;
 
-  /// Strips everything except letters, digits, apostrophes, and hyphens so
-  /// that "juice." matches the API token "juice".
   static String _normalize(String s) =>
       s.toLowerCase().replaceAll(RegExp(r"[^a-z0-9'''\-]"), '');
 
-  /// Pairs each token from [referenceText] with its [WordFeedback] entry.
-  ///
-  /// Matching walks [feedback.words] sequentially. If the normalized token
-  /// doesn't match the current word, one look-ahead is attempted to handle a
-  /// single ASR insertion/deletion. Unmatched tokens receive a null entry.
   List<(String, WordFeedback?)> _alignTokens() {
     final tokens = referenceText
         .split(RegExp(r'\s+'))
@@ -59,9 +52,8 @@ class InteractiveFeedbackSentence extends StatelessWidget {
         if (matches(token, words[wi])) {
           return (token, words[wi++]);
         }
-        // One-step look-ahead for insertion/deletion mismatches.
         if (wi + 1 < words.length && matches(token, words[wi + 1])) {
-          wi++; // skip the mismatched entry
+          wi++;
           return (token, words[wi++]);
         }
       }
@@ -90,16 +82,11 @@ class InteractiveFeedbackSentence extends StatelessWidget {
             child: Text(
               token,
               style: base.copyWith(
-                color: wf != null
-                    ? strictWordColor(wf)
-                    : AppColors.textPrimary,
-                // Subtle underline hints that tappable words are interactive.
-                decoration: wf != null
-                    ? TextDecoration.underline
-                    : TextDecoration.none,
-                decorationColor: wf != null
-                    ? strictWordColor(wf).withOpacity(0.5)
-                    : null,
+                color: wf != null ? strictWordColor(wf) : AppColors.textPrimary,
+                decoration:
+                    wf != null ? TextDecoration.underline : TextDecoration.none,
+                decorationColor:
+                    wf != null ? strictWordColor(wf).withOpacity(0.5) : null,
                 decorationStyle: TextDecorationStyle.dotted,
               ),
             ),
