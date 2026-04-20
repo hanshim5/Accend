@@ -1,5 +1,11 @@
 from app.repositories.supabase_public_lobby_repo import SupabasePublicLobbyRepo
-from app.schemas.private_lobby_schema import PrivateLobbyCreate, PrivateLobbyJoin, PrivateLobbyMemberOut
+from app.schemas.private_lobby_schema import (
+    LobbyTurnStateOut,
+    PrivateLobbyCreate,
+    PrivateLobbyJoin,
+    PrivateLobbyMemberOut,
+)
+from app.services.lobby_turn_state_store import turn_state_store
 
 
 class PublicLobbyService:
@@ -19,6 +25,7 @@ class PublicLobbyService:
         return self.repo.join_lobby(data)
 
     def leave_lobby(self, user_id: str) -> bool:
+        turn_state_store.clear_user(user_id=user_id)
         return self.repo.leave_lobby(user_id)
 
     def matchmake(self, data: PrivateLobbyCreate) -> PrivateLobbyMemberOut:
@@ -41,3 +48,27 @@ class PublicLobbyService:
             except RuntimeError:
                 continue
         return self.repo.create_lobby(data)
+
+    def get_turn_state(self, lobby_id: int) -> LobbyTurnStateOut:
+        members = self.repo.get_lobby(lobby_id)
+        return turn_state_store.get_state(
+            lobby_kind="public",
+            lobby_id=lobby_id,
+            members=members,
+        )
+
+    def submit_turn_score(
+        self,
+        *,
+        lobby_id: int,
+        actor_user_id: str,
+        score: float,
+    ) -> LobbyTurnStateOut:
+        members = self.repo.get_lobby(lobby_id)
+        return turn_state_store.submit_score(
+            lobby_kind="public",
+            lobby_id=lobby_id,
+            members=members,
+            actor_user_id=actor_user_id,
+            score=score,
+        )

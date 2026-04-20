@@ -443,6 +443,40 @@ class GroupSessionController extends ChangeNotifier {
     );
   }
 
+  Future<Map<String, dynamic>> getLobbyTurnState({
+    required int lobbyId,
+    required String lobbyKind,
+  }) async {
+    final token = _auth.accessToken;
+    if (token == null || token.isEmpty) {
+      throw StateError('Not authenticated');
+    }
+    final base = lobbyKind == 'public' ? '/public_lobbies' : '/private_lobbies';
+    return _api.getJson(
+      '$base/$lobbyId/turn_state',
+      accessToken: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> submitLobbyTurnScore({
+    required int lobbyId,
+    required String lobbyKind,
+    required double score,
+  }) async {
+    final token = _auth.accessToken;
+    if (token == null || token.isEmpty) {
+      throw StateError('Not authenticated');
+    }
+    final base = lobbyKind == 'public' ? '/public_lobbies' : '/private_lobbies';
+    return _api.postJson(
+      '$base/$lobbyId/turn_state/score',
+      accessToken: token,
+      body: {
+        'score': score,
+      },
+    );
+  }
+
   @override
   void dispose() {
     unsubscribeFromLobby();

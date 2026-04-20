@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -6,7 +7,6 @@ import 'package:provider/provider.dart';
 
 import '../../../app/constants.dart';
 import '../../../app/routes.dart';
-import '../../../common/widgets/primary_button.dart';
 import '../controllers/group_session_controller.dart';
 import '../models/private_lobby.dart';
 import '../widgets/quit_group_session_back_button.dart';
@@ -25,10 +25,23 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   String? _voiceError;
   bool _voiceConnecting = false;
   bool _micEnabled = false;
+  bool _turnSyncing = false;
+  Timer? _turnPoller;
+  String _lobbyKind = 'private';
+  final TextEditingController _scoreController = TextEditingController();
+  _LobbyTurnState? _turnState;
+  final Set<String> _newlyPlantedFlags = <String>{};
 
   @override
   void initState() {
     super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _lobbyKind = ModalRoute.of(context)?.settings.arguments as String? ?? 'private';
+    _startTurnStatePolling();
   }
 
   Future<void> _connectVoice() async {
@@ -109,6 +122,98 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     }
   }
 
+  Future<void> _submitCurrentScore(List<PrivateLobby> players) async {
+    final state = _turnState;
+    if (players.isEmpty || state == null || state.roundComplete) return;
+    final value = double.tryParse(_scoreController.text.trim());
+    if (value == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a numeric score first.')),
+      );
+      return;
+    }
+
+    final lobbyId = int.tryParse(players.first.lobbyId);
+    if (lobbyId == null) return;
+
+    final ctrl = context.read<GroupSessionController>();
+    try {
+      final json = await ctrl.submitLobbyTurnScore(
+        lobbyId: lobbyId,
+        lobbyKind: _lobbyKind,
+        score: (value.clamp(0, 100) as num).toDouble(),
+      );
+      final next = _LobbyTurnState.fromJson(json);
+      final latestUserId = next.latestScoredUserId;
+      if (!mounted) return;
+      setState(() {
+        _turnState = next;
+        _scoreController.clear();
+        if (latestUserId != null) {
+          _newlyPlantedFlags.add(latestUserId);
+        }
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 850));
+      if (!mounted || latestUserId == null) return;
+      setState(() {
+        _newlyPlantedFlags.remove(latestUserId);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Score submit failed (check turn order).')),
+      );
+      await _syncTurnState();
+    }
+  }
+
+  void _startTurnStatePolling() {
+    _turnPoller?.cancel();
+    _turnPoller = Timer.periodic(const Duration(seconds: 2), (_) {
+      unawaited(_syncTurnState());
+    });
+    unawaited(_syncTurnState());
+  }
+
+  Future<void> _syncTurnState() async {
+    if (_turnSyncing) return;
+    final ctrl = context.read<GroupSessionController>();
+    final players = ctrl.privateLobby;
+    if (players.isEmpty) return;
+    final lobbyId = int.tryParse(players.first.lobbyId);
+    if (lobbyId == null) return;
+    _turnSyncing = true;
+    try {
+      final json = await ctrl.getLobbyTurnState(
+        lobbyId: lobbyId,
+        lobbyKind: _lobbyKind,
+      );
+      final next = _LobbyTurnState.fromJson(json);
+      final prevSeq = _turnState?.eventSeq ?? 0;
+      final nextSeq = next.eventSeq;
+      final latestUserId = next.latestScoredUserId;
+      if (!mounted) return;
+      setState(() {
+        _turnState = next;
+        if (latestUserId != null && nextSeq > prevSeq) {
+          _newlyPlantedFlags.add(latestUserId);
+        }
+      });
+      if (latestUserId != null && nextSeq > prevSeq) {
+        await Future<void>.delayed(const Duration(milliseconds: 850));
+        if (!mounted) return;
+        setState(() {
+          _newlyPlantedFlags.remove(latestUserId);
+        });
+      }
+    } catch (_) {
+      // Keep current UI state if backend sync fails transiently.
+    } finally {
+      _turnSyncing = false;
+    }
+  }
+
   Future<void> _toggleMic() async {
     final room = _room;
     if (room == null) return;
@@ -127,20 +232,6 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
       setState(() {
         _voiceError = 'Failed to toggle mic: $e';
       });
-    }
-  }
-
-  Color _statusColor(String state) {
-    switch (state) {
-      case 'connected':
-        return AppColors.success;
-      case 'reconnecting':
-      case 'connecting':
-        return AppColors.accent2;
-      case 'disconnected':
-        return AppColors.failure;
-      default:
-        return AppColors.textSecondary;
     }
   }
 
@@ -179,6 +270,8 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
 
   @override
   void dispose() {
+    _turnPoller?.cancel();
+    _scoreController.dispose();
     unawaited(_disconnectVoice());
     super.dispose();
   }
@@ -187,33 +280,21 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   Widget build(BuildContext context) {
     final ctrl = context.watch<GroupSessionController>();
     final t = Theme.of(context);
-
-    final String lobbyCode;
-    if (ctrl.isLoading) {
-      lobbyCode = 'Loading...';
-    } else if (ctrl.privateLobby.isNotEmpty) {
-      lobbyCode = ctrl.privateLobby.first.lobbyId;
-    } else if (ctrl.error != null) {
-      lobbyCode = 'Error';
-    } else {
-      lobbyCode = '------';
-    }
-
-    final remoteCount = _room?.remoteParticipants.length ?? 0;
-    final voiceState = _room?.connectionState.name ?? '—';
-    final remoteAudioTracks = _room?.remoteParticipants.values
-            .expand((p) => p.trackPublications.values)
-            .where((pub) => pub.track is RemoteAudioTrack)
-            .length ??
-        0;
+    final players = ctrl.privateLobby;
+    final state = _turnState;
+    final allTurnsScored = state?.roundComplete ?? false;
+    final queue = state?.queueParticipants ?? const <_TurnParticipant>[];
+    final currentPlayer = state?.currentPlayer;
+    final scoresByPlayer = state?.scoresByPlayer ?? const <String, double>{};
 
     return Scaffold(
+      backgroundColor: AppColors.primaryBg,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 460),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
               child: Column(
                 children: [
                   Stack(
@@ -223,109 +304,589 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                         alignment: Alignment.center,
                         child: Padding(
                           padding: const EdgeInsets.only(top: 8),
-                          child: Text('Lobby', style: t.textTheme.headlineMedium),
+                          child: Text(
+                            'Time',
+                            style: t.textTheme.headlineMedium?.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Divider(color: AppColors.border, thickness: 5),
-                  const Spacer(),
+                  const SizedBox(height: 2),
                   Text(
-                    'Code: $lobbyCode',
-                    style: t.textTheme.titleLarge,
+                    '10',
+                    style: t.textTheme.displayLarge?.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  if (_voiceConnecting)
-                    Text(
-                      'Connecting voice…',
-                      style: t.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-                    )
-                  else if (_voiceError != null)
-                    Text(
-                      _voiceError!,
-                      style: t.textTheme.bodyMedium?.copyWith(color: AppColors.failure),
-                      textAlign: TextAlign.center,
-                    )
-                  else if (_room != null) ...[
-                    Text(
-                      'Voice: $voiceState',
-                      style: t.textTheme.bodyMedium,
+                  const SizedBox(height: 4),
+                  Text(
+                    'Prompt:',
+                    style: t.textTheme.titleLarge?.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
                     ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _statusColor(voiceState).withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: _statusColor(voiceState)),
-                      ),
-                      child: Text(
-                        voiceState.toUpperCase(),
-                        style: t.textTheme.bodySmall?.copyWith(
-                          color: _statusColor(voiceState),
-                          fontWeight: FontWeight.w700,
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface.withValues(alpha: 0.78),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Lieutenant',
+                          style: t.textTheme.headlineMedium?.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Participants in call: ${remoteCount + 1} (incl. you)',
-                      style: t.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Remote audio tracks: $remoteAudioTracks | Mic published: ${_micEnabled ? 'yes' : 'no'}',
-                      style: t.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                  if (_room == null)
-                    PrimaryButton(
-                      text: 'Join Voice',
-                      loading: _voiceConnecting,
-                      onPressed: _voiceConnecting ? null : _connectVoice,
+                        Text(
+                          "lu'tɛnənt",
+                          style: t.textTheme.titleMedium?.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
                     )
-                  else
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _toggleMic,
-                        icon: Icon(
-                          _micEnabled ? Icons.mic_rounded : Icons.mic_off_rounded,
-                        ),
-                        label: Text(_micEnabled ? 'Mute Mic' : 'Unmute Mic'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textPrimary,
-                          side: const BorderSide(color: AppColors.border, width: 2),
-                        ),
-                      ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    allTurnsScored
+                        ? 'Round complete!'
+                        : '${currentPlayer?.displayName ?? 'Player'} get ready!',
+                    style: t.textTheme.titleLarge?.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w800,
                     ),
-                  if (ctrl.error != null) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      ctrl.error!,
-                      style: t.textTheme.bodyMedium?.copyWith(color: AppColors.failure),
-                      textAlign: TextAlign.center,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: _TurnMountainView(
+                      players: players,
+                      orderedPlayers: queue,
+                      currentPlayerId: currentPlayer?.userId,
+                      scoresByPlayer: scoresByPlayer,
+                      newlyPlantedFlags: _newlyPlantedFlags,
                     ),
-                  ],
-                  const SizedBox(height: 18),
-                  PrimaryButton(
-                    text: 'Leave lobby',
-                    loading: ctrl.isLoading,
-                    onPressed: ctrl.privateLobby.isEmpty
+                  ),
+                  const SizedBox(height: 10),
+                  _RecordButton(
+                    connecting: _voiceConnecting,
+                    connected: _room != null,
+                    micEnabled: _micEnabled,
+                    onPressed: _voiceConnecting
                         ? null
-                        : () => _leaveLobby(context),
+                        : () {
+                            if (_room == null) {
+                              _connectVoice();
+                            } else {
+                              _toggleMic();
+                            }
+                          },
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 10),
+                  if (_room != null || _voiceConnecting)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _voiceConnecting
+                                ? AppColors.accent2
+                                : (_room != null ? AppColors.success : AppColors.failure),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _voiceConnecting
+                              ? 'Connecting voice...'
+                              : (_room != null ? 'Connected to voice' : 'Voice offline'),
+                          style: t.textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  if (_voiceError != null && _room == null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Voice unavailable',
+                      style: t.textTheme.bodySmall?.copyWith(color: AppColors.failure),
+                    )
+                  ],
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _scoreController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: t.textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'Enter score (0-100)',
+                      hintStyle: t.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                      filled: true,
+                      fillColor: AppColors.surface.withValues(alpha: 0.6),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadii.md),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onSubmitted: (_) => _submitCurrentScore(players),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: (players.isEmpty || allTurnsScored)
+                          ? null
+                          : () => _submitCurrentScore(players),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.surface,
+                        foregroundColor: AppColors.textPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadii.md),
+                          side: const BorderSide(color: AppColors.border),
+                        ),
+                      ),
+                      child: Text(allTurnsScored ? 'All turns submitted' : 'Submit score'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: ctrl.isLoading || players.isEmpty ? null : () => _leaveLobby(context),
+                    child: Text(
+                      'Leave lobby',
+                      style: t.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TurnMountainView extends StatelessWidget {
+  const _TurnMountainView({
+    required this.players,
+    required this.orderedPlayers,
+    required this.currentPlayerId,
+    required this.scoresByPlayer,
+    required this.newlyPlantedFlags,
+  });
+
+  final List<PrivateLobby> players;
+  final List<_TurnParticipant> orderedPlayers;
+  final String? currentPlayerId;
+  final Map<String, double> scoresByPlayer;
+  final Set<String> newlyPlantedFlags;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height = constraints.maxHeight;
+        return Stack(
+          children: [
+            CustomPaint(
+              size: Size(constraints.maxWidth, height),
+              painter: _MountainPainter(),
+            ),
+            Positioned(
+              left: 30,
+              top: 8,
+              child: Text(
+                '0.00 m',
+                style: t.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Positioned(
+              left: 8,
+              top: 8,
+              child: Icon(
+                Icons.near_me_rounded,
+                color: AppColors.textPrimary,
+                size: 14,
+              ),
+            ),
+            if (players.isNotEmpty)
+              ...orderedPlayers.asMap().entries.map((entry) {
+                final i = entry.key;
+                final p = entry.value;
+                final y = 52 + i * 40.0;
+                final isCurrent = p.userId == currentPlayerId;
+                return Positioned(
+                  left: 4,
+                  top: y,
+                  child: _PlayerOrderItem(
+                    label: p.displayName,
+                    isCurrent: isCurrent,
+                    color: _playerColor(i),
+                  ),
+                );
+              }),
+            ...players.map((p) {
+              final score = scoresByPlayer[p.userId];
+              if (score == null) return const SizedBox.shrink();
+              final top = math.max(20.0, height - 42 - ((score / 100) * (height - 70)));
+              final slopeX = _mountainSlopeX(top, constraints.maxWidth, height);
+              final flagColor = _colorForUser(p.userId);
+              return Positioned(
+                left: slopeX + 10,
+                top: top,
+                child: _FlagMarker(
+                  animated: newlyPlantedFlags.contains(p.userId),
+                  color: flagColor,
+                ),
+              );
+            }),
+            // Positioned(
+            //   left: 2,
+            //   bottom: 0,
+            //   child: Text(
+            //     'Altitude',
+            //     style: t.textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
+            //   ),
+            // ),
+          ],
+        );
+      },
+    );
+  }
+
+  Color _playerColor(int idx) {
+    const palette = [
+      Color(0xFFC06BFF),
+      Color(0xFF67A9FF),
+      Color(0xFF74EC8A),
+      Color(0xFFE8F087),
+      Color(0xFFF57E62),
+    ];
+    return palette[idx % palette.length];
+  }
+
+  Color _colorForUser(String userId) {
+    final idx = orderedPlayers.indexWhere((p) => p.userId == userId);
+    if (idx < 0) return _playerColor(0);
+    return _playerColor(idx);
+  }
+
+  double _mountainSlopeX(double y, double width, double height) {
+    final start = Offset(44, height - 20);
+    final end = Offset(width * 0.82, height * 0.28);
+    final dy = start.dy - end.dy;
+    if (dy <= 0) return start.dx;
+    final t = ((start.dy - y) / dy).clamp(0.0, 1.0);
+    return start.dx + (end.dx - start.dx) * t;
+  }
+}
+
+class _MountainPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = AppColors.textPrimary.withValues(alpha: 0.85)
+      ..strokeWidth = 1.3
+      ..style = PaintingStyle.stroke;
+    final dimLinePaint = Paint()
+      ..color = AppColors.textSecondary.withValues(alpha: 0.8)
+      ..strokeWidth = 4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final verticalX = 20.0;
+    final topY = 24.0;
+    final bottomY = size.height + 16;
+    canvas.drawLine(Offset(verticalX, topY), Offset(verticalX, bottomY), linePaint);
+
+    final ridgePath = Path()
+      ..moveTo(verticalX + 24, bottomY)
+      ..lineTo(size.width * 0.84, size.height * 0.11)
+      ..lineTo(size.width + 12, size.height * 0.40);
+    canvas.drawPath(ridgePath, dimLinePaint);
+
+    final snowPath = Path()
+      ..moveTo(size.width * 0.72, size.height * 0.30) // left edge of snowcap
+      ..lineTo(size.width * 0.84, size.height * 0.14) // peak
+      ..lineTo(size.width * 0.94, size.height * 0.30) // right edge of snowcap
+      ..lineTo(size.width * 0.89, size.height * 0.27)// right slope
+      ..lineTo(size.width * 0.84, size.height * 0.30)// back to peak
+      ..lineTo(size.width * 0.78, size.height * 0.27)// left slope
+      ..close();
+    canvas.drawPath(
+      snowPath,
+      Paint()..color = AppColors.textPrimary.withValues(alpha: 0.95),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _PlayerOrderItem extends StatelessWidget {
+  const _PlayerOrderItem({
+    required this.label,
+    required this.isCurrent,
+    required this.color,
+  });
+
+  final String label;
+  final bool isCurrent;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Row(
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.primaryBg,
+            border: Border.all(
+              color: color.withValues(alpha: isCurrent ? 1 : 0.8),
+              width: isCurrent ? 2.6 : 2,
+            ),
+            boxShadow: isCurrent
+                ? [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.45),
+                      blurRadius: 8,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Icon(
+            Icons.person_outline_rounded,
+            color: color,
+            size: 17,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: t.textTheme.bodyMedium?.copyWith(
+            color: AppColors.textPrimary.withValues(alpha: isCurrent ? 1 : 0.88),
+            fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RecordButton extends StatelessWidget {
+  const _RecordButton({
+    required this.connecting,
+    required this.connected,
+    required this.micEnabled,
+    required this.onPressed,
+  });
+
+  final bool connecting;
+  final bool connected;
+  final bool micEnabled;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color ring = connected ? AppColors.textPrimary : AppColors.textSecondary;
+    final Color icon = connected
+        ? (micEnabled ? AppColors.textPrimary : AppColors.textSecondary)
+        : AppColors.textSecondary;
+
+    return GestureDetector(
+      onTap: onPressed,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        width: 108,
+        height: 108,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.textPrimary.withValues(alpha: connected ? 0.95 : 0.35),
+          border: Border.all(color: ring, width: 4),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryBg.withValues(alpha: 0.38),
+              blurRadius: 10,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        alignment: Alignment.center,
+        child: connecting
+            ? const SizedBox(
+                width: 26,
+                height: 26,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              )
+            : Icon(
+                micEnabled ? Icons.mic_rounded : Icons.mic_none_rounded,
+                size: 50,
+                color: icon,
+              ),
+      ),
+    );
+  }
+}
+
+class _FlagMarker extends StatelessWidget {
+  const _FlagMarker({required this.animated, required this.color});
+
+  final bool animated;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: animated ? 18 : 0, end: 0),
+      duration: const Duration(milliseconds: 650),
+      curve: Curves.easeOutBack,
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(value, 0),
+          child: Opacity(
+            opacity: animated ? (1 - (value / 18).clamp(0, 1)) : 1,
+            child: child,
+          ),
+        );
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 2,
+            height: 16,
+            color: AppColors.textPrimary.withValues(alpha: 0.92),
+          ),
+          ClipPath(
+            clipper: _TriangleClipper(),
+            child: Container(
+              width: 14,
+              height: 10,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TriangleClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    return Path()
+      ..moveTo(size.width, size.height * 0.5)
+      ..lineTo(0, 0)
+      ..lineTo(0, size.height)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class _LobbyTurnState {
+  const _LobbyTurnState({
+    required this.currentTurnIndex,
+    required this.participants,
+    required this.roundComplete,
+    required this.eventSeq,
+    required this.latestScoredUserId,
+  });
+
+  final int currentTurnIndex;
+  final List<_TurnParticipant> participants;
+  final bool roundComplete;
+  final int eventSeq;
+  final String? latestScoredUserId;
+
+  factory _LobbyTurnState.fromJson(Map<String, dynamic> json) {
+    final list = (json['participants'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(_TurnParticipant.fromJson)
+        .toList()
+      ..sort((a, b) => a.turnOrder.compareTo(b.turnOrder));
+    return _LobbyTurnState(
+      currentTurnIndex: (json['current_turn_index'] as num?)?.toInt() ?? 0,
+      participants: list,
+      roundComplete: json['round_complete'] == true,
+      eventSeq: (json['event_seq'] as num?)?.toInt() ?? 0,
+      latestScoredUserId: json['latest_scored_user_id'] as String?,
+    );
+  }
+
+  Map<String, double> get scoresByPlayer {
+    final out = <String, double>{};
+    for (final p in participants) {
+      if (p.score != null) {
+        out[p.userId] = p.score!;
+      }
+    }
+    return out;
+  }
+
+  _TurnParticipant? get currentPlayer {
+    if (participants.isEmpty) return null;
+    final idx = currentTurnIndex.clamp(0, participants.length - 1);
+    return participants[idx];
+  }
+
+  List<_TurnParticipant> get queueParticipants {
+    if (participants.isEmpty) return const [];
+    final idx = currentTurnIndex.clamp(0, participants.length - 1);
+    return [
+      ...participants.skip(idx),
+      ...participants.take(idx),
+    ];
+  }
+}
+
+class _TurnParticipant {
+  const _TurnParticipant({
+    required this.userId,
+    required this.displayName,
+    required this.turnOrder,
+    required this.score,
+  });
+
+  final String userId;
+  final String displayName;
+  final int turnOrder;
+  final double? score;
+
+  factory _TurnParticipant.fromJson(Map<String, dynamic> json) {
+    final dynamic rawScore = json['score'];
+    return _TurnParticipant(
+      userId: (json['user_id'] as String?) ?? '',
+      displayName: (json['username'] as String?) ?? 'Player',
+      turnOrder: (json['turn_order'] as num?)?.toInt() ?? 0,
+      score: rawScore is num ? rawScore.toDouble() : null,
     );
   }
 }

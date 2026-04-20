@@ -1,0 +1,7 @@
+
+height = 200.0  # Example height
+score = 50   # Example score
+
+top = max(20.0, height - 42 - ((score / 100) * (height - 70)))
+
+print(top)

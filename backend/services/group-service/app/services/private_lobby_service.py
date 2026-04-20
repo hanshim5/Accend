@@ -18,7 +18,14 @@ Later you might add rules like:
 from uuid import UUID
 
 from app.repositories.private_lobby_repo import PrivateLobbyRepo
-from app.schemas.private_lobby_schema import PrivateLobbyJoin, PrivateLobbyMemberOut, PrivateLobbyCreate, PrivateLobbyDeleteOut
+from app.schemas.private_lobby_schema import (
+    LobbyTurnStateOut,
+    PrivateLobbyJoin,
+    PrivateLobbyMemberOut,
+    PrivateLobbyCreate,
+    PrivateLobbyDeleteOut,
+)
+from app.services.lobby_turn_state_store import turn_state_store
 
 
 class PrivateLobbyService:
@@ -48,4 +55,29 @@ class PrivateLobbyService:
 
     def leave_lobby(self, user_id: str) -> bool:
         """Delete a private_lobbies row owned by user_id."""
+        turn_state_store.clear_user(user_id=user_id)
         return self.repo.leave_lobby(user_id)
+
+    def get_turn_state(self, lobby_id: int) -> LobbyTurnStateOut:
+        members = self.repo.get_lobby(lobby_id)
+        return turn_state_store.get_state(
+            lobby_kind="private",
+            lobby_id=lobby_id,
+            members=members,
+        )
+
+    def submit_turn_score(
+        self,
+        *,
+        lobby_id: int,
+        actor_user_id: str,
+        score: float,
+    ) -> LobbyTurnStateOut:
+        members = self.repo.get_lobby(lobby_id)
+        return turn_state_store.submit_score(
+            lobby_kind="private",
+            lobby_id=lobby_id,
+            members=members,
+            actor_user_id=actor_user_id,
+            score=score,
+        )

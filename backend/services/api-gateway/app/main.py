@@ -1003,6 +1003,48 @@ async def proxy_leave_lobby(
     return r.json()
 
 
+@app.get("/private_lobbies/{lobby_id}/turn_state")
+async def proxy_get_private_turn_state(
+    lobby_id: str,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{settings.GROUP_SERVICE_URL}/private_lobbies/{lobby_id}/turn_state",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+    return r.json()
+
+
+class LobbyTurnScoreReq(BaseModel):
+    score: float = Field(ge=0, le=100)
+
+
+@app.post("/private_lobbies/{lobby_id}/turn_state/score")
+async def proxy_submit_private_turn_score(
+    lobby_id: str,
+    body: LobbyTurnScoreReq,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.post(
+            f"{settings.GROUP_SERVICE_URL}/private_lobbies/{lobby_id}/turn_state/score",
+            headers={"X-User-Id": user_id},
+            json={"score": body.score},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+    return r.json()
+
+
 # -----------------------------------
 # Public lobbies (matchmaking)
 # -----------------------------------
@@ -1119,6 +1161,44 @@ async def proxy_leave_public_lobby(
     if r.status_code >= 400:
         raise HTTPException(status_code=r.status_code, detail=r.text)
 
+    return r.json()
+
+
+@app.get("/public_lobbies/{lobby_id}/turn_state")
+async def proxy_get_public_turn_state(
+    lobby_id: str,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{settings.GROUP_SERVICE_URL}/public_lobbies/{lobby_id}/turn_state",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+    return r.json()
+
+
+@app.post("/public_lobbies/{lobby_id}/turn_state/score")
+async def proxy_submit_public_turn_score(
+    lobby_id: str,
+    body: LobbyTurnScoreReq,
+    authorization: str | None = Header(default=None),
+):
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.post(
+            f"{settings.GROUP_SERVICE_URL}/public_lobbies/{lobby_id}/turn_state/score",
+            headers={"X-User-Id": user_id},
+            json={"score": body.score},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
     return r.json()
 
 
