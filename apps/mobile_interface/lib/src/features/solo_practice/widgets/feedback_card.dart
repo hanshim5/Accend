@@ -15,61 +15,45 @@ Color feedbackScoreColor(double? accuracy) {
   return AppColors.failure;
 }
 
-/// Word-level color that balances the aggregate score with phoneme analysis.
+/// Word-level color driven by the worst phoneme, with a one-outlier grace rule.
 ///
-/// Strategy — use [word.accuracy] as the primary signal, then apply phoneme
-/// penalties only for phonemes that are *clearly* wrong (< 60):
-///
-///  • No phoneme data            → [feedbackScoreColor] on [word.accuracy].
-///  • ≥ 2 red phonemes (< 60),
-///    OR red share > 40%         → failure red (multiple clear errors).
-///  • 1 red phoneme              → downgrade one level:
-///                                   green  → action orange
-///                                   orange → stays orange  (already flagged)
-///                                   red    → stays red
-///  • No red phonemes            → [feedbackScoreColor] on [word.accuracy].
-///
-/// Borderline phonemes (60–84) do NOT trigger a downgrade on their own;
-/// the aggregate [word.accuracy] already reflects them naturally.
+///  • No phoneme data   → [feedbackScoreColor] on [word.accuracy].
+///  • Substitutions (user said a different phoneme) count as red, mirroring
+///    [userSaidPhonemeColor].
+///  • ≥ 2 red phonemes  → failure red.
+///  • 1 red phoneme     → action orange (grace: one isolated mistake ≠ red word).
+///  • Any yellow (60–84, no substitution) → action orange.
+///  • All green (≥ 85)  → success green.
 Color strictWordColor(WordFeedback word) {
   if (word.phonemes.isEmpty) return feedbackScoreColor(word.accuracy);
 
-  final accuracies = word.phonemes.map((p) => p.accuracy ?? 100.0).toList();
-  final total = accuracies.length;
-  final redCount = accuracies.where((a) => a < 60).length;
+  int redCount = 0;
+  bool hasYellow = false;
 
-  // Multiple clearly-wrong phonemes → hard red.
-  if (redCount >= 2 || redCount / total > 0.40) return AppColors.failure;
-
-  final base = feedbackScoreColor(word.accuracy);
-
-  // One clearly-wrong phoneme → bump down one level from the base.
-  if (redCount == 1) {
-    return base == AppColors.success ? AppColors.action : base;
+  for (final p in word.phonemes) {
+    final isSubstitution = p.userSaid != null && p.userSaid != p.symbol;
+    final accuracy = p.accuracy ?? 100.0;
+    if (isSubstitution || accuracy < 60) {
+      redCount++;
+    } else if (accuracy < 85) {
+      hasYellow = true;
+    }
   }
 
-  // A phoneme substitution (user said a different symbol with accuracy < 85)
-  // counts as a meaningful error even if the aggregate score looks good.
-  final hasSubstitution = word.phonemes.any(
-    (p) => p.userSaid != null && p.userSaid != p.symbol && (p.accuracy ?? 100.0) < 85,
-  );
-
-  // Two or more imperfect phonemes (60–84) also prevent a green rating.
-  final orangeCount = accuracies.where((a) => a >= 60 && a < 85).length;
-
-  if ((hasSubstitution || orangeCount >= 2) && base == AppColors.success) {
-    return AppColors.action;
-  }
-
-  return base;
+  if (redCount >= 2) return AppColors.failure;
+  if (redCount == 1) return AppColors.action;
+  if (hasYellow) return AppColors.action;
+  return AppColors.success;
 }
 
 /// Color for a "You said" phoneme chip — green only when the symbol matches
-/// AND accuracy is high (≥ 85).
+/// AND accuracy is high (≥ 85). A substitution (different phoneme) is always red.
 Color userSaidPhonemeColor(PhonemeFeedback p) {
   final said = p.userSaid ?? p.symbol;
   final symbolMatches = said == p.symbol;
   if (symbolMatches && (p.accuracy ?? 0) >= 85) return AppColors.success;
+  // Substitution: user produced a different phoneme — always failure red.
+  if (!symbolMatches) return AppColors.failure;
   final c = feedbackScoreColor(p.accuracy);
   return c == AppColors.success ? AppColors.action : c;
 }
