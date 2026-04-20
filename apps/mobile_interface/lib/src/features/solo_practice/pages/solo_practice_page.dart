@@ -14,8 +14,8 @@ import '../../courses/controllers/courses_controller.dart';
 import '../../courses/models/lesson.dart';
 import '../../progress/services/progress_service.dart';
 import '../controllers/solo_practice_controller.dart';
-import '../widgets/feedback_card.dart';
 import '../../../common/widgets/interactive_feedback_sentence.dart';
+import '../../../common/widgets/phoneme_feedback.dart';
 
 // ---------------------------------------------------------------------------
 // Page
