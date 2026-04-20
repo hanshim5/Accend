@@ -45,12 +45,14 @@ class _MyAppState extends State<MyApp> {
 
       if (data.event == AuthChangeEvent.passwordRecovery) {
         debugPrint('Navigating to reset password page');
-        final navigator = _navigatorKey.currentState;
-        if (navigator == null) return;
-        navigator.pushNamedAndRemoveUntil(
-          AppRoutes.resetPassword,
-          (route) => route.settings.name == AppRoutes.login,
-        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final navigator = _navigatorKey.currentState;
+          if (navigator == null) return;
+          navigator.pushNamedAndRemoveUntil(
+            AppRoutes.resetPassword,
+            (route) => route.settings.name == AppRoutes.login,
+          );
+        });
       }
     });
   }
