@@ -40,6 +40,23 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
   bool get _isNoDataError =>
       widget.isMetricsMode && ((_error ?? '').contains('422'));
 
+  /// True when the AI backend is temporarily overloaded (HTTP 503).
+  bool get _isServiceUnavailable => (_error ?? '').contains('503');
+
+  /// User-facing error message — never shows raw JSON or exception strings.
+  String get _displayError {
+    if (_isNoDataError) return '';
+    if (_isServiceUnavailable) {
+      return 'The AI is temporarily busy due to high demand. Please try again in a moment.';
+    }
+    final raw = _error ?? '';
+    // Strip the "ApiException(NNN): " prefix if present, show just the detail.
+    final prefixPattern = RegExp(r'^ApiException\(\d+\):\s*');
+    return prefixPattern.hasMatch(raw)
+        ? raw.replaceFirst(prefixPattern, '')
+        : 'There was an error generating your course. Please try again.';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -242,7 +259,7 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
         Text(
           isNoData
               ? 'Complete at least one pronunciation session first. Your phoneme scores will be used to build a course targeted at your weakest sounds.'
-              : (_error ?? 'There was an error generating your course. Please try again.'),
+              : _displayError,
           textAlign: TextAlign.center,
           style: textTheme.bodyMedium?.copyWith(
             color: AppColors.textSecondary,

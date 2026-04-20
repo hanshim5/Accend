@@ -331,7 +331,7 @@ def generate_course_from_prompt(prompt: str) -> dict:
     except Exception as e:
         if not allow_fallback:
             print("Gemini failed and fallback disabled:", repr(e), flush=True)
-            raise
+            raise RuntimeError(str(e)) from e
 
         print("Gemini failed, falling back to stub:", repr(e), flush=True)
         title = f"[STUB] {prompt_clean[:60]}".strip() or "[STUB] New Course"
@@ -449,7 +449,7 @@ def generate_course_from_metrics(user_id: str) -> dict:
     except Exception as e:
         if not allow_fallback:
             print("Gemini failed and fallback disabled:", repr(e), flush=True)
-            raise
+            raise RuntimeError(str(e)) from e
 
         print("Gemini failed, falling back to stub:", repr(e), flush=True)
 

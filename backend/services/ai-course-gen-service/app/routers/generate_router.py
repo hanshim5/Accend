@@ -63,8 +63,15 @@ async def generate_course(body: GenerateCourseReq):
     if not prompt:
         raise HTTPException(status_code=400, detail="Prompt must be non-empty")
 
-    # Delegate actual generation logic to the AI service layer.
-    result = generate_course_from_prompt(prompt)
+    try:
+        result = generate_course_from_prompt(prompt)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        msg = str(exc)
+        if "503" in msg or "UNAVAILABLE" in msg:
+            raise HTTPException(status_code=503, detail="AI generation service temporarily unavailable. Please try again.")
+        raise HTTPException(status_code=502, detail=msg)
 
     # The generated result is expected to match the response schema shape:
     # {"title": ..., "lessons": [{...}]}
@@ -102,6 +109,8 @@ async def generate_course_from_user_metrics(
         msg = str(exc)
         if "SUPABASE_URL" in msg or "SUPABASE_SERVICE_ROLE_KEY" in msg:
             raise HTTPException(status_code=503, detail=msg)
+        if "503" in msg or "UNAVAILABLE" in msg:
+            raise HTTPException(status_code=503, detail="AI generation service temporarily unavailable. Please try again.")
         raise HTTPException(status_code=502, detail=msg)
 
     return result

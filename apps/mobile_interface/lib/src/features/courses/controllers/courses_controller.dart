@@ -119,7 +119,7 @@ class CoursesController extends ChangeNotifier {
         lessons: createdLessons,
       );
     } catch (e) {
-      _generateError = e.toString();
+      _generateError = e is ApiException ? 'ApiException(${e.statusCode}): ${e.detail}' : e.toString();
       return null;
     } finally {
       _isGenerating = false;
@@ -168,7 +168,7 @@ class CoursesController extends ChangeNotifier {
         lessons: createdLessons,
       );
     } catch (e) {
-      _generateError = e.toString();
+      _generateError = e is ApiException ? 'ApiException(${e.statusCode}): ${e.detail}' : e.toString();
       return null;
     } finally {
       _isGenerating = false;
