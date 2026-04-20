@@ -80,16 +80,19 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Dialog(
       backgroundColor: Colors.transparent,
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadii.lg),
         ),
-        child: _emailSent ? _buildConfirmation(t) : _buildForm(t),
+        child: SingleChildScrollView(
+          child: _emailSent ? _buildConfirmation(t) : _buildForm(t),
+        ),
       ),
     );
   }

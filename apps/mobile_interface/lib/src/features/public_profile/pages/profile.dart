@@ -190,15 +190,18 @@ class _ProfilePageState extends State<ProfilePage> {
     bool isRefreshing,
     bool isSaving,
   ) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
     return Scaffold(
       backgroundColor: AppColors.primaryBg,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Column(
           children: [
             const _Header(),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 24 + bottomInset),
                 children: [
                   if (isRefreshing) ...[
                     const LinearProgressIndicator(minHeight: 2),

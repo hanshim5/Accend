@@ -55,9 +55,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Scaffold(
       backgroundColor: AppColors.primaryBg,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: AppColors.primaryBg,
         elevation: 0,
@@ -70,7 +72,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+            padding: EdgeInsets.fromLTRB(28, 24, 28, 24 + bottomInset),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 320),
               child: Form(
