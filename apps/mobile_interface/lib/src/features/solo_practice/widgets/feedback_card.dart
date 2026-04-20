@@ -15,20 +15,19 @@ Color feedbackScoreColor(double? accuracy) {
   return AppColors.failure;
 }
 
-/// Word-level color driven by the worst phoneme, with a one-outlier grace rule.
+/// Word-level color based on phoneme counts.
 ///
-///  • No phoneme data   → [feedbackScoreColor] on [word.accuracy].
-///  • Substitutions (user said a different phoneme) count as red, mirroring
-///    [userSaidPhonemeColor].
-///  • ≥ 2 red phonemes  → failure red.
-///  • 1 red phoneme     → action orange (grace: one isolated mistake ≠ red word).
-///  • Any yellow (60–84, no substitution) → action orange.
-///  • All green (≥ 85)  → success green.
+///  • No phoneme data    → [feedbackScoreColor] on [word.accuracy].
+///  • Substitutions count as red, mirroring [userSaidPhonemeColor].
+///  • ≥ 2 red (< 60)    → failure red.
+///  • 1 red             → action orange (one isolated error ≠ red word).
+///  • ≥ 2 yellow (60–84) → action orange (two borderline phonemes = flagged).
+///  • 0–1 yellow, 0 red → success green (single API noise ignored).
 Color strictWordColor(WordFeedback word) {
   if (word.phonemes.isEmpty) return feedbackScoreColor(word.accuracy);
 
   int redCount = 0;
-  bool hasYellow = false;
+  int yellowCount = 0;
 
   for (final p in word.phonemes) {
     final isSubstitution = p.userSaid != null && p.userSaid != p.symbol;
@@ -36,13 +35,13 @@ Color strictWordColor(WordFeedback word) {
     if (isSubstitution || accuracy < 60) {
       redCount++;
     } else if (accuracy < 85) {
-      hasYellow = true;
+      yellowCount++;
     }
   }
 
   if (redCount >= 2) return AppColors.failure;
   if (redCount == 1) return AppColors.action;
-  if (hasYellow) return AppColors.action;
+  if (yellowCount >= 2) return AppColors.action;
   return AppColors.success;
 }
 
