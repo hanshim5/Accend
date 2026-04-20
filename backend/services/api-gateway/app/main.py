@@ -804,6 +804,132 @@ async def generate_course(
         }
 
 
+@app.post("/ai/generate-course-from-metrics")
+async def generate_course_from_metrics(
+    authorization: str | None = Header(default=None),
+):
+    """
+    Generate and persist a course targeting the user's weakest phonemes.
+
+    This is the metrics-driven counterpart to POST /ai/generate-course.
+    Instead of accepting a free-text prompt, it reads the authenticated
+    user's phoneme accuracy data and automatically generates a course
+    designed to address their specific pronunciation weaknesses.
+
+    Flow:
+    1. Validate JWT and extract user_id.
+    2. Call AI service to generate a phoneme-targeted course (no prompt needed).
+    3. Create the parent course row in courses-service.
+    4. Normalize and persist the generated curriculum in courses-service.
+    5. Return an aggregated response: created course + lessons + raw AI output.
+
+    Error responses:
+    - 422 if the user has no phoneme practice data yet.
+    - 503 if the AI service is missing Supabase configuration.
+    - 502 if any downstream service fails unexpectedly.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        # Ask the AI service to generate a course from the user's phoneme metrics.
+        # X-User-Id is forwarded so the AI service can query user_phoneme_metrics.
+        ai_resp = await client.post(
+            f"{settings.AI_COURSE_GEN_SERVICE_URL}/generate-course-from-metrics",
+            headers={"X-User-Id": user_id},
+        )
+
+        if ai_resp.status_code >= 400:
+            raise HTTPException(
+                status_code=ai_resp.status_code,
+                detail=ai_resp.text,
+            )
+
+        ai_data = ai_resp.json()
+
+        if "title" not in ai_data:
+            raise HTTPException(status_code=502, detail="AI service returned no title")
+
+        title = ai_data.get("title", "Pronunciation Practice")
+        image_url = ai_data.get("image_url")
+
+        # Create the parent course row.
+        course_resp = await client.post(
+            f"{settings.COURSES_SERVICE_URL}/courses",
+            headers={"X-User-Id": user_id},
+            json={
+                "title": title,
+                "image_url": image_url,
+            },
+        )
+
+        if course_resp.status_code >= 400:
+            raise HTTPException(
+                status_code=course_resp.status_code,
+                detail=course_resp.text,
+            )
+
+        course_row = course_resp.json()
+        course_id = course_row.get("id")
+        if not course_id:
+            raise HTTPException(status_code=502, detail="Courses service returned no id")
+
+        # Normalize AI lesson output into the curriculum payload expected by courses-service.
+        curriculum_payload: dict = {"lessons": []}
+
+        raw_lessons = ai_data.get("lessons") or ai_data.get("outline") or []
+        for raw_l in raw_lessons:
+            if isinstance(raw_l, str):
+                lesson_title = raw_l
+                lesson_items = []
+            elif isinstance(raw_l, dict):
+                lesson_title = raw_l.get("title") or raw_l.get("lesson_title") or "Untitled lesson"
+                lesson_items = raw_l.get("items") or raw_l.get("phrases") or []
+            else:
+                continue
+
+            normalized_items = []
+            for it in lesson_items:
+                if isinstance(it, str):
+                    normalized_items.append({"text": it})
+                elif isinstance(it, dict) and it.get("text"):
+                    normalized_items.append({
+                        "text": it["text"],
+                        "ipa": it.get("ipa"),
+                        "hint": it.get("hint"),
+                    })
+
+            if not normalized_items:
+                continue
+
+            curriculum_payload["lessons"].append({
+                "title": lesson_title,
+                "items": normalized_items,
+            })
+
+        if curriculum_payload["lessons"]:
+            curriculum_resp = await client.post(
+                f"{settings.COURSES_SERVICE_URL}/courses/{course_id}/curriculum",
+                headers={"X-User-Id": user_id},
+                json=curriculum_payload,
+            )
+
+            if curriculum_resp.status_code >= 400:
+                raise HTTPException(
+                    status_code=curriculum_resp.status_code,
+                    detail={"courses_error": curriculum_resp.text, "ai_preview": ai_data},
+                )
+
+            curriculum_rows = curriculum_resp.json()
+        else:
+            curriculum_rows = []
+
+        return {
+            "course": course_row,
+            "lessons": curriculum_rows,
+            "ai": ai_data,
+        }
+
+
 # -----------------------------------
 # Pronunciation Feedback
 # -----------------------------------

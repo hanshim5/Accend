@@ -21,9 +21,9 @@ Endpoints:
 - POST /generate-course
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from ..schemas.generate_schema import GenerateCourseReq, GenerateCourseRes
-from ..services.ai_service import generate_course_from_prompt
+from ..services.ai_service import generate_course_from_prompt, generate_course_from_metrics
 
 # Router for AI course generation endpoints.
 router = APIRouter()
@@ -68,4 +68,40 @@ async def generate_course(body: GenerateCourseReq):
 
     # The generated result is expected to match the response schema shape:
     # {"title": ..., "lessons": [{...}]}
+    return result
+
+
+@router.post("/generate-course-from-metrics", response_model=GenerateCourseRes)
+async def generate_course_from_user_metrics(
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+):
+    """
+    Generate a pronunciation course targeting the user's weakest phonemes.
+
+    Flow:
+    1. Extract authenticated user identity from the X-User-Id header (set by Gateway).
+    2. Fetch the user's lowest-accuracy phonemes from user_phoneme_metrics.
+    3. Build a phoneme-targeted prompt from those results.
+    4. Call Gemini to generate a structured course focused on those sounds.
+    5. Return response validated as GenerateCourseRes.
+
+    Notes:
+    - X-User-Id is trusted because it is set by the Gateway after JWT verification.
+    - Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to be configured.
+    - Returns 422 if the user has no phoneme practice data yet.
+    - Returns 503 if Supabase is not configured on this service.
+    """
+    if not x_user_id or not x_user_id.strip():
+        raise HTTPException(status_code=401, detail="Missing X-User-Id")
+
+    try:
+        result = generate_course_from_metrics(x_user_id.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except RuntimeError as exc:
+        msg = str(exc)
+        if "SUPABASE_URL" in msg or "SUPABASE_SERVICE_ROLE_KEY" in msg:
+            raise HTTPException(status_code=503, detail=msg)
+        raise HTTPException(status_code=502, detail=msg)
+
     return result

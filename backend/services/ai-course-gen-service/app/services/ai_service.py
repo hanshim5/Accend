@@ -42,6 +42,15 @@ from google.genai import types
 
 from ..schemas.generate_schema import Lesson, LessonItem
 from .image_selection_service import select_course_image
+from ..clients.supabase import rest_get
+
+
+# Maximum number of weak phonemes to include in one targeted course.
+_MAX_TARGET_PHONEMES = 5
+
+# Minimum practice attempts required for a phoneme to be considered meaningful data.
+# Phonemes below this threshold are excluded unless no others are available.
+_MIN_ATTEMPTS_PREFERRED = 3
 
 
 # -------------------------
@@ -331,5 +340,128 @@ def generate_course_from_prompt(prompt: str) -> dict:
         return {
             "title": title,
             "image_url": select_course_image(title),
+            "lessons": [lesson.dict() for lesson in lessons],
+        }
+
+
+# -------------------------
+# Metrics-based generation
+# -------------------------
+
+def _fetch_weak_phonemes(user_id: str) -> list[dict]:
+    """
+    Fetch the user's weakest phonemes from user_phoneme_metrics.
+
+    Strategy:
+    1. Query all phoneme rows for the user, ordered by accuracy ascending.
+    2. Prefer phonemes with at least _MIN_ATTEMPTS_PREFERRED attempts.
+    3. Fall back to any phoneme with at least 1 attempt if not enough preferred rows exist.
+    4. Return up to _MAX_TARGET_PHONEMES rows.
+
+    Each returned dict has:
+    - phoneme: str (ARPAbet symbol, e.g. "iy", "p")
+    - current_avg_accuracy: float (0–100)
+    - total_attempts: int
+
+    Raises:
+    - ValueError if the user has no phoneme data at all.
+    """
+    rows = rest_get(
+        table="user_phoneme_metrics",
+        params={
+            "select": "phoneme,current_avg_accuracy,total_attempts",
+            "user_id": f"eq.{user_id}",
+            "order": "current_avg_accuracy.asc",
+        },
+    )
+
+    if not rows:
+        raise ValueError(
+            "No phoneme practice data found. Complete at least one pronunciation "
+            "session before generating a metrics-based course."
+        )
+
+    # Prefer phonemes with sufficient attempts for statistical reliability.
+    preferred = [r for r in rows if int(r.get("total_attempts", 0)) >= _MIN_ATTEMPTS_PREFERRED]
+    candidates = preferred if preferred else rows
+
+    return candidates[:_MAX_TARGET_PHONEMES]
+
+
+def _build_phoneme_prompt(phonemes: list[dict]) -> str:
+    """
+    Build the "User request:" section for a phoneme-targeted course.
+
+    This string is inserted into _gemini_generate's full prompt template,
+    which already prepends _JSON_SHAPE_INSTRUCTIONS and the system context.
+    Therefore this function must describe only WHAT to generate (which
+    phonemes to target and why) — never HOW to format the output, since
+    that is fully controlled by _JSON_SHAPE_INSTRUCTIONS.
+
+    Format:
+    - Lists phonemes ranked lowest-accuracy-first with their scores.
+    - Instructs the model to focus lessons on those specific sounds.
+    """
+    lines = []
+    for p in phonemes:
+        symbol = p.get("phoneme", "?")
+        accuracy = float(p.get("current_avg_accuracy", 0))
+        lines.append(f"  - /{symbol}/ (accuracy: {accuracy:.0f}%)")
+
+    phoneme_list = "\n".join(lines)
+
+    return f"""
+Pronunciation practice course for a learner who struggles with these English phonemes (lowest accuracy first):
+
+{phoneme_list}
+
+Each lesson should target one or two of these sounds using everyday words, phrases, and short sentences that prominently feature them.
+""".strip()
+
+
+def generate_course_from_metrics(user_id: str) -> dict:
+    """
+    Generate a pronunciation course targeting the user's weakest phonemes.
+
+    Flow:
+    1. Fetch the user's lowest-accuracy phonemes from user_phoneme_metrics.
+    2. Build a phoneme-targeted prompt from those results.
+    3. Call Gemini to generate the structured course.
+    4. Fall back to a stub course if Gemini fails and fallback is enabled.
+
+    Args:
+    - user_id: The authenticated user's UUID string (from X-User-Id header).
+
+    Returns:
+    - Dict matching the GenerateCourseRes shape: {title, image_url, lessons}.
+
+    Raises:
+    - ValueError if the user has no phoneme data.
+    - RuntimeError if Gemini fails and ALLOW_STUB_FALLBACK is disabled.
+    """
+    weak_phonemes = _fetch_weak_phonemes(user_id)
+    prompt = _build_phoneme_prompt(weak_phonemes)
+
+    allow_fallback = _env_truthy("ALLOW_STUB_FALLBACK", default=True)
+
+    try:
+        return _gemini_generate(prompt)
+    except Exception as e:
+        if not allow_fallback:
+            print("Gemini failed and fallback disabled:", repr(e), flush=True)
+            raise
+
+        print("Gemini failed, falling back to stub:", repr(e), flush=True)
+
+        # Build a descriptive title from the target phonemes for the stub.
+        symbols = ", ".join(
+            f"/{p.get('phoneme', '?')}/" for p in weak_phonemes
+        )
+        title = f"[STUB] Pronunciation Practice: {symbols}"
+        lessons = stub_generate_lessons(prompt)
+
+        return {
+            "title": title,
+            "image_url": select_course_image("pronunciation"),
             "lessons": [lesson.dict() for lesson in lessons],
         }
