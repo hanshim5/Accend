@@ -23,11 +23,12 @@ class PublicLobbyService:
 
     def matchmake(self, data: PrivateLobbyCreate) -> PrivateLobbyMemberOut:
         """
-        Join the oldest joinable public lobby (<5 members, session_start false),
-        or create a new lobby if none exists. Retries briefly on race conditions.
+        Join the oldest joinable public lobby (<5 members, session_start false,
+        no blocked/blocking members), or create a new lobby if none exists.
+        Retries briefly on race conditions.
         """
         for _ in range(5):
-            lobby_id = self.repo.find_oldest_joinable_lobby_id()
+            lobby_id = self.repo.find_oldest_joinable_lobby_id(str(data.user_id))
             if lobby_id is None:
                 break
             try:

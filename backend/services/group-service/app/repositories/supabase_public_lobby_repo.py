@@ -43,19 +43,39 @@ class SupabasePublicLobbyRepo:
         )
         return [PrivateLobbyMemberOut.model_validate(row) for row in rows]
 
-    def find_oldest_joinable_lobby_id(self) -> int | None:
+    def _get_block_related_ids(self, user_id: str) -> set[str]:
+        """Return all user IDs in any block relationship with user_id (either direction)."""
+        try:
+            blocked_by_me = rest_get(
+                table="user_blocks",
+                params={"select": "blocked_id", "blocker_id": f"eq.{user_id}"},
+            )
+            blocking_me = rest_get(
+                table="user_blocks",
+                params={"select": "blocker_id", "blocked_id": f"eq.{user_id}"},
+            )
+            return (
+                {row["blocked_id"] for row in blocked_by_me if row.get("blocked_id")}
+                | {row["blocker_id"] for row in blocking_me if row.get("blocker_id")}
+            )
+        except RuntimeError:
+            return set()
+
+    def find_oldest_joinable_lobby_id(self, user_id: str) -> int | None:
         """
-        Oldest lobby = smallest min(joined_at) among lobbies with session_start=false
-        and member count < 5.
+        Oldest lobby = smallest min(joined_at) among lobbies with session_start=false,
+        member count < 5, and no members in a block relationship with user_id.
         """
         rows = rest_get(
             table="public_lobbies",
             params={
-                "select": "lobby_id,joined_at",
+                "select": "lobby_id,user_id,joined_at",
                 "session_start": "eq.false",
                 "order": "joined_at.asc",
             },
         )
+        block_related = self._get_block_related_ids(user_id)
+
         by_lobby: dict[int, list[dict]] = defaultdict(list)
         for row in rows:
             lid = row["lobby_id"]
@@ -65,6 +85,8 @@ class SupabasePublicLobbyRepo:
         best: tuple[str, int] | None = None  # (min joined_at iso, lobby_id)
         for lid, members in by_lobby.items():
             if len(members) >= 5:
+                continue
+            if any(str(m.get("user_id", "")) in block_related for m in members):
                 continue
             min_j = min(m["joined_at"] for m in members)
             if best is None or min_j < best[0]:

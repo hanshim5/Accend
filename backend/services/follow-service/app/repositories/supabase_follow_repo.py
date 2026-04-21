@@ -39,6 +39,11 @@ class SupabaseFollowRepo:
         if not follower_ids:
             return []
 
+        blocked_set = await self._get_blocked_and_blocker_ids(user_id)
+        follower_ids = [fid for fid in follower_ids if fid not in blocked_set]
+        if not follower_ids:
+            return []
+
         profiles = await self._get_profiles(follower_ids)
         following_rows = await supabase.get(
             "user_follows",
@@ -49,6 +54,7 @@ class SupabaseFollowRepo:
             },
         )
         i_follow_ids = {row["followee_id"] for row in following_rows}
+        i_block_ids = {bid for bid in blocked_set if bid in set(follower_ids)}
         metrics = await self._get_social_metrics(follower_ids)
         await self._sync_missing_profile_levels(profiles, metrics["level"])
 
@@ -57,6 +63,7 @@ class SupabaseFollowRepo:
                 profiles[follower_id],
                 i_follow=follower_id in i_follow_ids,
                 follows_me=True,
+                i_block=follower_id in i_block_ids,
                 level=metrics["level"].get(follower_id, 1),
                 current_streak=metrics["streak"].get(follower_id, 0),
                 overall_accuracy=metrics["accuracy"].get(follower_id, 0.0),
@@ -80,6 +87,11 @@ class SupabaseFollowRepo:
         if not followee_ids:
             return []
 
+        blocked_set = await self._get_blocked_and_blocker_ids(user_id)
+        followee_ids = [fid for fid in followee_ids if fid not in blocked_set]
+        if not followee_ids:
+            return []
+
         profiles = await self._get_profiles(followee_ids)
         follower_rows = await supabase.get(
             "user_follows",
@@ -98,6 +110,7 @@ class SupabaseFollowRepo:
                 profiles[followee_id],
                 i_follow=True,
                 follows_me=followee_id in follows_me_ids,
+                i_block=False,
                 level=metrics["level"].get(followee_id, 1),
                 current_streak=metrics["streak"].get(followee_id, 0),
                 overall_accuracy=metrics["accuracy"].get(followee_id, 0.0),
@@ -130,6 +143,15 @@ class SupabaseFollowRepo:
         if not candidate_ids:
             return []
 
+        # Only hide users who have blocked you — you can still find users you've blocked to unblock them.
+        blocker_ids = await self._get_blocker_ids(user_id)
+        rows = [row for row in rows if row.get("id") not in blocker_ids]
+        candidate_ids = [row["id"] for row in rows if row.get("id")]
+        if not candidate_ids:
+            return []
+
+        i_block_ids = await self._get_i_block_ids(user_id)
+
         following_rows = await supabase.get(
             "user_follows",
             params={
@@ -157,6 +179,7 @@ class SupabaseFollowRepo:
                 row,
                 i_follow=row["id"] in i_follow_ids,
                 follows_me=row["id"] in follows_me_ids,
+                i_block=row["id"] in i_block_ids,
                 level=metrics["level"].get(row["id"], 1),
                 current_streak=metrics["streak"].get(row["id"], 0),
                 overall_accuracy=metrics["accuracy"].get(row["id"], 0.0),
@@ -217,6 +240,55 @@ class SupabaseFollowRepo:
             },
         )
 
+    async def block(self, blocker_id: UUID, blocked_id: UUID) -> None:
+        if blocker_id == blocked_id:
+            from app.utils.errors import bad_request
+            bad_request("cannot block yourself")
+
+        existing = await supabase.get(
+            "user_blocks",
+            params={
+                "select": "blocker_id",
+                "blocker_id": f"eq.{blocker_id}",
+                "blocked_id": f"eq.{blocked_id}",
+                "limit": "1",
+            },
+        )
+        if existing:
+            return
+
+        try:
+            await supabase.post(
+                "user_blocks",
+                json={
+                    "blocker_id": str(blocker_id),
+                    "blocked_id": str(blocked_id),
+                },
+            )
+        except httpx.HTTPStatusError as e:
+            if e.response is not None and e.response.status_code == 409:
+                return
+            raise
+
+    async def unblock(self, blocker_id: UUID, blocked_id: UUID) -> None:
+        await supabase.delete(
+            "user_blocks",
+            params={
+                "blocker_id": f"eq.{blocker_id}",
+                "blocked_id": f"eq.{blocked_id}",
+            },
+        )
+
+    async def list_blocked_ids(self, user_id: UUID) -> list[str]:
+        rows = await supabase.get(
+            "user_blocks",
+            params={
+                "select": "blocked_id",
+                "blocker_id": f"eq.{user_id}",
+            },
+        )
+        return [row["blocked_id"] for row in rows if row.get("blocked_id")]
+
     async def delete_account(self, user_id: UUID) -> None:
         """
         Delete all follow relationships for a user.
@@ -236,6 +308,15 @@ class SupabaseFollowRepo:
         await supabase.delete(
             "user_follows",
             params={"followee_id": f"eq.{user_id}"},
+        )
+        # Delete all blocks where user is the blocker or blocked
+        await supabase.delete(
+            "user_blocks",
+            params={"blocker_id": f"eq.{user_id}"},
+        )
+        await supabase.delete(
+            "user_blocks",
+            params={"blocked_id": f"eq.{user_id}"},
         )
 
     async def _get_profiles(self, user_ids: list[str]) -> dict[str, dict]:
@@ -262,12 +343,44 @@ class SupabaseFollowRepo:
     def _in_clause(self, values: list[str]) -> str:
         return "in.(" + ",".join(values) + ")"
 
+    async def _get_blocked_and_blocker_ids(self, user_id: UUID) -> set[str]:
+        """Return all user IDs in a block relationship with user_id (either direction)."""
+        blocker_rows = await supabase.get(
+            "user_blocks",
+            params={"select": "blocked_id", "blocker_id": f"eq.{user_id}"},
+        )
+        blocked_by_rows = await supabase.get(
+            "user_blocks",
+            params={"select": "blocker_id", "blocked_id": f"eq.{user_id}"},
+        )
+        return (
+            {row["blocked_id"] for row in blocker_rows if row.get("blocked_id")}
+            | {row["blocker_id"] for row in blocked_by_rows if row.get("blocker_id")}
+        )
+
+    async def _get_blocker_ids(self, user_id: UUID) -> set[str]:
+        """Return user IDs of people who have blocked the current user."""
+        rows = await supabase.get(
+            "user_blocks",
+            params={"select": "blocker_id", "blocked_id": f"eq.{user_id}"},
+        )
+        return {row["blocker_id"] for row in rows if row.get("blocker_id")}
+
+    async def _get_i_block_ids(self, user_id: UUID) -> set[str]:
+        """Return user IDs that the current user has blocked."""
+        rows = await supabase.get(
+            "user_blocks",
+            params={"select": "blocked_id", "blocker_id": f"eq.{user_id}"},
+        )
+        return {row["blocked_id"] for row in rows if row.get("blocked_id")}
+
     def _to_social_user(
         self,
         row: dict,
         *,
         i_follow: bool,
         follows_me: bool,
+        i_block: bool = False,
         level: int,
         current_streak: int,
         overall_accuracy: float,
@@ -293,6 +406,7 @@ class SupabaseFollowRepo:
             meters_climbed=max(0, int(meters_climbed)),
             i_follow=i_follow,
             follows_me=follows_me,
+            i_block=i_block,
             profile_image_url=row.get("profile_image_url"),
         )
 

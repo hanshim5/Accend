@@ -74,6 +74,34 @@ async def unfollow_user(
     return FollowWriteResponse(ok=True)
 
 
+@router.post("/block/{blocked_id}", response_model=FollowWriteResponse)
+async def block_user(
+    blocked_id: UUID,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: FollowService = Depends(get_follow_service),
+):
+    await svc.block(_get_user_id(x_user_id), blocked_id)
+    return FollowWriteResponse(ok=True)
+
+
+@router.delete("/block/{blocked_id}", response_model=FollowWriteResponse)
+async def unblock_user(
+    blocked_id: UUID,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: FollowService = Depends(get_follow_service),
+):
+    await svc.unblock(_get_user_id(x_user_id), blocked_id)
+    return FollowWriteResponse(ok=True)
+
+
+@router.get("/blocked-ids", response_model=list[str])
+async def list_blocked_ids(
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: FollowService = Depends(get_follow_service),
+):
+    return await svc.list_blocked_ids(_get_user_id(x_user_id))
+
+
 @router.delete("/account", status_code=204)
 async def delete_account(
     x_user_id: str | None = Header(default=None, alias="X-User-Id"),

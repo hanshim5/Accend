@@ -1443,6 +1443,86 @@ async def proxy_social_unfollow_user(
     return r.json()
 
 
+@app.post("/social/block/{blocked_id}")
+async def proxy_social_block_user(
+    blocked_id: str,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Block another user through follow-service.
+
+    Flow:
+    1. Validate JWT.
+    2. Forward block request with X-User-Id.
+    3. Return downstream response.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(
+            f"{settings.FOLLOW_SERVICE_URL}/block/{blocked_id}",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.delete("/social/block/{blocked_id}")
+async def proxy_social_unblock_user(
+    blocked_id: str,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Unblock a previously blocked user through follow-service.
+
+    Flow:
+    1. Validate JWT.
+    2. Forward unblock request with X-User-Id.
+    3. Return downstream response.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.delete(
+            f"{settings.FOLLOW_SERVICE_URL}/block/{blocked_id}",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
+@app.get("/social/blocked-ids")
+async def proxy_social_blocked_ids(
+    authorization: str | None = Header(default=None),
+):
+    """
+    Fetch the list of user IDs the authenticated user has blocked.
+
+    Flow:
+    1. Validate JWT.
+    2. Forward request to follow-service with X-User-Id.
+    3. Return list of blocked user IDs.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{settings.FOLLOW_SERVICE_URL}/blocked-ids",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
 # -----------------------------------
 # Progress Service — Phoneme Scores
 # -----------------------------------
