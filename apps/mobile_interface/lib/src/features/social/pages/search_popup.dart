@@ -10,6 +10,8 @@ import 'package:provider/provider.dart';
 import '../controllers/social_controller.dart';
 import '../models/social_user.dart';
 
+import '../widgets/social_user_profile_popup.dart';
+
 class SearchPopup extends StatefulWidget {
   const SearchPopup({super.key});
 
@@ -133,6 +135,26 @@ class _SearchPopupState extends State<SearchPopup> {
       if (!mounted) return;
       setState(() {
         _error = 'Could not update follow state.';
+      });
+    }
+  }
+
+  Future<void> _toggleBlock(SocialUser user) async {
+    try {
+      final social = context.read<SocialController>();
+      if (user.iBlock) {
+        await social.unblock(user.id);
+      } else {
+        await social.block(user.id);
+      }
+
+      final currentQuery = _controller.text.trim();
+      if (currentQuery.isEmpty || !mounted) return;
+      await _searchUsers(currentQuery);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Could not update block state.';
       });
     }
   }
@@ -292,7 +314,14 @@ class _SearchPopupState extends State<SearchPopup> {
                             separatorBuilder: (_, __) => const SizedBox(height: 8),
                             itemBuilder: (context, index) {
                               final user = _results[index];
-                              return Container(
+                              return GestureDetector(
+                                onTap: () => showSocialUserProfilePopup(
+                                  context: context,
+                                  user: user,
+                                  onPrimaryAction: () => _toggleFollow(user),
+                                  onAvoidAction: () => _toggleBlock(user),
+                                ),
+                                child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: const Color(0x661E293B),
@@ -372,6 +401,7 @@ class _SearchPopupState extends State<SearchPopup> {
                                     ),
                                   ],
                                 ),
+                              ),
                               );
                             },
                           ),

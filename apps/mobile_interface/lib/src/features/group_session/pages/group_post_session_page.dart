@@ -56,6 +56,19 @@ class _GroupPostSessionPageState extends State<GroupPostSessionPage> {
     }
   }
 
+  Future<void> _toggleBlock(
+    BuildContext context,
+    String userId,
+    bool currentlyBlocked,
+  ) async {
+    final social = context.read<SocialController>();
+    if (currentlyBlocked) {
+      await social.unblock(userId);
+    } else {
+      await social.block(userId);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
@@ -94,14 +107,17 @@ class _GroupPostSessionPageState extends State<GroupPostSessionPage> {
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final p = _participants[index];
-                          final isFollowing = social.following
+                        final isFollowing = social.following
                               .any((u) => u.id == p.userId);
+                          final isBlocked = social.blockedIds.contains(p.userId);
                           return _ParticipantCard(
                             username: p.username,
                             isFollowing: isFollowing,
-                            isLoading: social.isLoading,
+                            isBlocked: isBlocked,
                             onFollowTap: () =>
                                 _toggleFollow(context, p.userId, isFollowing),
+                            onAvoidTap: () =>
+                                _toggleBlock(context, p.userId, isBlocked),
                           );
                         },
                       ),
@@ -144,14 +160,16 @@ class _ParticipantCard extends StatelessWidget {
   const _ParticipantCard({
     required this.username,
     required this.isFollowing,
-    required this.isLoading,
+    required this.isBlocked,
     required this.onFollowTap,
+    required this.onAvoidTap,
   });
 
   final String username;
   final bool isFollowing;
-  final bool isLoading;
+  final bool isBlocked;
   final VoidCallback onFollowTap;
+  final VoidCallback onAvoidTap;
 
   @override
   Widget build(BuildContext context) {
@@ -182,7 +200,7 @@ class _ParticipantCard extends StatelessWidget {
           SizedBox(
             height: 36,
             child: ElevatedButton(
-              onPressed: isLoading ? null : onFollowTap,
+              onPressed: onFollowTap,
               style: ElevatedButton.styleFrom(
                 elevation: 0,
                 backgroundColor:
@@ -195,6 +213,7 @@ class _ParticipantCard extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
+                minimumSize: const Size(96, 36),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                 textStyle: GoogleFonts.montserrat(
@@ -203,6 +222,34 @@ class _ParticipantCard extends StatelessWidget {
                 ),
               ),
               child: Text(isFollowing ? 'Following' : 'Follow'),
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            height: 36,
+            child: ElevatedButton(
+              onPressed: onAvoidTap,
+              style: ElevatedButton.styleFrom(
+                elevation: 0,
+                backgroundColor:
+                    isBlocked ? AppColors.failure : Colors.transparent,
+                foregroundColor:
+                    isBlocked ? Colors.white : AppColors.failure,
+                side: isBlocked
+                    ? BorderSide.none
+                    : const BorderSide(color: AppColors.failure, width: 1),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                minimumSize: const Size(96, 36),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                textStyle: GoogleFonts.montserrat(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              child: Text(isBlocked ? 'Avoided' : 'Avoid'),
             ),
           ),
         ],

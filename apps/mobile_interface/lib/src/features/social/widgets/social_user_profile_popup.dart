@@ -9,6 +9,7 @@ Future<void> showSocialUserProfilePopup({
   required BuildContext context,
   required SocialUser user,
   required VoidCallback onPrimaryAction,
+  required VoidCallback onAvoidAction,
 }) {
   return showDialog<void>(
     context: context,
@@ -16,21 +17,39 @@ Future<void> showSocialUserProfilePopup({
     builder: (_) => _SocialUserProfilePopup(
       user: user,
       onPrimaryAction: onPrimaryAction,
+      onAvoidAction: onAvoidAction,
     ),
   );
 }
 
-class _SocialUserProfilePopup extends StatelessWidget {
+class _SocialUserProfilePopup extends StatefulWidget {
   const _SocialUserProfilePopup({
     required this.user,
     required this.onPrimaryAction,
+    required this.onAvoidAction,
   });
 
   final SocialUser user;
   final VoidCallback onPrimaryAction;
+  final VoidCallback onAvoidAction;
+
+  @override
+  State<_SocialUserProfilePopup> createState() => _SocialUserProfilePopupState();
+}
+
+class _SocialUserProfilePopupState extends State<_SocialUserProfilePopup> {
+  late bool _isBlocked;
+
+  @override
+  void initState() {
+    super.initState();
+    _isBlocked = widget.user.iBlock;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final user = widget.user;
+    final isBlocked = _isBlocked;
     final isFollowing = user.iFollow;
     final nativeLanguage = (user.nativeLanguage?.trim().isNotEmpty ?? false)
         ? user.nativeLanguage!.trim()
@@ -226,33 +245,68 @@ class _SocialUserProfilePopup extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    onPrimaryAction();
-                    Navigator.of(context).pop();
-                  },
-                  icon: Icon(
-                    isFollowing ? Icons.person_remove_rounded : Icons.person_add_rounded,
-                    size: 18,
-                  ),
-                  label: Text(isFollowing ? 'Unfollow' : 'Follow'),
-                  style: ElevatedButton.styleFrom(
-                    elevation: 0,
-                    backgroundColor: isFollowing ? Colors.transparent : AppColors.action,
-                    foregroundColor: isFollowing ? const Color(0xFFCBD5E1) : AppColors.primaryBg,
-                    side: isFollowing
-                        ? const BorderSide(color: Color(0x7F64748B), width: 1)
-                        : BorderSide.none,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    textStyle: GoogleFonts.montserrat(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          widget.onPrimaryAction();
+                          Navigator.of(context).pop();
+                        },
+                        icon: Icon(
+                          isFollowing ? Icons.person_remove_rounded : Icons.person_add_rounded,
+                          size: 18,
+                        ),
+                        label: Text(isFollowing ? 'Unfollow' : 'Follow'),
+                        style: ElevatedButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor: isFollowing ? Colors.transparent : AppColors.action,
+                          foregroundColor: isFollowing ? const Color(0xFFCBD5E1) : AppColors.primaryBg,
+                          side: isFollowing
+                              ? const BorderSide(color: Color(0x7F64748B), width: 1)
+                              : BorderSide.none,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          textStyle: GoogleFonts.montserrat(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() => _isBlocked = !_isBlocked);
+                          widget.onAvoidAction();
+                        },
+                        icon: Icon(
+                          isBlocked ? Icons.block_rounded : Icons.person_off_rounded,
+                          size: 18,
+                        ),
+                        label: Text(isBlocked ? 'Avoided' : 'Avoid'),
+                        style: ElevatedButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor: isBlocked ? AppColors.failure : Colors.transparent,
+                          foregroundColor: isBlocked ? Colors.white : AppColors.failure,
+                          side: isBlocked
+                              ? BorderSide.none
+                              : const BorderSide(color: AppColors.failure, width: 1),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          textStyle: GoogleFonts.montserrat(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

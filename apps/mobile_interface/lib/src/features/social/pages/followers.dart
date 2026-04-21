@@ -77,8 +77,13 @@ class FollowersTab extends StatelessWidget {
 																				return;
 																			}
 																			controller.follow(user.id);
-																		},
-																	),
+																		},																	onAvoidAction: () {
+																		if (user.iBlock) {
+																			controller.unblock(user.id);
+																		} else {
+																			controller.block(user.id);
+																		}
+																	},																	),
 												);
 											},
 										),
