@@ -1,8 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:mobile_interface/src/features/group_session/pages/group_session_select_page.dart';
-import 'package:mobile_interface/src/features/group_session/pages/group_session_private_select_page.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -23,6 +21,7 @@ import 'package:mobile_interface/src/features/home/controllers/home_controller.d
 import 'package:mobile_interface/src/features/progress/services/progress_service.dart';
 
 import 'package:mobile_interface/src/common/widgets/bottom_nav_bar.dart';
+import 'package:mobile_interface/src/features/home/pages/home.dart';
 import 'package:mobile_interface/src/features/social/pages/social.dart';
 import 'package:mobile_interface/src/features/public_profile/pages/profile.dart';
 
@@ -121,7 +120,10 @@ class _MyAppState extends State<MyApp> {
 
         initialRoute: AppRoutes.login,
 
-        routes: AppRoutes.table,
+        routes: {
+          ...AppRoutes.table,
+          AppRoutes.shell: (_) => const MainShell(),
+        },
       ),
     );
   }
@@ -134,65 +136,60 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
-  int _selectedIndex = 3; // leo TODO start on Group Sessions 
+class _MainShellState extends State<MainShell> with SingleTickerProviderStateMixin {
+  int _selectedIndex = 1;
+
+  late final AnimationController _fadeController;
+  late final Animation<double> _fadeAnimation;
 
   final _pages = const [
     SocialPage(),
     HomePage(),
     ProfilePage(),
-    GroupSessionSelectPage(),
-    GroupSessionPrivateSelectPage(),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+      value: 1.0,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
+  }
+
+  void _onTabTap(int index) {
+    if (index == _selectedIndex) return;
+    _fadeController.reverse().then((_) {
+      if (!mounted) return;
+      setState(() => _selectedIndex = index);
+      _fadeController.forward();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: _pages,
+        ),
       ),
       bottomNavigationBar: BottomNavBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-      ),
-    );
-  }
-}
-
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  int _counter = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Accend')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('You have pushed the button this many times: +1'),
-            Text('$_counter', style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(context, AppRoutes.courses);
-              },
-              child: const Text("Go to Courses"),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => setState(() => _counter++),
-        child: const Icon(Icons.add),
+        onDestinationSelected: _onTabTap,
       ),
     );
   }

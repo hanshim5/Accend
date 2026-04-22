@@ -3,8 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_interface/src/app/constants.dart';
 import 'package:provider/provider.dart';
 
-import '../../../app/routes.dart';
-import '../../../common/widgets/bottom_nav_bar.dart';
 import '../controllers/social_controller.dart';
 
 import 'followers.dart';
@@ -28,19 +26,6 @@ class _SocialPageState extends State<SocialPage> {
       if (!mounted) return;
       context.read<SocialController>().load(force: true);
     });
-  }
-
-  void _onNavTap(int index) {
-    switch (index) {
-      case 0:
-        break;
-      case 1:
-        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-        break;
-      case 2:
-        Navigator.of(context).pushReplacementNamed(AppRoutes.profile);
-        break;
-    }
   }
 
   Future<void> _openSearchPopup() async {
@@ -153,10 +138,6 @@ class _SocialPageState extends State<SocialPage> {
           shape: const CircleBorder(),
           child: const Icon(Icons.search_rounded, size: 28),
         ),
-      ),
-      bottomNavigationBar: BottomNavBar(
-        selectedIndex: 0,
-        onDestinationSelected: _onNavTap,
       ),
     );
   }

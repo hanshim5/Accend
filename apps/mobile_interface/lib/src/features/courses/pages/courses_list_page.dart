@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 
 import '../../../app/constants.dart';
 import '../../../app/routes.dart';
-import '../../../common/widgets/bottom_nav_bar.dart';
 
 import '../controllers/courses_controller.dart';
 import '../models/course.dart';
@@ -44,19 +43,6 @@ class _CoursesListPageState extends State<CoursesListPage> {
     }
   }
 
-  void _onNavTap(int index) {
-    switch (index) {
-      case 0:
-        Navigator.of(context).pushReplacementNamed(AppRoutes.social);
-        break;
-      case 1:
-        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-        break;
-      case 2:
-        Navigator.of(context).pushReplacementNamed(AppRoutes.profile);
-        break;
-    }
-  }
 
   Future<void> _confirmDelete(Course course) async {
     final confirmed = await showGeneralDialog<bool>(
@@ -150,8 +136,7 @@ class _CoursesListPageState extends State<CoursesListPage> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () =>
-            Navigator.of(context).pushReplacementNamed(AppRoutes.home),
+          onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
           "Courses",
@@ -207,10 +192,6 @@ class _CoursesListPageState extends State<CoursesListPage> {
             },
           ),
         ),
-      ),
-      bottomNavigationBar: BottomNavBar(
-        selectedIndex: null,
-        onDestinationSelected: _onNavTap,
       ),
     );
   }

@@ -113,7 +113,7 @@ class _GroupPostSessionPageState extends State<GroupPostSessionPage> {
                 child: ElevatedButton(
                   onPressed: () => Navigator.pushNamedAndRemoveUntil(
                     context,
-                    AppRoutes.home,
+                    AppRoutes.shell,
                     (_) => false,
                   ),
                   style: ElevatedButton.styleFrom(

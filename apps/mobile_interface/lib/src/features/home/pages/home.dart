@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../app/constants.dart';
-import '../../../common/widgets/bottom_nav_bar.dart';
 import '../../../common/widgets/colored_button.dart';
 import '../../../app/routes.dart';
 import '../../../features/home/widgets/home_introduction.dart';
@@ -23,19 +22,6 @@ class _HomePageState extends State<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.read<HomeController>().load();
     });
-  }
-
-  void _onNavTap(BuildContext context, int index) {
-    switch (index) {
-      case 0:
-        Navigator.of(context).pushReplacementNamed(AppRoutes.social);
-        break;
-      case 1:
-        break; // already here
-      case 2:
-        Navigator.of(context).pushReplacementNamed(AppRoutes.profile);
-        break;
-    }
   }
 
   @override
@@ -167,10 +153,6 @@ class _HomePageState extends State<HomePage> {
             },
           ),
         ),
-      ),
-      bottomNavigationBar: BottomNavBar(
-        selectedIndex: 1,
-        onDestinationSelected: (i) => _onNavTap(context, i),
       ),
     );
   }

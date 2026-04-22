@@ -104,6 +104,7 @@ const _groupDummyFeedbacks = [
 
 class AppRoutes {
   static const login = '/login';
+  static const shell = '/shell';
 
   static const onboardingUserInfo = '/onboarding/user-info';
   static const onboardingLearningGoal = '/onboarding/learning-goal';

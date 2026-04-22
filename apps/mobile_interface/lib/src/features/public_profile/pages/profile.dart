@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/constants.dart';
-import '../../../common/widgets/bottom_nav_bar.dart';
 import '../../../common/utils/metric_formatters.dart';
 import '../../../app/routes.dart';
 import '../controllers/public_profile_controller.dart';
@@ -104,19 +103,6 @@ class _ProfilePageState extends State<ProfilePage> {
   void dispose() {
     _fullNameCtrl.dispose();
     super.dispose();
-  }
-
-  void _onNavTap(BuildContext context, int index) {
-    switch (index) {
-      case 0:
-        Navigator.of(context).pushReplacementNamed(AppRoutes.social);
-        break;
-      case 1:
-        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-        break;
-      case 2:
-        break; // already here
-    }
   }
 
   @override
@@ -398,10 +384,6 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: BottomNavBar(
-        selectedIndex: 2,
-        onDestinationSelected: (i) => _onNavTap(context, i),
       ),
     );
   }

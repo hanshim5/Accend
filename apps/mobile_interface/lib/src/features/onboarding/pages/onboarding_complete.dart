@@ -23,7 +23,7 @@ class OnboardingCompletePage extends StatelessWidget {
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.of(context).pushNamed(AppRoutes.home);
+                  Navigator.of(context).pushReplacementNamed(AppRoutes.shell);
                 },
                 child: const Text('Go to Home'),
               ),

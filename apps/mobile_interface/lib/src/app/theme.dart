@@ -2,6 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'constants.dart';
 
+class _FadePageTransitionsBuilder extends PageTransitionsBuilder {
+  const _FadePageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return FadeTransition(
+      opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+      child: child,
+    );
+  }
+}
+
 class AppTheme {
   static ThemeData dark() {
     final base = ThemeData.dark(useMaterial3: true);
@@ -10,6 +28,12 @@ class AppTheme {
     final bodyFont = GoogleFonts.publicSans();
 
     return base.copyWith(
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.iOS: _FadePageTransitionsBuilder(),
+          TargetPlatform.android: _FadePageTransitionsBuilder(),
+        },
+      ),
       scaffoldBackgroundColor: AppColors.primaryBg,
 
       colorScheme: base.colorScheme.copyWith(

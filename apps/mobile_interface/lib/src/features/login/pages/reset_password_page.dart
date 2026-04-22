@@ -43,7 +43,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
       context.read<HomeController>().load();
       if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (_) => false);
+      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.shell, (_) => false);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
