@@ -75,7 +75,8 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
       ..sort((a, b) => a.joinedAt.compareTo(b.joinedAt));
 
     return Scaffold(
-      body: Column(
+      body: SafeArea(
+        child: Column(
         children: [
           Container(
             height: 69,
@@ -93,8 +94,8 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
                   left: 4,
                   child: IconButton(
                     onPressed: () {
-                      Navigator.of(context).pushReplacementNamed(routes.AppRoutes.groupSessionPrivateSelect);
                       ctrl.leaveLobby();
+                      Navigator.of(context).pop();
                     },
                     icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
                   ),
@@ -246,6 +247,7 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
             ),
           ),
         ],
+      ),
       ),
     );
   }

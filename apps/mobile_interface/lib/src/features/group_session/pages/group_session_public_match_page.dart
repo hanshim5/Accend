@@ -123,7 +123,8 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
     }
 
     return Scaffold(
-      body: Column(
+      body: SafeArea(
+        child: Column(
         children: [
           Container(
             height: 69,
@@ -142,7 +143,7 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
                   child: IconButton(
                     onPressed: () async {
                       await ctrl.leavePublicLobby();
-                      if (context.mounted) Navigator.of(context).pushReplacementNamed(routes.AppRoutes.groupSessionSelect);
+                      if (context.mounted) Navigator.of(context).pop();
                     },
                     icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
                   ),
@@ -255,6 +256,7 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
             ),
           ),
         ],
+      ),
       ),
     );
   }
