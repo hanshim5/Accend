@@ -8,6 +8,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 
 from app.dependencies import get_public_lobby_service
 from app.schemas.private_lobby_schema import (
+    LobbyTurnScoreIn,
+    LobbyTurnStateOut,
     PrivateLobbyCreate,
     PrivateLobbyDeleteOut,
     PrivateLobbyJoin,
@@ -84,3 +86,47 @@ def get_lobby(
 ):
     _get_user_id(x_user_id)
     return svc.get_lobby(lobby_id)
+
+
+@router.get("/{lobby_id}/turn_state", response_model=LobbyTurnStateOut)
+def get_turn_state(
+    lobby_id: int,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: PublicLobbyService = Depends(get_public_lobby_service),
+):
+    _get_user_id(x_user_id)
+    return svc.get_turn_state(lobby_id)
+
+
+@router.post("/{lobby_id}/turn_state/score", response_model=LobbyTurnStateOut)
+def submit_turn_score(
+    lobby_id: int,
+    data: LobbyTurnScoreIn,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: PublicLobbyService = Depends(get_public_lobby_service),
+):
+    user_id = _get_user_id(x_user_id)
+    try:
+        return svc.submit_turn_score(
+            lobby_id=lobby_id,
+            actor_user_id=str(user_id),
+            score=data.score,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/{lobby_id}/turn_state/vote_next_round", response_model=LobbyTurnStateOut)
+def vote_next_round(
+    lobby_id: int,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: PublicLobbyService = Depends(get_public_lobby_service),
+):
+    user_id = _get_user_id(x_user_id)
+    try:
+        return svc.vote_next_round(
+            lobby_id=lobby_id,
+            actor_user_id=str(user_id),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))

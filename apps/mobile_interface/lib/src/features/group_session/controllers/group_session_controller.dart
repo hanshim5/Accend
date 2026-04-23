@@ -28,6 +28,8 @@ class GroupSessionController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   List<PrivateLobby> get privateLobby => List.unmodifiable(_privateLobby);
+  String? get myUserId => _auth.currentUser?.id;
+
   PrivateLobby? get createPrivateLobby => _createPrivateLobby;
   PrivateLobby? get joinPrivateLobby => _joinPrivateLobby;
 
@@ -440,6 +442,56 @@ class GroupSessionController extends ChangeNotifier {
         'lobby_id': lobbyId,
         'lobby_kind': lobbyKind,
       },
+    );
+  }
+
+  Future<Map<String, dynamic>> getLobbyTurnState({
+    required int lobbyId,
+    required String lobbyKind,
+  }) async {
+    final token = _auth.accessToken;
+    if (token == null || token.isEmpty) {
+      throw StateError('Not authenticated');
+    }
+    final base = lobbyKind == 'public' ? '/public_lobbies' : '/private_lobbies';
+    return _api.getJson(
+      '$base/$lobbyId/turn_state',
+      accessToken: token,
+    );
+  }
+
+  Future<Map<String, dynamic>> submitLobbyTurnScore({
+    required int lobbyId,
+    required String lobbyKind,
+    required double score,
+  }) async {
+    final token = _auth.accessToken;
+    if (token == null || token.isEmpty) {
+      throw StateError('Not authenticated');
+    }
+    final base = lobbyKind == 'public' ? '/public_lobbies' : '/private_lobbies';
+    return _api.postJson(
+      '$base/$lobbyId/turn_state/score',
+      accessToken: token,
+      body: {
+        'score': score,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> voteLobbyNextRound({
+    required int lobbyId,
+    required String lobbyKind,
+  }) async {
+    final token = _auth.accessToken;
+    if (token == null || token.isEmpty) {
+      throw StateError('Not authenticated');
+    }
+    final base = lobbyKind == 'public' ? '/public_lobbies' : '/private_lobbies';
+    return _api.postJson(
+      '$base/$lobbyId/turn_state/vote_next_round',
+      accessToken: token,
+      body: const <String, dynamic>{},
     );
   }
 

@@ -15,7 +15,7 @@ Rule of thumb:
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class PrivateLobbyCreate(BaseModel):
     """
@@ -62,3 +62,35 @@ class PrivateLobbyMemberOut(BaseModel):
 
 class PrivateLobbyDeleteOut(BaseModel):
     deleted: bool
+
+
+class LobbyTurnParticipantOut(BaseModel):
+    user_id: str
+    username: str
+    turn_order: int
+    score: float | None = None
+
+
+class LobbyTurnStateOut(BaseModel):
+    lobby_id: int
+    lobby_kind: str
+    current_turn_index: int
+    participants: list[LobbyTurnParticipantOut]
+    round_complete: bool
+    event_seq: int
+    latest_scored_user_id: str | None = None
+    next_round_votes: list[str] = Field(default_factory=list)
+    next_round_vote_count: int = 0
+
+
+class LobbyTurnScoreIn(BaseModel):
+    score: float = Field(ge=0, le=100)
+
+
+class LobbyNextRoundVoteOut(BaseModel):
+    """
+    Kept as a distinct response model option if we later want to return something
+    other than the full LobbyTurnStateOut.
+    """
+
+    state: LobbyTurnStateOut
