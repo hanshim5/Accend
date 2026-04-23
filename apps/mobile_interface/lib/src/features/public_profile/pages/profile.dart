@@ -1567,13 +1567,33 @@ class _DetailField extends StatelessWidget {
         _InfoLabel(label),
         const SizedBox(height: 8),
         _FieldShell(
-          child: Text(
-            value,
-            style: GoogleFonts.manrope(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  value,
+                  style: GoogleFonts.manrope(
+                    color: AppColors.textSecondary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.lock_outline_rounded,
+                color: AppColors.textSecondary,
+                size: 16,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Email cannot be changed',
+          style: GoogleFonts.manrope(
+            color: AppColors.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
