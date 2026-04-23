@@ -89,7 +89,7 @@ class OnboardingController extends ChangeNotifier {
     notifyListeners();
 
     if (profile['onboarding_complete'] == true) {
-      return AppRoutes.courses;
+      return AppRoutes.shell;
     }
 
     if (_isMissing(data.skillAssess)) return AppRoutes.onboardingSkillAssess;
