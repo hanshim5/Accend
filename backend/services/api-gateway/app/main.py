@@ -704,6 +704,105 @@ class GenerateReq(BaseModel):
     prompt: str = Field(min_length=1, max_length=5000)
 
 
+class SeedOnboardingCourseReq(BaseModel):
+    """Body for onboarding seed generation; forwarded to ai-course-gen-service."""
+
+    learning_goal: Literal["travel", "career", "culture", "brain_training"]
+    focus_areas: list[str] = Field(default_factory=list)
+
+
+async def _persist_ai_course_payload(
+    client: httpx.AsyncClient,
+    user_id: str,
+    ai_data: dict,
+) -> dict:
+    """
+    Create the parent course in courses-service and persist curriculum from AI JSON.
+
+    Shared by /ai/generate-course, /ai/seed-onboarding-course, and metrics generation.
+    """
+    if "title" not in ai_data:
+        raise HTTPException(status_code=502, detail="AI service returned no title")
+
+    title = ai_data.get("title", "Untitled Course")
+    image_url = ai_data.get("image_url")
+
+    course_resp = await client.post(
+        f"{settings.COURSES_SERVICE_URL}/courses",
+        headers={"X-User-Id": user_id},
+        json={
+            "title": title,
+            "image_url": image_url,
+        },
+    )
+
+    if course_resp.status_code >= 400:
+        raise HTTPException(
+            status_code=course_resp.status_code,
+            detail=course_resp.text,
+        )
+
+    course_row = course_resp.json()
+    course_id = course_row.get("id")
+    if not course_id:
+        raise HTTPException(status_code=502, detail="Courses service returned no id")
+
+    curriculum_payload = {"lessons": []}
+
+    raw_lessons = ai_data.get("lessons") or ai_data.get("outline") or []
+    for raw_l in raw_lessons:
+        if isinstance(raw_l, str):
+            lesson_title = raw_l
+            lesson_items = []
+        elif isinstance(raw_l, dict):
+            lesson_title = raw_l.get("title") or raw_l.get("lesson_title") or "Untitled lesson"
+            lesson_items = raw_l.get("items") or raw_l.get("phrases") or []
+        else:
+            continue
+
+        normalized_items = []
+        for it in lesson_items:
+            if isinstance(it, str):
+                normalized_items.append({"text": it})
+            elif isinstance(it, dict) and it.get("text"):
+                normalized_items.append({
+                    "text": it["text"],
+                    "ipa": it.get("ipa"),
+                    "hint": it.get("hint"),
+                })
+
+        if not normalized_items:
+            continue
+
+        curriculum_payload["lessons"].append({
+            "title": lesson_title,
+            "items": normalized_items,
+        })
+
+    if curriculum_payload["lessons"]:
+        curriculum_resp = await client.post(
+            f"{settings.COURSES_SERVICE_URL}/courses/{course_id}/curriculum",
+            headers={"X-User-Id": user_id},
+            json=curriculum_payload,
+        )
+
+        if curriculum_resp.status_code >= 400:
+            raise HTTPException(
+                status_code=curriculum_resp.status_code,
+                detail={"courses_error": curriculum_resp.text, "ai_preview": ai_data},
+            )
+
+        curriculum_rows = curriculum_resp.json()
+    else:
+        curriculum_rows = []
+
+    return {
+        "course": course_row,
+        "lessons": curriculum_rows,
+        "ai": ai_data,
+    }
+
+
 @app.post("/ai/generate-course")
 async def generate_course(
     req: GenerateReq,
@@ -728,11 +827,9 @@ async def generate_course(
     - Courses service owns persistence.
     - Gateway coordinates both while exposing a single endpoint to Flutter.
     """
-    # Step 1: Validate identity.
     user_id = verify_supabase_jwt(authorization)
 
     async with httpx.AsyncClient(timeout=30) as client:
-        # Step 2: Ask AI service to generate structured course content.
         ai_resp = await client.post(
             f"{settings.AI_COURSE_GEN_SERVICE_URL}/generate-course",
             json={"prompt": req.prompt},
@@ -745,108 +842,34 @@ async def generate_course(
             )
 
         ai_data = ai_resp.json()
+        return await _persist_ai_course_payload(client, user_id, ai_data)
 
-        # Minimal validation before persistence.
-        # The AI service should return a title and lessons, but the gateway
-        # still validates and normalizes the response before writing anything.
-        if "title" not in ai_data:
-            raise HTTPException(status_code=502, detail="AI service returned no title")
 
-        title = ai_data.get("title", "Untitled Course")
-        image_url = ai_data.get("image_url")
+@app.post("/ai/seed-onboarding-course")
+async def seed_onboarding_course(
+    req: SeedOnboardingCourseReq,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Starter courses after onboarding: AI builds the prompt from goal templates;
+    persistence matches POST /ai/generate-course.
+    """
+    user_id = verify_supabase_jwt(authorization)
 
-        # Step 3: Create the parent course row first.
-        course_resp = await client.post(
-            f"{settings.COURSES_SERVICE_URL}/courses",
-            headers={"X-User-Id": user_id},
-            json={
-                "title": title,
-                "image_url": image_url,
-            },
+    async with httpx.AsyncClient(timeout=90) as client:
+        ai_resp = await client.post(
+            f"{settings.AI_COURSE_GEN_SERVICE_URL}/generate-onboarding-seed",
+            json=req.model_dump(),
         )
 
-        if course_resp.status_code >= 400:
+        if ai_resp.status_code >= 400:
             raise HTTPException(
-                status_code=course_resp.status_code,
-                detail=course_resp.text,
+                status_code=ai_resp.status_code,
+                detail=ai_resp.text,
             )
 
-        course_row = course_resp.json()
-        course_id = course_row.get("id")
-        if not course_id:
-            raise HTTPException(status_code=502, detail="Courses service returned no id")
-
-        # Step 4: Normalize AI lesson output into the curriculum payload
-        # expected by courses-service.
-        curriculum_payload = {"lessons": []}
-
-        # Support both current and legacy shapes:
-        # - ai_data["lessons"]
-        # - ai_data["outline"]
-        raw_lessons = ai_data.get("lessons") or ai_data.get("outline") or []
-        for raw_l in raw_lessons:
-            # Accept either:
-            # - a plain string lesson title
-            # - a dict with title/items fields
-            if isinstance(raw_l, str):
-                lesson_title = raw_l
-                lesson_items = []
-            elif isinstance(raw_l, dict):
-                lesson_title = raw_l.get("title") or raw_l.get("lesson_title") or "Untitled lesson"
-                lesson_items = raw_l.get("items") or raw_l.get("phrases") or []
-            else:
-                continue
-
-            # Normalize item shape.
-            # Accept either:
-            # - list[str]
-            # - list[dict{text, ipa, hint}]
-            normalized_items = []
-            for it in lesson_items:
-                if isinstance(it, str):
-                    normalized_items.append({"text": it})
-                elif isinstance(it, dict) and it.get("text"):
-                    normalized_items.append({
-                        "text": it["text"],
-                        "ipa": it.get("ipa"),
-                        "hint": it.get("hint"),
-                    })
-
-            # Skip lessons with no valid items so courses-service
-            # does not receive invalid curriculum data.
-            if not normalized_items:
-                continue
-
-            curriculum_payload["lessons"].append({
-                "title": lesson_title,
-                "items": normalized_items,
-            })
-
-        # Persist the curriculum only if at least one valid lesson exists.
-        if curriculum_payload["lessons"]:
-            curriculum_resp = await client.post(
-                f"{settings.COURSES_SERVICE_URL}/courses/{course_id}/curriculum",
-                headers={"X-User-Id": user_id},
-                json=curriculum_payload,
-            )
-
-            if curriculum_resp.status_code >= 400:
-                # Surface helpful context for debugging multi-service failures.
-                raise HTTPException(
-                    status_code=curriculum_resp.status_code,
-                    detail={"courses_error": curriculum_resp.text, "ai_preview": ai_data},
-                )
-
-            curriculum_rows = curriculum_resp.json()
-        else:
-            curriculum_rows = []
-
-        # Step 5: Return aggregated response for frontend use.
-        return {
-            "course": course_row,
-            "lessons": curriculum_rows,
-            "ai": ai_data,
-        }
+        ai_data = ai_resp.json()
+        return await _persist_ai_course_payload(client, user_id, ai_data)
 
 
 @app.post("/ai/generate-course-from-metrics")
@@ -890,89 +913,7 @@ async def generate_course_from_metrics(
             )
 
         ai_data = ai_resp.json()
-
-        if "title" not in ai_data:
-            raise HTTPException(status_code=502, detail="AI service returned no title")
-
-        title = ai_data.get("title", "Pronunciation Practice")
-        image_url = ai_data.get("image_url")
-
-        # Create the parent course row.
-        course_resp = await client.post(
-            f"{settings.COURSES_SERVICE_URL}/courses",
-            headers={"X-User-Id": user_id},
-            json={
-                "title": title,
-                "image_url": image_url,
-            },
-        )
-
-        if course_resp.status_code >= 400:
-            raise HTTPException(
-                status_code=course_resp.status_code,
-                detail=course_resp.text,
-            )
-
-        course_row = course_resp.json()
-        course_id = course_row.get("id")
-        if not course_id:
-            raise HTTPException(status_code=502, detail="Courses service returned no id")
-
-        # Normalize AI lesson output into the curriculum payload expected by courses-service.
-        curriculum_payload: dict = {"lessons": []}
-
-        raw_lessons = ai_data.get("lessons") or ai_data.get("outline") or []
-        for raw_l in raw_lessons:
-            if isinstance(raw_l, str):
-                lesson_title = raw_l
-                lesson_items = []
-            elif isinstance(raw_l, dict):
-                lesson_title = raw_l.get("title") or raw_l.get("lesson_title") or "Untitled lesson"
-                lesson_items = raw_l.get("items") or raw_l.get("phrases") or []
-            else:
-                continue
-
-            normalized_items = []
-            for it in lesson_items:
-                if isinstance(it, str):
-                    normalized_items.append({"text": it})
-                elif isinstance(it, dict) and it.get("text"):
-                    normalized_items.append({
-                        "text": it["text"],
-                        "ipa": it.get("ipa"),
-                        "hint": it.get("hint"),
-                    })
-
-            if not normalized_items:
-                continue
-
-            curriculum_payload["lessons"].append({
-                "title": lesson_title,
-                "items": normalized_items,
-            })
-
-        if curriculum_payload["lessons"]:
-            curriculum_resp = await client.post(
-                f"{settings.COURSES_SERVICE_URL}/courses/{course_id}/curriculum",
-                headers={"X-User-Id": user_id},
-                json=curriculum_payload,
-            )
-
-            if curriculum_resp.status_code >= 400:
-                raise HTTPException(
-                    status_code=curriculum_resp.status_code,
-                    detail={"courses_error": curriculum_resp.text, "ai_preview": ai_data},
-                )
-
-            curriculum_rows = curriculum_resp.json()
-        else:
-            curriculum_rows = []
-
-        return {
-            "course": course_row,
-            "lessons": curriculum_rows,
-            "ai": ai_data,
-        }
+        return await _persist_ai_course_payload(client, user_id, ai_data)
 
 
 class GenerateSessionItemsGatewayReq(BaseModel):

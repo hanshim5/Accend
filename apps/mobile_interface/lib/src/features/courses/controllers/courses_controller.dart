@@ -40,6 +40,25 @@ class CoursesController extends ChangeNotifier {
   bool get isGenerating => _isGenerating;
   String? get generateError => _generateError;
 
+  static const Set<String> validOnboardingLearningGoals = {
+    'travel',
+    'career',
+    'culture',
+    'brain_training',
+  };
+
+  /// Parses profile `learning_goal` (comma-separated) into ordered known keys.
+  static List<String> orderedOnboardingLearningGoals(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return [];
+    return raw
+        .split(RegExp(r'[,;]'))
+        .map((s) => s.trim().toLowerCase().replaceAll(' ', '_'))
+        .where(
+          (s) => s.isNotEmpty && validOnboardingLearningGoals.contains(s),
+        )
+        .toList();
+  }
+
   Future<void> loadCourses() async {
     _isLoading = true;
     _error = null;
@@ -174,6 +193,77 @@ class CoursesController extends ChangeNotifier {
       _isGenerating = false;
       notifyListeners();
     }
+  }
+
+  /// Creates one onboarding seed course for [learningGoal] (travel, career, culture, brain_training).
+  ///
+  /// [focusAreasCsv] uses the same comma/semicolon format as profile `focus_areas`.
+  /// Refreshes [loadCourses] on success. On failure returns `null` and sets [generateError].
+  Future<GeneratedCourseResult?> seedSingleOnboardingCourse({
+    required String learningGoal,
+    String? focusAreasCsv,
+  }) async {
+    _isGenerating = true;
+    _generateError = null;
+    notifyListeners();
+
+    try {
+      final token = _auth.accessToken;
+      if (token == null) throw Exception('User not authenticated');
+
+      final g = learningGoal.trim().toLowerCase();
+      if (!validOnboardingLearningGoals.contains(g)) {
+        throw Exception('Invalid learning goal for seeding: $learningGoal');
+      }
+
+      final focusAreas = _parseFocusAreasCsv(focusAreasCsv);
+
+      final res = await _api.postJson(
+        '/ai/seed-onboarding-course',
+        accessToken: token,
+        body: {
+          'learning_goal': g,
+          'focus_areas': focusAreas,
+        },
+        timeout: const Duration(seconds: 90),
+      );
+
+      final rawCourse = res['course'];
+      if (rawCourse is! Map<String, dynamic>) {
+        throw Exception('Invalid seed-onboarding-course response: missing course');
+      }
+
+      final rawLessons = res['lessons'] as List<dynamic>? ?? const [];
+
+      final createdCourse = Course.fromJson(rawCourse);
+      final createdLessons = rawLessons
+          .cast<Map<String, dynamic>>()
+          .map((e) => Lesson.fromJson(e))
+          .toList();
+
+      await loadCourses();
+
+      return GeneratedCourseResult(
+        course: createdCourse,
+        lessons: createdLessons,
+      );
+    } catch (e) {
+      _generateError =
+          e is ApiException ? 'ApiException(${e.statusCode}): ${e.detail}' : e.toString();
+      return null;
+    } finally {
+      _isGenerating = false;
+      notifyListeners();
+    }
+  }
+
+  List<String> _parseFocusAreasCsv(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return [];
+    return raw
+        .split(RegExp(r'[,;]'))
+        .map((s) => s.trim().toLowerCase().replaceAll(' ', '_'))
+        .where((s) => s.isNotEmpty)
+        .toList();
   }
 
   Future<List<Lesson>> fetchLessons(String courseId) async {

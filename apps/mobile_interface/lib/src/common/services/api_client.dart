@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 
@@ -64,12 +65,15 @@ class ApiClient {
     String path, {
     Object? body,
     String? accessToken,
+    Duration? timeout,
   }) async {
-    final res = await _client.post(
+    Future<http.Response> request = _client.post(
       _uri(path),
       headers: _headers(accessToken: accessToken, contentJson: true),
       body: body == null ? null : jsonEncode(body),
     );
+    final res =
+        timeout != null ? await request.timeout(timeout) : await request;
 
     return _handleJson(res);
   }

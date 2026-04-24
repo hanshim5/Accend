@@ -23,7 +23,7 @@ Notes:
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 
 class LessonItem(BaseModel):
@@ -53,6 +53,18 @@ class Lesson(BaseModel):
     """
     title: str
     items: List[LessonItem] = Field(default_factory=list)
+
+
+class SeedOnboardingCourseReq(BaseModel):
+    """
+    Request to generate a starter course from onboarding selections.
+
+    learning_goal must match mobile onboarding values (travel, career, culture, brain_training).
+    focus_areas are optional skill tags (e.g. vocabulary, pronunciation) to emphasize in prompts.
+    """
+
+    learning_goal: Literal["travel", "career", "culture", "brain_training"]
+    focus_areas: List[str] = Field(default_factory=list)
 
 
 class GenerateCourseReq(BaseModel):

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../app/constants.dart';
 import '../../../app/routes.dart';
 import '../controllers/courses_controller.dart';
+import '../widgets/generation_logo_ring.dart';
 import '../widgets/start_lesson_popup.dart';
 
 class GenerateCoursePage extends StatefulWidget {
@@ -153,7 +154,7 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
       key: const ValueKey('loading'),
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const _GenerationLogoRing(
+        const GenerationLogoRing(
           color: AppColors.accent,
           loading: true,
         ),
@@ -186,7 +187,7 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
       key: const ValueKey('success'),
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const _GenerationLogoRing(
+        const GenerationLogoRing(
           color: AppColors.success,
           loading: false,
         ),
@@ -242,7 +243,7 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
       key: const ValueKey('failure'),
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _GenerationLogoRing(
+        GenerationLogoRing(
           color: isNoData ? AppColors.action : AppColors.failure,
           loading: false,
         ),
@@ -298,76 +299,6 @@ class _GenerateCoursePageState extends State<GenerateCoursePage> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _GenerationLogoRing extends StatelessWidget {
-  const _GenerationLogoRing({
-    required this.color,
-    required this.loading,
-  });
-
-  final Color color;
-  final bool loading;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 148,
-      height: 148,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 126,
-            height: 126,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: color.withValues(alpha: 0.9),
-                width: 3,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.18),
-                  blurRadius: 24,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-          ),
-          if (loading)
-            const SizedBox(
-              width: 148,
-              height: 148,
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                backgroundColor: Colors.transparent,
-              ),
-            ),
-          Container(
-            width: 82,
-            height: 82,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.primaryBg,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Image.asset(
-                'assets/images/accend_logo.png',
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => Icon(
-                  Icons.school_rounded,
-                  color: color,
-                  size: 36,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

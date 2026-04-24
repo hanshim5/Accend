@@ -78,8 +78,9 @@ class LoginController extends ChangeNotifier {
 
       home.load();
 
+      final route = await onboarding.getPostLoginRoute();
       if (!context.mounted) return;
-      Navigator.pushReplacementNamed(context, AppRoutes.shell);
+      Navigator.pushReplacementNamed(context, route);
     } catch (e) {
       errorMessage = 'Invalid username, email, or password.';
     } finally {

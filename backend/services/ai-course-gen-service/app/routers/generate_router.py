@@ -19,10 +19,18 @@ Important:
 Endpoints:
 - GET  /health
 - POST /generate-course
+- POST /generate-onboarding-seed
 """
 
 from fastapi import APIRouter, Header, HTTPException
-from ..schemas.generate_schema import GenerateCourseReq, GenerateCourseRes, GenerateSessionItemsReq, GenerateSessionItemsRes
+from ..schemas.generate_schema import (
+    GenerateCourseReq,
+    GenerateCourseRes,
+    GenerateSessionItemsReq,
+    GenerateSessionItemsRes,
+    SeedOnboardingCourseReq,
+)
+from ..prompts.onboarding_seed import build_onboarding_seed_prompt
 from ..services.ai_service import generate_course_from_prompt, generate_course_from_metrics, generate_session_items
 
 # Router for AI course generation endpoints.
@@ -75,6 +83,30 @@ async def generate_course(body: GenerateCourseReq):
 
     # The generated result is expected to match the response schema shape:
     # {"title": ..., "lessons": [{...}]}
+    return result
+
+
+@router.post("/generate-onboarding-seed", response_model=GenerateCourseRes)
+async def generate_onboarding_seed(body: SeedOnboardingCourseReq):
+    """
+    Build a course from hardcoded goal templates plus optional focus areas.
+
+    Used after onboarding; the gateway persists the result like a normal generate-course flow.
+    """
+    try:
+        prompt = build_onboarding_seed_prompt(
+            body.learning_goal,
+            body.focus_areas or None,
+        )
+        result = generate_course_from_prompt(prompt)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        msg = str(exc)
+        if "503" in msg or "UNAVAILABLE" in msg:
+            raise HTTPException(status_code=503, detail="AI generation service temporarily unavailable. Please try again.")
+        raise HTTPException(status_code=502, detail=msg)
+
     return result
 
 
