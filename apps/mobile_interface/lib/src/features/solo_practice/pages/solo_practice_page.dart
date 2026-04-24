@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../../app/constants.dart';
 import '../../../app/routes.dart';
+import '../../../common/models/pronunciation_feedback.dart';
 import '../../../common/pages/session_results_page.dart';
 import '../../../common/services/auth_service.dart';
 import '../../../common/widgets/microphone.dart';
@@ -582,6 +583,22 @@ class _SoloPracticePageState extends State<SoloPracticePage>
                                               ),
                                             ],
                                           ),
+                                          // ── AI Tips ──────────────────────────────
+                                          if (_isLowScore(_controller.currentFeedback!)) ...[
+                                            const SizedBox(height: AppSpacing.md),
+                                            _AiTipsSection(
+                                              cardIndex: _controller.currentCardIndex,
+                                              controller: _controller,
+                                              accessToken: () {
+                                                try {
+                                                  return context.read<AuthService>().accessToken;
+                                                } catch (_) {
+                                                  return null;
+                                                }
+                                              }(),
+                                              onStateChanged: () => setState(() {}),
+                                            ),
+                                          ],
                                           const SizedBox(height: AppSpacing.lg),
                                           // Try Again / Next actions.
                                           Row(
@@ -733,6 +750,188 @@ class _SoloPracticePageState extends State<SoloPracticePage>
             ),
 
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Low-score helper
+// ---------------------------------------------------------------------------
+
+/// Returns true when a result is below the threshold that triggers the AI tips
+/// button.  Mirrors the existing red-zone threshold used by [feedbackScoreColor].
+bool _isLowScore(PronunciationFeedbackMock f) {
+  final score = f.pronScore ??
+      (f.accuracyScore + f.fluencyScore + f.completenessScore) / 3;
+  return score < 60;
+}
+
+// ---------------------------------------------------------------------------
+// AI tips section
+// ---------------------------------------------------------------------------
+
+/// Shown inside the post-submission feedback card when the score is low.
+///
+/// Cycles through four states driven by local + controller state:
+/// - Button (default, session ID present)
+/// - Loading spinner (local `_loading` flag, avoids double-tap race)
+/// - Suggestions list (permanent once loaded)
+/// - Error message with retry (when controller reports failure)
+class _AiTipsSection extends StatefulWidget {
+  const _AiTipsSection({
+    required this.cardIndex,
+    required this.controller,
+    required this.accessToken,
+    required this.onStateChanged,
+  });
+
+  final int cardIndex;
+  final SoloPracticeController controller;
+  final String? accessToken;
+  final VoidCallback onStateChanged;
+
+  @override
+  State<_AiTipsSection> createState() => _AiTipsSectionState();
+}
+
+class _AiTipsSectionState extends State<_AiTipsSection> {
+  bool _loading = false;
+
+  Future<void> _request() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    await widget.controller.requestAiSuggestions(widget.accessToken);
+    if (mounted) {
+      setState(() => _loading = false);
+      widget.onStateChanged();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bodyStyle = GoogleFonts.publicSans(
+      color: AppColors.textSecondary,
+      fontSize: 13,
+      fontWeight: FontWeight.w500,
+    );
+
+    // Suggestions already loaded — render them permanently.
+    final suggestions = widget.controller.aiSuggestionsFor(widget.cardIndex);
+    if (suggestions != null && suggestions.isNotEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.primaryBg,
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'AI Tips',
+              style: GoogleFonts.inter(
+                color: AppColors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            for (final s in suggestions) ...[
+              const SizedBox(height: 4),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Icon(
+                      Icons.arrow_right_rounded,
+                      size: 16,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(child: Text(s, style: bodyStyle)),
+                ],
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    // Loading spinner — local flag prevents double-tap.
+    if (_loading) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.accent,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text('Getting AI tips…', style: bodyStyle),
+        ],
+      );
+    }
+
+    // Error state — show message and allow retry.
+    if (widget.controller.aiSuggestionsFailed) {
+      return Row(
+        children: [
+          Icon(Icons.error_outline_rounded, size: 15, color: AppColors.failure),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Couldn\'t load tips.',
+              style: bodyStyle.copyWith(color: AppColors.failure),
+            ),
+          ),
+          TextButton(
+            onPressed: _request,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.accent,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'Retry',
+              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Default: button (only when a session ID is available).
+    final sessionId = widget.controller.currentFeedback?.feedbackSessionId;
+    if (sessionId == null) return const SizedBox.shrink();
+
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _request,
+        icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+        label: Text(
+          'Get AI Tips',
+          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.accent,
+          side: const BorderSide(color: AppColors.accent),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.md),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
         ),
       ),
     );
