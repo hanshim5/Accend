@@ -178,6 +178,35 @@ def get_wav_duration_seconds(path: Path) -> float:
         return frames / float(rate)
 
 
+# How much silence (in seconds) to prepend and append to the audio before
+# sending to Azure.  Azure's acoustic model scores each phoneme using
+# neighbouring-phoneme context (coarticulation); without any context the
+# first and last phonemes in an utterance are systematically under-scored.
+# 250 ms of silence on each side is enough to give the model that context
+# window without meaningfully affecting fluency or duration metrics.
+SILENCE_PAD_SECONDS = 0.25
+
+
+def pad_wav_with_silence(src: Path, dst: Path, pad_seconds: float = SILENCE_PAD_SECONDS) -> None:
+    """
+    Copy *src* WAV to *dst*, prepending and appending *pad_seconds* of silence.
+
+    The silence is generated as zero-valued PCM frames matching the source
+    file's sample width, channels, and frame rate, so Azure sees a valid,
+    consistently-formatted file.
+    """
+    with wave.open(str(src), "rb") as r:
+        params = r.getparams()
+        frames = r.readframes(r.getnframes())
+
+    pad_frame_count = int(params.framerate * pad_seconds)
+    silent_frames = b"\x00" * pad_frame_count * params.nchannels * params.sampwidth
+
+    with wave.open(str(dst), "wb") as w:
+        w.setparams(params)
+        w.writeframes(silent_frames + frames + silent_frames)
+
+
 # ---------------------------------------------------------------------------
 # Azure assessment
 # ---------------------------------------------------------------------------
@@ -194,42 +223,53 @@ def run_pronunciation_assessment(audio_path: Path, reference_text: str) -> tuple
         subscription=settings.azure_speech_key,
         region=settings.azure_speech_region,
     )
-    audio_config = speechsdk.audio.AudioConfig(filename=str(audio_path))
-    speech_recognizer = speechsdk.SpeechRecognizer(
-        speech_config=speech_config,
-        language=LOCALE,
-        audio_config=audio_config,
-    )
-    pronunciation_config = speechsdk.PronunciationAssessmentConfig(
-        reference_text=reference_text.strip(),
-        grading_system=speechsdk.PronunciationAssessmentGradingSystem.HundredMark,
-        granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme,
-        enable_miscue=True,
-    )
-    pronunciation_config.nbest_phoneme_count = 5
-    # Enable prosody — enriches the raw result used by Gemini, but is NOT
-    # forwarded to the app.
-    pronunciation_config.enable_prosody_assessment()
-    pronunciation_config.apply_to(speech_recognizer)
 
-    result = speech_recognizer.recognize_once()
-    if result.reason != speechsdk.ResultReason.RecognizedSpeech:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "reason": str(result.reason),
-                "error": result.properties.get(
-                    speechsdk.PropertyId.SpeechServiceResponse_JsonResult, ""
-                )
-                or getattr(result, "error_details", None)
-                or "Speech recognition failed.",
-            },
+    # Pad the audio with silence so boundary phonemes (first / last in the
+    # utterance) receive the coarticulation context the acoustic model needs.
+    # Without this, Azure consistently under-scores them — an artefact of the
+    # model, not the learner's actual pronunciation.
+    padded_path = audio_path.with_suffix(".padded.wav")
+    pad_wav_with_silence(audio_path, padded_path)
+
+    try:
+        audio_config = speechsdk.audio.AudioConfig(filename=str(padded_path))
+        speech_recognizer = speechsdk.SpeechRecognizer(
+            speech_config=speech_config,
+            language=LOCALE,
+            audio_config=audio_config,
         )
-    json_str = result.properties.get(
-        speechsdk.PropertyId.SpeechServiceResponse_JsonResult, "{}"
-    )
-    raw = json.loads(json_str)
-    return _clean_pronunciation_result(raw), _extract_prosody(raw)
+        pronunciation_config = speechsdk.PronunciationAssessmentConfig(
+            reference_text=reference_text.strip(),
+            grading_system=speechsdk.PronunciationAssessmentGradingSystem.HundredMark,
+            granularity=speechsdk.PronunciationAssessmentGranularity.Phoneme,
+            enable_miscue=True,
+        )
+        pronunciation_config.nbest_phoneme_count = 5
+        # Enable prosody — enriches the raw result used by Gemini, but is NOT
+        # forwarded to the app.
+        pronunciation_config.enable_prosody_assessment()
+        pronunciation_config.apply_to(speech_recognizer)
+
+        result = speech_recognizer.recognize_once()
+        if result.reason != speechsdk.ResultReason.RecognizedSpeech:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "reason": str(result.reason),
+                    "error": result.properties.get(
+                        speechsdk.PropertyId.SpeechServiceResponse_JsonResult, ""
+                    )
+                    or getattr(result, "error_details", None)
+                    or "Speech recognition failed.",
+                },
+            )
+        json_str = result.properties.get(
+            speechsdk.PropertyId.SpeechServiceResponse_JsonResult, "{}"
+        )
+        raw = json.loads(json_str)
+        return _clean_pronunciation_result(raw), _extract_prosody(raw)
+    finally:
+        padded_path.unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------
