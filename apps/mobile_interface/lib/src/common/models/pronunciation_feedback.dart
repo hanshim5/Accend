@@ -88,13 +88,18 @@ class WordFeedback {
 /// Despite the "Mock" suffix, this type is used both for:
 /// - Real JSON parsed from the pronunciation-feedback microservice.
 /// - Locally generated mock data when the API call fails or is unavailable.
+///
+/// [feedbackSessionId] is the opaque ID returned by /assess that can be
+/// passed to /pronunciation/ai-feedback to retrieve Gemini suggestions.
+/// It is null for mock/fallback results.
 class PronunciationFeedbackMock {
   final double accuracyScore;
   final double fluencyScore;
   final double completenessScore;
   final double? pronScore;
-  final String? summary; // optional tip
+  final String? summary;
   final List<WordFeedback> words;
+  final String? feedbackSessionId;
 
   const PronunciationFeedbackMock({
     required this.accuracyScore,
@@ -103,5 +108,6 @@ class PronunciationFeedbackMock {
     this.pronScore,
     this.summary,
     this.words = const [],
+    this.feedbackSessionId,
   });
 }

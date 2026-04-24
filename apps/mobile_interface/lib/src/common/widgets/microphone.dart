@@ -158,8 +158,11 @@ class _MicrophoneState extends State<Microphone>
       await _recorder.start(
         const RecordConfig(
           encoder: AudioEncoder.wav,
-          sampleRate: 16000, // 16 kHz is guaranteed on all Android devices/emulators
-          numChannels: 1,    // mono — also what Azure Speech SDK expects
+          sampleRate: 16000,   // 16 kHz — Azure's optimal input rate for pronunciation assessment
+          numChannels: 1,      // mono — what Azure Speech SDK expects
+          autoGain: true,      // normalise volume across quiet/loud speakers
+          noiseSuppress: false, // keep raw signal — suppression targets fricatives (s/sh/f) which Azure needs
+          echoCancel: false,   // not needed; no playback during recording
         ),
         path: path,
       );

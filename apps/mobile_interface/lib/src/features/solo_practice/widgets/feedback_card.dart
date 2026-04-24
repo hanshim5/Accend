@@ -17,46 +17,40 @@ Color feedbackScoreColor(double? accuracy) {
 /// Word-level color based on phoneme counts.
 ///
 ///  • No phoneme data              → [feedbackScoreColor] on [word.accuracy].
-///  • Any substitution             → failure red (wrong phoneme = real error,
-///                                   no grace regardless of count).
-///  • ≥ 2 low-accuracy (< 60)      → failure red.
-///  • 1 low-accuracy (< 60)        → action orange (grace: API noise on
-///                                   fricatives etc. ≠ broken word).
+///  • Any substitution             → failure red.
+///  • Any phoneme accuracy < 60    → failure red (clearly wrong, no grace).
 ///  • ≥ 2 borderline (60–84)       → action orange.
 ///  • else                         → success green.
 Color strictWordColor(WordFeedback word) {
   if (word.phonemes.isEmpty) return feedbackScoreColor(word.accuracy);
 
-  int lowCount = 0;
   int yellowCount = 0;
 
   for (final p in word.phonemes) {
     final isSubstitution = p.userSaid != null && p.userSaid != p.symbol;
     if (isSubstitution) return AppColors.failure;
     final accuracy = p.accuracy ?? 100.0;
-    if (accuracy < 60) {
-      lowCount++;
-    } else if (accuracy < 85) {
-      yellowCount++;
-    }
+    if (accuracy < 60) return AppColors.failure;
+    if (accuracy < 85) yellowCount++;
   }
 
-  if (lowCount >= 2) return AppColors.failure;
-  if (lowCount == 1) return AppColors.action;
   if (yellowCount >= 2) return AppColors.action;
   return AppColors.success;
 }
 
-/// Color for a "You said" phoneme chip — green only when the symbol matches
-/// AND accuracy is high (≥ 85). A substitution (different phoneme) is always red.
+/// Color for a "You said" phoneme chip.
+///
+///  • Known substitution (user_said ≠ symbol)     → always failure red.
+///  • user_said unknown + accuracy < 60            → failure red (clearly wrong).
+///  • user_said unknown + accuracy 60–84           → action orange.
+///  • Correct + accuracy ≥ 85                      → success green.
+///  • Correct + accuracy 60–84                     → action orange (not perfect).
 Color userSaidPhonemeColor(PhonemeFeedback p) {
   final said = p.userSaid ?? p.symbol;
-  final symbolMatches = said == p.symbol;
-  if (symbolMatches && (p.accuracy ?? 0) >= 85) return AppColors.success;
-  // Substitution: user produced a different phoneme — always failure red.
-  if (!symbolMatches) return AppColors.failure;
-  final c = feedbackScoreColor(p.accuracy);
-  return c == AppColors.success ? AppColors.action : c;
+  // Any visible mismatch between what the user said and the target → red.
+  if (said != p.symbol) return AppColors.failure;
+  // user_said was null or matched — color by accuracy.
+  return feedbackScoreColor(p.accuracy);
 }
 
 /// Shows the phoneme detail popup for a single [symbol].

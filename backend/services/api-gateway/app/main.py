@@ -26,7 +26,7 @@ Notes:
 - Downstream services trust the Gateway and use X-User-Id for identity.
 """
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -991,6 +991,38 @@ async def proxy_pronunciation_assess(
             f"{settings.PRONUNCIATION_FEEDBACK_SERVICE_URL}/assess",
             files={"audio": (filename, content, "audio/wav")},
             data={"reference_text": reference_text},
+        )
+
+    if r.status_code >= 400:
+        try:
+            detail = r.json()
+        except Exception:
+            detail = r.text
+        raise HTTPException(status_code=r.status_code, detail=detail)
+
+    return r.json()
+
+
+@app.post("/pronunciation/ai-feedback")
+async def proxy_pronunciation_ai_feedback(
+    request: Request,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Proxy AI feedback generation to the pronunciation-feedback service.
+
+    Accepts the assessment JSON (summary, words, feedback_session_id) and
+    returns 2–3 Gemini-generated improvement suggestions.
+    """
+    if not getattr(settings, "ALLOW_ANON_PRONUNCIATION_ASSESS", False):
+        verify_supabase_jwt(authorization)
+
+    body = await request.json()
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(
+            f"{settings.PRONUNCIATION_FEEDBACK_SERVICE_URL}/ai-feedback",
+            json=body,
         )
 
     if r.status_code >= 400:

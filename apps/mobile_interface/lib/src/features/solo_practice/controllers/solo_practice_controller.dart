@@ -57,6 +57,17 @@ class SoloPracticeController {
 
   PronunciationFeedbackMock? currentFeedback;
 
+  /// Gemini-generated suggestions keyed by card index.
+  /// Once populated for an index they are never cleared, enforcing the
+  /// "cannot generate again for the same item" requirement.
+  final Map<int, List<String>> _aiSuggestions = {};
+
+  /// True while a Gemini request is in-flight for the current card.
+  bool isLoadingAiSuggestions = false;
+
+  /// Set when the last AI suggestions request failed (cleared on next attempt).
+  bool aiSuggestionsFailed = false;
+
   /// All feedback results collected so far in this session (one per submitted card).
   List<PronunciationFeedbackMock> get sessionFeedbacks =>
       List.unmodifiable(_sessionFeedbacks);
@@ -141,11 +152,55 @@ class SoloPracticeController {
     return false;
   }
 
+  /// Clears AI suggestions and error state for the current card so the button
+  /// reappears after a retry.
+  void clearAiSuggestionsForCurrentCard() {
+    _aiSuggestions.remove(currentCardIndex);
+    aiSuggestionsFailed = false;
+  }
+
+  /// Returns the cached AI suggestions for [index], or null if none yet.
+  List<String>? aiSuggestionsFor(int index) => _aiSuggestions[index];
+
+  /// True when AI suggestions have already been generated for [index].
+  bool hasSuggestions(int index) => _aiSuggestions.containsKey(index);
+
+  /// Fetch Gemini suggestions for the current card and cache them.
+  /// No-op if suggestions already exist or no feedback / session ID is available.
+  Future<void> requestAiSuggestions(String? accessToken) async {
+    final feedback = currentFeedback;
+    final sessionId = feedback?.feedbackSessionId;
+    if (feedback == null || sessionId == null) return;
+    if (hasSuggestions(currentCardIndex)) return;
+
+    isLoadingAiSuggestions = true;
+    aiSuggestionsFailed = false;
+    try {
+      final suggestions = await fetchAiFeedback(
+        sessionId: sessionId,
+        feedback: feedback,
+        accessToken: accessToken,
+      );
+      if (suggestions != null && suggestions.isNotEmpty) {
+        _aiSuggestions[currentCardIndex] = suggestions;
+      } else {
+        aiSuggestionsFailed = true;
+      }
+    } catch (_) {
+      aiSuggestionsFailed = true;
+    } finally {
+      isLoadingAiSuggestions = false;
+    }
+  }
+
   /// Reset session to first card, clear feedback and accumulated results, mic to idle.
   void resetSession() {
     currentCardIndex = 0;
     micStateIndex = 0;
     currentFeedback = null;
     _sessionFeedbacks.clear();
+    _aiSuggestions.clear();
+    isLoadingAiSuggestions = false;
+    aiSuggestionsFailed = false;
   }
 }

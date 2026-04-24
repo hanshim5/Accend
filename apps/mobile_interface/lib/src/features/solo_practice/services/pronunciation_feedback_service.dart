@@ -222,6 +222,9 @@ PronunciationFeedbackMock? _feedbackFromAssessmentJson(String body) {
     // Guard here (after building the word list) rather than early-returning
     // above, so we can still surface partial word data in a future extension.
     if (accuracy == null || fluency == null || completeness == null) return null;
+
+    final feedbackSessionId = map['feedback_session_id'] as String?;
+
     return PronunciationFeedbackMock(
       accuracyScore: accuracy,
       fluencyScore: fluency,
@@ -229,7 +232,69 @@ PronunciationFeedbackMock? _feedbackFromAssessmentJson(String body) {
       pronScore: pronScore,
       summary: 'Keep practicing for even clearer speech.',
       words: words,
+      feedbackSessionId: feedbackSessionId,
     );
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Calls the API gateway `POST /pronunciation/ai-feedback` with the assessment
+/// data and session ID, and returns 2–3 Gemini-generated suggestion strings.
+///
+/// Returns null on any error so callers can handle gracefully.
+Future<List<String>?> fetchAiFeedback({
+  required String sessionId,
+  required PronunciationFeedbackMock feedback,
+  String? accessToken,
+}) async {
+  final uri = Uri.parse('$_gatewayBaseUrl/pronunciation/ai-feedback');
+
+  // Build the JSON body mirroring the backend AiFeedbackRequest schema.
+  final body = jsonEncode({
+    'feedback_session_id': sessionId,
+    'summary': {
+      'accuracy': feedback.accuracyScore,
+      'fluency': feedback.fluencyScore,
+      'completeness': feedback.completenessScore,
+      'pronScore': feedback.pronScore,
+    },
+    'words': [
+      for (final w in feedback.words)
+        {
+          'text': w.text,
+          'accuracy': w.accuracy,
+          'errorType': w.errorType,
+          'phonemes': [
+            for (final p in w.phonemes)
+              {
+                'symbol': p.symbol,
+                'accuracy': p.accuracy,
+                'user_said': p.userSaid,
+              },
+          ],
+        },
+    ],
+  });
+
+  try {
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+    if (accessToken != null && accessToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $accessToken';
+    }
+
+    final response = await http
+        .post(uri, headers: headers, body: body)
+        .timeout(const Duration(seconds: 20));
+
+    if (response.statusCode != 200) return null;
+
+    final map = jsonDecode(response.body) as Map<String, dynamic>;
+    final suggestions = map['suggestions'] as List<dynamic>?;
+    if (suggestions == null) return null;
+    return suggestions.map((s) => s.toString()).toList();
   } catch (_) {
     return null;
   }
