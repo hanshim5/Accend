@@ -87,7 +87,47 @@ class _GroupSessionSelectPageState extends State<GroupSessionSelectPage> {
                               title: 'Public Room',
                               subtitle: 'Automatically match-made rooms',
                               icon: Icons.public,
-                              onTap: () {
+                              onTap: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    backgroundColor: const Color(0xFF1E293B),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    title: const Text(
+                                      'Join a Public Room?',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    content: const Text(
+                                      'You\'ll be matched with other learners automatically, ignoring those you have avoided. Ready to join?',
+                                      style: TextStyle(color: AppColors.textSecondary),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(false),
+                                        child: const Text(
+                                          'Cancel',
+                                          style: TextStyle(color: AppColors.textSecondary),
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(true),
+                                        child: const Text(
+                                          'Let\'s go',
+                                          style: TextStyle(
+                                            color: AppColors.action,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed != true || !context.mounted) return;
                                 context.read<GroupSessionController>().resetPrivateLobbyState(notify: false);
                                 Navigator.pushNamed(context, routes.AppRoutes.groupSessionPublicMatch);
                               },
