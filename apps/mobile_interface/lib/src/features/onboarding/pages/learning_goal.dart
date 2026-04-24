@@ -15,10 +15,10 @@ class LearningGoalPage extends StatefulWidget {
 }
 
 class _LearningGoalPageState extends State<LearningGoalPage> {
-  int? _selectedIndex;
+  final Set<String> _selected = {};
   bool _syncedFromController = false;
 
-  final List<_GoalOption> _options = const [
+  static const List<_GoalOption> _options = [
     _GoalOption(
       title: 'Travel',
       icon: Icons.flight_takeoff,
@@ -46,30 +46,35 @@ class _LearningGoalPageState extends State<LearningGoalPage> {
     super.didChangeDependencies();
     if (_syncedFromController) return;
     _syncedFromController = true;
-    final value = context.read<OnboardingController>().data.learningGoal;
-    if (value == null) return;
-    final idx = _options.indexWhere((o) => o.backendValue == value);
-    if (idx >= 0) setState(() => _selectedIndex = idx);
+    final saved = context.read<OnboardingController>().data.learningGoal;
+    if (saved == null || saved.trim().isEmpty) return;
+    final validValues = _options.map((o) => o.backendValue).toSet();
+    final parsed = saved
+        .split(RegExp(r'[,;]'))
+        .map((s) => s.trim().toLowerCase().replaceAll(' ', '_'))
+        .where((s) => s.isNotEmpty && validValues.contains(s))
+        .toSet();
+    if (parsed.isNotEmpty) setState(() => _selected.addAll(parsed));
   }
 
-  void _onSelect(int idx) {
-    setState(() => _selectedIndex = idx);
+  void _toggle(String backendValue) {
+    setState(() {
+      if (_selected.contains(backendValue)) {
+        _selected.remove(backendValue);
+      } else {
+        _selected.add(backendValue);
+      }
+    });
     final onboardingController = context.read<OnboardingController>();
-    onboardingController.setLearningGoal(_options[idx].backendValue);
+    onboardingController.setLearningGoal(_selected.join(', '));
     onboardingController.saveProgress();
   }
 
-  String? get _selectedGoalBackendValue {
-    final idx = _selectedIndex;
-    if (idx == null) return null;
-    return _options[idx].backendValue;
-  }
-
   Future<void> _onContinue() async {
-    final goal = _selectedGoalBackendValue;
-    if (goal == null) return;
-    debugPrint('LearningGoal payload: {learning_goal: $goal}');
+    if (_selected.isEmpty) return;
+    debugPrint('LearningGoal payload: {learning_goal: ${_selected.join(', ')}}');
     await context.read<OnboardingController>().saveProgress(silent: false);
+    if (!mounted) return;
     Navigator.pushNamed(context, AppRoutes.onboardingFocusAreas);
   }
 
@@ -118,10 +123,9 @@ class _LearningGoalPageState extends State<LearningGoalPage> {
                 icon: Icons.flag_outlined,
                 leadingText: 'Why ',
                 highlightedText: 'are you learning?',
-                subheader: 'This will help the AI determine your coursework.',
-                leadingColor: AppColors.accent, // blue "Why"
-                highlightedColor:
-                    AppColors.textPrimary, // white "are you learning?"
+                subheader: 'Select all that apply — the AI will use these to build your coursework.',
+                leadingColor: AppColors.accent,
+                highlightedColor: AppColors.textPrimary,
               ),
               const SizedBox(height: AppSpacing.lg),
 
@@ -154,10 +158,10 @@ class _LearningGoalPageState extends State<LearningGoalPage> {
                       ),
                       itemBuilder: (context, idx) {
                         final opt = _options[idx];
-                        final selected = _selectedIndex == idx;
+                        final selected = _selected.contains(opt.backendValue);
 
                         return GestureDetector(
-                          onTap: () => _onSelect(idx),
+                          onTap: () => _toggle(opt.backendValue),
                           child: GoalOptionCard(
                             title: opt.title,
                             icon: opt.icon,
@@ -177,7 +181,7 @@ class _LearningGoalPageState extends State<LearningGoalPage> {
                 height: 56,
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _selectedIndex == null ? null : _onContinue,
+                  onPressed: _selected.isEmpty ? null : _onContinue,
                   child: const Text('Continue'),
                 ),
               ),
