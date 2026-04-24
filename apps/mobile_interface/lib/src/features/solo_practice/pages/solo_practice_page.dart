@@ -763,10 +763,14 @@ class _SoloPracticePageState extends State<SoloPracticePage>
 
 /// Returns true when a result is below the threshold that triggers the AI tips
 /// button.  Mirrors the existing red-zone threshold used by [feedbackScoreColor].
+/// Triggers the AI tips button when accuracy is below 88.
+///
+/// Accuracy alone is used rather than the composite (pronScore / average)
+/// because fluency and completeness measure flow and coverage — a smooth,
+/// complete but mispronounced attempt inflates the composite while accuracy
+/// still flags the real errors. 88 catches anything not solidly green.
 bool _isLowScore(PronunciationFeedbackMock f) {
-  final score = f.pronScore ??
-      (f.accuracyScore + f.fluencyScore + f.completenessScore) / 3;
-  return score < 75;
+  return f.accuracyScore < 88;
 }
 
 // ---------------------------------------------------------------------------
