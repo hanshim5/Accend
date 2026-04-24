@@ -25,8 +25,10 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
   final _username = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _passwordConfirm = TextEditingController();
 
   bool _hidePassword = true;
+  bool _hidePasswordConfirm = true;
   bool _submitting = false;
 
   @override
@@ -35,6 +37,7 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
     _username.dispose();
     _email.dispose();
     _password.dispose();
+    _passwordConfirm.dispose();
     _api.dispose();
     super.dispose();
   }
@@ -45,6 +48,7 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
       username: _username.text,
       email: _email.text,
       password: _password.text,
+      passwordConfirm: _passwordConfirm.text,
     );
     setState(() {});
   }
@@ -262,7 +266,10 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
                               controller: _password,
                               obscureText: _hidePassword,
                               onChanged: (_) {
-                                if (_c.passwordErr != null) _validate();
+                                if (_c.passwordErr != null ||
+                                    _c.passwordConfirmErr != null) {
+                                  _validate();
+                                }
                               },
                               decoration: InputDecoration(
                                 hintText: '••••••••••••',
@@ -273,6 +280,37 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
                                   ),
                                   icon: Icon(
                                     _hidePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          OnboardingLabeledField(
+                            label: 'Confirm Password',
+                            rightLabel: '(Match above)',
+                            rightLabelColor: AppColors.textSecondary,
+                            child: TextField(
+                              controller: _passwordConfirm,
+                              obscureText: _hidePasswordConfirm,
+                              onChanged: (_) {
+                                if (_c.passwordErr != null ||
+                                    _c.passwordConfirmErr != null) {
+                                  _validate();
+                                }
+                              },
+                              decoration: InputDecoration(
+                                hintText: '••••••••••••',
+                                errorText: _c.passwordConfirmErr,
+                                suffixIcon: IconButton(
+                                  onPressed: () => setState(
+                                    () => _hidePasswordConfirm =
+                                        !_hidePasswordConfirm,
+                                  ),
+                                  icon: Icon(
+                                    _hidePasswordConfirm
                                         ? Icons.visibility_off
                                         : Icons.visibility,
                                   ),
