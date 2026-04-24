@@ -1,11 +1,13 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import'package:mobile_interface/src/common/services/auth_service.dart';
+import 'package:mobile_interface/src/common/services/auth_service.dart';
 import '../../../app/routes.dart' as routes;
-
 import '../../../app/constants.dart';
 import 'package:mobile_interface/src/features/group_session/controllers/group_session_controller.dart';
+import '../data/session_topics.dart';
 import '../widgets/private_code_display.dart';
 
 class GroupSessionPrivateCreatePage extends StatefulWidget {
@@ -15,8 +17,13 @@ class GroupSessionPrivateCreatePage extends StatefulWidget {
   State<GroupSessionPrivateCreatePage> createState() => _GroupSessionPrivateCreatePageState();
 }
 
+enum _GenStatus { loading, done, failed }
+
 class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreatePage> {
   GroupSessionController? _ctrl;
+  bool _isStarting = false;
+  _GenStatus _genStatus = _GenStatus.loading;
+  Future<void>? _genFuture;
 
   @override
   void didChangeDependencies() {
@@ -32,9 +39,8 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final ctrl = context.read<GroupSessionController>();
-
       final userId = context.read<AuthService>().currentUser?.id ?? 'Unknown';
-      
+
       () async {
         final username = await ctrl.getCurrentUsername();
         await ctrl.createLobby(userId, username);
@@ -42,8 +48,56 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
         if (!mounted || lobbyId == null || lobbyId.isEmpty) return;
         await ctrl.getLobby(lobbyId);
         await ctrl.subscribeToLobby(lobbyId);
+        // Kick off generation in the background while players join.
+        _beginGeneration(ctrl, lobbyId);
       }();
     });
+  }
+
+  void _beginGeneration(GroupSessionController ctrl, String lobbyId) {
+    final topic = kSessionTopics[Random().nextInt(kSessionTopics.length)];
+    _genFuture = ctrl
+        .generateSessionItems(topic)
+        .then((_) => ctrl.setLobbyItems(lobbyKind: 'private', lobbyId: lobbyId))
+        .then((_) {
+      if (mounted) setState(() => _genStatus = _GenStatus.done);
+    }).catchError((_) {
+      if (mounted) setState(() => _genStatus = _GenStatus.failed);
+    });
+  }
+
+  Future<void> _onStartPressed(GroupSessionController ctrl) async {
+    final lobbyId = ctrl.createPrivateLobby?.lobbyId;
+    if (lobbyId == null) return;
+
+    if (_genStatus == _GenStatus.failed) {
+      // Retry generation before navigating.
+      setState(() {
+        _genStatus = _GenStatus.loading;
+        _isStarting = true;
+      });
+      _beginGeneration(ctrl, lobbyId);
+    } else {
+      setState(() => _isStarting = true);
+    }
+
+    try {
+      await _genFuture;
+      if (!mounted) return;
+      if (_genStatus == _GenStatus.failed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to prepare session. Please try again.')),
+        );
+        return;
+      }
+      Navigator.pushNamed(
+        context,
+        routes.AppRoutes.groupSessionActiveLobby,
+        arguments: 'private',
+      );
+    } finally {
+      if (mounted) setState(() => _isStarting = false);
+    }
   }
 
   @override
@@ -215,16 +269,39 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: (ctrl.isLoading || ctrl.createPrivateLobby?.lobbyId == null)
+                      onPressed: (ctrl.isLoading || ctrl.createPrivateLobby?.lobbyId == null || _isStarting)
                           ? null
-                          : () => Navigator.pushNamed(
-                                context,
-                                routes.AppRoutes.groupSessionActiveLobby,
-                                arguments: 'private',
-                              ),
-                      icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Start'),
+                          : () => _onStartPressed(ctrl),
+                      icon: _isStarting
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : Icon(_genStatus == _GenStatus.failed ? Icons.refresh_rounded : Icons.play_arrow_rounded),
+                      label: Text(
+                        _isStarting
+                            ? (_genStatus == _GenStatus.loading ? 'Preparing...' : 'Starting...')
+                            : (_genStatus == _GenStatus.failed ? 'Retry & Start' : 'Start'),
+                      ),
                     ),
+                  ),
+                  const SizedBox(height: 6),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: switch (_genStatus) {
+                      _GenStatus.loading => Text(
+                          'Preparing session…',
+                          key: const ValueKey('loading'),
+                          style: t.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                        ),
+                      _GenStatus.done => Text(
+                          'Session ready',
+                          key: const ValueKey('done'),
+                          style: t.textTheme.bodySmall?.copyWith(color: AppColors.success),
+                        ),
+                      _GenStatus.failed => Text(
+                          'Preparation failed — tap Retry & Start',
+                          key: const ValueKey('failed'),
+                          style: t.textTheme.bodySmall?.copyWith(color: AppColors.failure),
+                        ),
+                    },
                   ),
 
                   // const SizedBox(height: 12),

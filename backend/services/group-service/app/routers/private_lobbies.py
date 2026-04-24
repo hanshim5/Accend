@@ -27,16 +27,19 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 
-from app.dependencies import get_private_lobby_service
+from app.dependencies import get_private_lobby_service, get_lobby_items_repo
 from app.schemas.private_lobby_schema import (
+    LobbyItemOut,
     LobbyTurnScoreIn,
     LobbyTurnStateOut,
     PrivateLobbyCreate,
     PrivateLobbyDeleteOut,
     PrivateLobbyJoin,
     PrivateLobbyMemberOut,
+    SetLobbyItemsReq,
 )
 from app.services.private_lobby_service import PrivateLobbyService
+from app.repositories.supabase_lobby_items_repo import SupabaseLobbyItemsRepo
 
 
 # Router is mounted with prefix="/courses"
@@ -203,4 +206,43 @@ def vote_next_round(
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/{lobby_id}/items", response_model=list[LobbyItemOut])
+def set_lobby_items(
+    lobby_id: int,
+    body: SetLobbyItemsReq,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    repo: SupabaseLobbyItemsRepo = Depends(get_lobby_items_repo),
+):
+    """
+    Store the AI-generated items for this lobby session.
+
+    Called once by the host immediately after creating the lobby.
+    Joiners do not call this — they read via GET.
+    """
+    _get_user_id(x_user_id)
+    try:
+        return repo.insert_items(lobby_id=lobby_id, lobby_kind="private", items=body.items)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.get("/{lobby_id}/items", response_model=list[LobbyItemOut])
+def get_lobby_items(
+    lobby_id: int,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    repo: SupabaseLobbyItemsRepo = Depends(get_lobby_items_repo),
+):
+    """
+    Fetch the stored session items for this lobby.
+
+    Called by joiners (and optionally the host) before entering the active lobby.
+    Returns an empty list if items have not been stored yet.
+    """
+    _get_user_id(x_user_id)
+    try:
+        return repo.get_items(lobby_id=lobby_id, lobby_kind="private")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 

@@ -6,16 +6,19 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 
-from app.dependencies import get_public_lobby_service
+from app.dependencies import get_public_lobby_service, get_lobby_items_repo
 from app.schemas.private_lobby_schema import (
+    LobbyItemOut,
     LobbyTurnScoreIn,
     LobbyTurnStateOut,
     PrivateLobbyCreate,
     PrivateLobbyDeleteOut,
     PrivateLobbyJoin,
     PrivateLobbyMemberOut,
+    SetLobbyItemsReq,
 )
 from app.services.public_lobby_service import PublicLobbyService
+from app.repositories.supabase_lobby_items_repo import SupabaseLobbyItemsRepo
 
 router = APIRouter(prefix="/public_lobbies", tags=["public_lobbies"])
 
@@ -130,3 +133,40 @@ def vote_next_round(
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/{lobby_id}/items", response_model=list[LobbyItemOut])
+def set_lobby_items(
+    lobby_id: int,
+    body: SetLobbyItemsReq,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    repo: SupabaseLobbyItemsRepo = Depends(get_lobby_items_repo),
+):
+    """
+    Store the AI-generated items for this public lobby session.
+
+    Called once by the matched host immediately after matchmaking completes.
+    """
+    _get_user_id(x_user_id)
+    try:
+        return repo.insert_items(lobby_id=lobby_id, lobby_kind="public", items=body.items)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.get("/{lobby_id}/items", response_model=list[LobbyItemOut])
+def get_lobby_items(
+    lobby_id: int,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    repo: SupabaseLobbyItemsRepo = Depends(get_lobby_items_repo),
+):
+    """
+    Fetch the stored session items for this public lobby.
+
+    Called by all participants before entering the active lobby.
+    """
+    _get_user_id(x_user_id)
+    try:
+        return repo.get_items(lobby_id=lobby_id, lobby_kind="public")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))

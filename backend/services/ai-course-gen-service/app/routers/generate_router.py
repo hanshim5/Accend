@@ -22,8 +22,8 @@ Endpoints:
 """
 
 from fastapi import APIRouter, Header, HTTPException
-from ..schemas.generate_schema import GenerateCourseReq, GenerateCourseRes
-from ..services.ai_service import generate_course_from_prompt, generate_course_from_metrics
+from ..schemas.generate_schema import GenerateCourseReq, GenerateCourseRes, GenerateSessionItemsReq, GenerateSessionItemsRes
+from ..services.ai_service import generate_course_from_prompt, generate_course_from_metrics, generate_session_items
 
 # Router for AI course generation endpoints.
 router = APIRouter()
@@ -114,3 +114,34 @@ async def generate_course_from_user_metrics(
         raise HTTPException(status_code=502, detail=msg)
 
     return result
+
+
+@router.post("/generate-session-items", response_model=GenerateSessionItemsRes)
+async def generate_session_items_endpoint(body: GenerateSessionItemsReq):
+    """
+    Generate 20 short phrases/sentences for a group pronunciation session.
+
+    Flow:
+    1. Receive and validate the topic string.
+    2. Call AI service to generate a flat list of 20 items guided by the topic.
+    3. Return items in GenerateSessionItemsRes shape.
+
+    Notes:
+    - No course or lesson structure — just a flat list of 20 practice prompts.
+    - Called by the Gateway when a group lobby host creates a session.
+    """
+    topic = body.topic.strip()
+    if not topic:
+        raise HTTPException(status_code=400, detail="Topic must be non-empty")
+
+    try:
+        items = generate_session_items(topic)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        msg = str(exc)
+        if "503" in msg or "UNAVAILABLE" in msg:
+            raise HTTPException(status_code=503, detail="AI generation service temporarily unavailable. Please try again.")
+        raise HTTPException(status_code=502, detail=msg)
+
+    return {"items": items}

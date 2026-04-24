@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -7,7 +8,10 @@ import 'package:mobile_interface/src/common/services/auth_service.dart';
 import '../../../app/constants.dart';
 import '../../../app/routes.dart' as routes;
 import '../controllers/group_session_controller.dart';
+import '../data/session_topics.dart';
 import '../widgets/private_code_display.dart';
+
+enum _GenStatus { loading, done, failed }
 
 /// Matchmaking: loading until lobby has 5 players or 10s timeout, then shows lobby.
 class GroupSessionPublicMatchPage extends StatefulWidget {
@@ -20,6 +24,9 @@ class GroupSessionPublicMatchPage extends StatefulWidget {
 class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPage> {
   Timer? _timeoutTimer;
   bool _timedOut = false;
+  bool _isStarting = false;
+  _GenStatus _genStatus = _GenStatus.loading;
+  Future<void>? _genFuture;
 
   @override
   void initState() {
@@ -38,8 +45,71 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
       if (id != null && id.isNotEmpty) {
         await ctrl.getPublicLobby(id, showLoading: false);
         await ctrl.subscribeToPublicLobby(id);
+        // Only the host generates items; joiners fetch on Start.
+        if (ctrl.joinPrivateLobby?.host == true) {
+          _beginGeneration(ctrl, id);
+        } else {
+          // Non-host: mark done immediately so the button shows "Start" normally.
+          setState(() => _genStatus = _GenStatus.done);
+        }
       }
     });
+  }
+
+  void _beginGeneration(GroupSessionController ctrl, String lobbyId) {
+    final topic = kSessionTopics[Random().nextInt(kSessionTopics.length)];
+    _genFuture = ctrl
+        .generateSessionItems(topic)
+        .then((_) => ctrl.setLobbyItems(lobbyKind: 'public', lobbyId: lobbyId))
+        .then((_) {
+      if (mounted) setState(() => _genStatus = _GenStatus.done);
+    }).catchError((_) {
+      if (mounted) setState(() => _genStatus = _GenStatus.failed);
+    });
+  }
+
+  Future<void> _onStartPressed(GroupSessionController ctrl) async {
+    final lobbyId = ctrl.joinPrivateLobby?.lobbyId;
+    if (lobbyId == null) return;
+    final isHost = ctrl.joinPrivateLobby?.host == true;
+
+    if (isHost && _genStatus == _GenStatus.failed) {
+      setState(() {
+        _genStatus = _GenStatus.loading;
+        _isStarting = true;
+      });
+      _beginGeneration(ctrl, lobbyId);
+    } else {
+      setState(() => _isStarting = true);
+    }
+
+    try {
+      if (isHost) {
+        await _genFuture;
+        if (!mounted) return;
+        if (_genStatus == _GenStatus.failed) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to prepare session. Please try again.')),
+          );
+          return;
+        }
+      } else {
+        await ctrl.fetchLobbyItems(lobbyKind: 'public', lobbyId: lobbyId);
+      }
+      if (!mounted) return;
+      Navigator.pushNamed(
+        context,
+        routes.AppRoutes.groupSessionActiveLobby,
+        arguments: 'public',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load session: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isStarting = false);
+    }
   }
 
   @override
@@ -236,16 +306,40 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: players.isEmpty
+                      onPressed: (players.isEmpty || _isStarting)
                           ? null
-                          : () => Navigator.pushNamed(
-                                context,
-                                routes.AppRoutes.groupSessionActiveLobby,
-                                arguments: 'public',
-                              ),
-                      icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Start'),
+                          : () => _onStartPressed(ctrl),
+                      icon: _isStarting
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : Icon(_genStatus == _GenStatus.failed ? Icons.refresh_rounded : Icons.play_arrow_rounded),
+                      label: Text(
+                        _isStarting
+                            ? (_genStatus == _GenStatus.loading ? 'Preparing...' : 'Starting...')
+                            : (_genStatus == _GenStatus.failed ? 'Retry & Start' : 'Start'),
+                      ),
                     ),
+                  ),
+                  const SizedBox(height: 6),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: switch (_genStatus) {
+                      _GenStatus.loading when (ctrl.joinPrivateLobby?.host == true) => Text(
+                          'Preparing session…',
+                          key: const ValueKey('loading'),
+                          style: t.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                        ),
+                      _GenStatus.done => Text(
+                          'Session ready',
+                          key: const ValueKey('done'),
+                          style: t.textTheme.bodySmall?.copyWith(color: AppColors.success),
+                        ),
+                      _GenStatus.failed => Text(
+                          'Preparation failed — tap Retry & Start',
+                          key: const ValueKey('failed'),
+                          style: t.textTheme.bodySmall?.copyWith(color: AppColors.failure),
+                        ),
+                      _ => const SizedBox.shrink(key: ValueKey('empty')),
+                    },
                   ),
                         const SizedBox(height: 12),
                       ],
