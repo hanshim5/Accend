@@ -33,6 +33,10 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   _LobbyTurnState? _turnState;
   final Set<String> _newlyPlantedFlags = <String>{};
 
+  /// Counts completed rounds — used to advance through session items.
+  /// Incremented whenever roundComplete transitions from true → false.
+  int _roundIndex = 0;
+
   @override
   void initState() {
     super.initState();
@@ -185,9 +189,12 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
       final next = _LobbyTurnState.fromJson(json);
       if (!mounted) return;
       setState(() {
+        // Detect round transition: was complete, now active → new round started.
+        if (_turnState?.roundComplete == true && !next.roundComplete) {
+          _roundIndex++;
+        }
         _turnState = next;
 
-        // Once the backend resets the round, wipe local UI artifacts too.
         if (!next.roundComplete) {
           _newlyPlantedFlags.clear();
           _scoreController.clear();
@@ -229,6 +236,9 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
       final latestUserId = next.latestScoredUserId;
       if (!mounted) return;
       setState(() {
+        if (_turnState?.roundComplete == true && !next.roundComplete) {
+          _roundIndex++;
+        }
         _turnState = next;
         if (latestUserId != null && nextSeq > prevSeq) {
           _newlyPlantedFlags.add(latestUserId);
@@ -321,7 +331,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     final items = ctrl.sessionItems;
     final LessonItem? currentItem = items.isEmpty
         ? null
-        : items[(state?.currentTurnIndex ?? 0) % items.length];
+        : items[_roundIndex % items.length];
     final queue = state?.queueParticipants ?? const <_TurnParticipant>[];
     final currentPlayer = state?.currentPlayer;
     final scoresByPlayer = state?.scoresByPlayer ?? const <String, double>{};
