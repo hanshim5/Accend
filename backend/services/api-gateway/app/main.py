@@ -975,6 +975,47 @@ async def generate_course_from_metrics(
         }
 
 
+class GenerateSessionItemsGatewayReq(BaseModel):
+    """
+    Request body for generating a flat list of group session items.
+
+    Fields:
+    - topic: Short topic string passed to the AI (e.g. "Travel").
+    """
+    topic: str = Field(min_length=1, max_length=200)
+
+
+@app.post("/ai/generate-session-items")
+async def generate_session_items(
+    req: GenerateSessionItemsGatewayReq,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Generate 20 short pronunciation phrases for a group session.
+
+    Flow:
+    1. Validate JWT.
+    2. Forward the topic to the AI service.
+    3. Return the flat list of items directly to the client.
+
+    Notes:
+    - No persistence — the caller (Flutter) is responsible for storing
+      the items via POST /{kind}_lobbies/{id}/items.
+    """
+    verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(
+            f"{settings.AI_COURSE_GEN_SERVICE_URL}/generate-session-items",
+            json={"topic": req.topic},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
 # -----------------------------------
 # Pronunciation Feedback
 # -----------------------------------
@@ -1404,6 +1445,106 @@ async def proxy_vote_public_next_round(
             f"{settings.GROUP_SERVICE_URL}/public_lobbies/{lobby_id}/turn_state/vote_next_round",
             headers={"X-User-Id": user_id},
             json={},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+    return r.json()
+
+
+class SetLobbyItemsGatewayReq(BaseModel):
+    items: list[dict]
+
+
+@app.post("/private_lobbies/{lobby_id}/items")
+async def proxy_set_private_lobby_items(
+    lobby_id: str,
+    body: SetLobbyItemsGatewayReq,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Store AI-generated session items for a private lobby.
+
+    Called once by the host after generating items from the AI service.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.post(
+            f"{settings.GROUP_SERVICE_URL}/private_lobbies/{lobby_id}/items",
+            headers={"X-User-Id": user_id},
+            json={"items": body.items},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+    return r.json()
+
+
+@app.get("/private_lobbies/{lobby_id}/items")
+async def proxy_get_private_lobby_items(
+    lobby_id: str,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Fetch session items for a private lobby.
+
+    Called by all participants before entering the active lobby.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{settings.GROUP_SERVICE_URL}/private_lobbies/{lobby_id}/items",
+            headers={"X-User-Id": user_id},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+    return r.json()
+
+
+@app.post("/public_lobbies/{lobby_id}/items")
+async def proxy_set_public_lobby_items(
+    lobby_id: str,
+    body: SetLobbyItemsGatewayReq,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Store AI-generated session items for a public lobby.
+
+    Called once by the matched host after generating items.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.post(
+            f"{settings.GROUP_SERVICE_URL}/public_lobbies/{lobby_id}/items",
+            headers={"X-User-Id": user_id},
+            json={"items": body.items},
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+    return r.json()
+
+
+@app.get("/public_lobbies/{lobby_id}/items")
+async def proxy_get_public_lobby_items(
+    lobby_id: str,
+    authorization: str | None = Header(default=None),
+):
+    """
+    Fetch session items for a public lobby.
+
+    Called by all participants before entering the active lobby.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{settings.GROUP_SERVICE_URL}/public_lobbies/{lobby_id}/items",
+            headers={"X-User-Id": user_id},
         )
 
     if r.status_code >= 400:

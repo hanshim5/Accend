@@ -17,6 +17,7 @@ Later:
 
 from app.repositories.supabase_private_lobby_repo import SupabasePrivateLobbyRepo
 from app.repositories.supabase_public_lobby_repo import SupabasePublicLobbyRepo
+from app.repositories.supabase_lobby_items_repo import SupabaseLobbyItemsRepo
 from app.services.private_lobby_service import PrivateLobbyService
 from app.services.public_lobby_service import PublicLobbyService
 
@@ -27,3 +28,7 @@ def get_private_lobby_service() -> PrivateLobbyService:
 
 def get_public_lobby_service() -> PublicLobbyService:
     return PublicLobbyService(repo=SupabasePublicLobbyRepo())
+
+
+def get_lobby_items_repo() -> SupabaseLobbyItemsRepo:
+    return SupabaseLobbyItemsRepo()

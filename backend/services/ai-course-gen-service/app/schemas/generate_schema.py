@@ -89,3 +89,23 @@ class GenerateCourseRes(BaseModel):
     title: str
     image_url: Optional[str] = None
     lessons: List[Lesson] = Field(default_factory=list)
+
+
+class GenerateSessionItemsReq(BaseModel):
+    """
+    Request schema for generating a flat list of session items for group play.
+
+    Fields:
+    - topic: A short topic string that guides the LLM (e.g. "Daily routines").
+    """
+    topic: str = Field(..., min_length=1, max_length=200)
+
+
+class GenerateSessionItemsRes(BaseModel):
+    """
+    Response schema for AI-generated group session items.
+
+    Returns a flat list of 20 pronunciation prompts — no course or lesson nesting.
+    Each item has the same shape as a course LessonItem.
+    """
+    items: List[LessonItem] = Field(default_factory=list)

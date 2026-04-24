@@ -345,6 +345,141 @@ def generate_course_from_prompt(prompt: str) -> dict:
 
 
 # -------------------------
+# Group session items
+# -------------------------
+
+_SESSION_ITEMS_SHAPE = """
+Return ONLY valid JSON (no markdown, no backticks, no explanation) in EXACTLY this shape:
+
+{
+  "items": [
+    { "text": string, "ipa": string|null, "hint": string|null }
+  ]
+}
+
+Non-negotiable Rules:
+- Exactly 20 items
+- Each item text must be a short, practical phrase or sentence (phrases/words/sentences)
+- Keep item text concise (3 to 12 words)
+- Vary the difficulty and sentence structure across the 20 items
+- Use null for ipa/hint when not provided
+- No extra keys anywhere
+- Always use the English language
+- Avoid any acronyms
+- No placeholders
+""".strip()
+
+
+def _validate_session_items(payload: dict) -> list[dict]:
+    """
+    Validate and normalize a flat list of session items from Gemini output.
+
+    Filters out any items missing valid text. Returns at most 20 items.
+    """
+    if not isinstance(payload, dict):
+        raise ValueError("Gemini output is not a JSON object")
+
+    raw = payload.get("items")
+    if not isinstance(raw, list) or len(raw) == 0:
+        raise ValueError("Missing/invalid items list")
+
+    normalized = []
+    for it in raw:
+        if not isinstance(it, dict):
+            continue
+        text = it.get("text")
+        if not isinstance(text, str) or not text.strip():
+            continue
+        ipa = it.get("ipa")
+        hint = it.get("hint")
+        normalized.append({
+            "text": text.strip(),
+            "ipa": ipa if ipa is None or isinstance(ipa, str) else None,
+            "hint": hint if hint is None or isinstance(hint, str) else None,
+        })
+
+    if not normalized:
+        raise ValueError("No valid items after normalization")
+
+    return normalized[:20]
+
+
+def generate_session_items(topic: str) -> list[dict]:
+    """
+    Generate 20 short phrases/sentences for a group pronunciation session.
+
+    Args:
+    - topic: A short topic string to guide the LLM (e.g. "Daily routines").
+
+    Returns:
+    - List of up to 20 dicts, each with keys: text, ipa (nullable), hint (nullable).
+
+    Falls back to simple stub items if Gemini fails and ALLOW_STUB_FALLBACK is enabled.
+    """
+    topic_clean = topic.strip()
+    if not topic_clean:
+        raise ValueError("Topic must be non-empty")
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set")
+
+    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    client = genai.Client(api_key=api_key)
+
+    full_prompt = f"""
+You are generating pronunciation practice content for a group language learning session.
+
+{_SESSION_ITEMS_SHAPE}
+
+Topic to base the items on: {topic_clean}
+""".strip()
+
+    allow_fallback = _env_truthy("ALLOW_STUB_FALLBACK", default=True)
+
+    try:
+        resp = client.models.generate_content(
+            model=model_name,
+            contents=full_prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json"),
+        )
+        text = _strip_code_fences((getattr(resp, "text", "") or "").strip())
+
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            repair_prompt = f"""
+You returned INVALID JSON.
+
+Fix it and return ONLY valid JSON matching EXACTLY this shape (no markdown, no extra text):
+{_SESSION_ITEMS_SHAPE}
+
+Here is your invalid output:
+{text}
+""".strip()
+            resp2 = client.models.generate_content(
+                model=model_name,
+                contents=repair_prompt,
+                config=types.GenerateContentConfig(response_mime_type="application/json"),
+            )
+            text2 = _strip_code_fences((getattr(resp2, "text", "") or "").strip())
+            data = json.loads(text2)
+
+        return _validate_session_items(data)
+
+    except Exception as e:
+        if not allow_fallback:
+            print("Gemini session items failed and fallback disabled:", repr(e), flush=True)
+            raise RuntimeError(str(e)) from e
+
+        print("Gemini session items failed, falling back to stub:", repr(e), flush=True)
+        stub_phrases = [
+            f"Practice phrase {i + 1} about {topic_clean}." for i in range(20)
+        ]
+        return [{"text": p, "ipa": None, "hint": None} for p in stub_phrases]
+
+
+# -------------------------
 # Metrics-based generation
 # -------------------------
 
