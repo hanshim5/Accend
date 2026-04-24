@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:mobile_interface/src/common/services/api_client.dart';
 import 'package:mobile_interface/src/common/services/auth_service.dart';
+import 'package:mobile_interface/src/features/courses/models/lesson_item.dart';
 import 'package:mobile_interface/src/features/group_session/models/private_lobby.dart';
 
 class GroupSessionController extends ChangeNotifier {
@@ -23,7 +24,7 @@ class GroupSessionController extends ChangeNotifier {
   RealtimeChannel? _lobbyChannel;
   String? _subscribedLobbyId;
   bool _isRealtimeSyncing = false;
-
+  List<LessonItem> _sessionItems = [];
 
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -33,11 +34,15 @@ class GroupSessionController extends ChangeNotifier {
   PrivateLobby? get createPrivateLobby => _createPrivateLobby;
   PrivateLobby? get joinPrivateLobby => _joinPrivateLobby;
 
+  /// The AI-generated lesson items for the current group session.
+  List<LessonItem> get sessionItems => List.unmodifiable(_sessionItems);
+
   void resetPrivateLobbyState({bool notify = true}) {
     _error = null;
     _privateLobby = [];
     _createPrivateLobby = null;
     _joinPrivateLobby = null;
+    _sessionItems = [];
     if (notify) notifyListeners();
   }
 
@@ -493,6 +498,75 @@ class GroupSessionController extends ChangeNotifier {
       accessToken: token,
       body: const <String, dynamic>{},
     );
+  }
+
+  /// Generate 20 session items from the AI service for the given topic.
+  ///
+  /// Stores the result in [sessionItems]. Throws on network or API failure.
+  Future<void> generateSessionItems(String topic) async {
+    final token = _auth.accessToken;
+    if (token == null || token.isEmpty) throw StateError('Not authenticated');
+
+    final response = await _api.postJson(
+      '/ai/generate-session-items',
+      accessToken: token,
+      body: {'topic': topic},
+    );
+
+    final rawItems = response['items'] as List<dynamic>? ?? [];
+    _sessionItems = rawItems
+        .cast<Map<String, dynamic>>()
+        .map(LessonItem.fromSessionJson)
+        .toList();
+  }
+
+  /// Persist [sessionItems] to the lobby so all members can fetch them.
+  ///
+  /// Called once by the host immediately after [generateSessionItems].
+  Future<void> setLobbyItems({
+    required String lobbyKind,
+    required String lobbyId,
+  }) async {
+    final token = _auth.accessToken;
+    if (token == null || token.isEmpty) throw StateError('Not authenticated');
+
+    final base = lobbyKind == 'public' ? '/public_lobbies' : '/private_lobbies';
+    await _api.postList(
+      '$base/$lobbyId/items',
+      accessToken: token,
+      body: {
+        'items': _sessionItems
+            .map((item) => {
+                  'position': item.position,
+                  'text': item.text,
+                  'ipa': item.ipa,
+                  'hint': item.hint,
+                })
+            .toList(),
+      },
+    );
+  }
+
+  /// Fetch session items from the lobby (used by joiners).
+  ///
+  /// Stores the result in [sessionItems]. Throws on network or API failure.
+  Future<void> fetchLobbyItems({
+    required String lobbyKind,
+    required String lobbyId,
+  }) async {
+    final token = _auth.accessToken;
+    if (token == null || token.isEmpty) throw StateError('Not authenticated');
+
+    final base = lobbyKind == 'public' ? '/public_lobbies' : '/private_lobbies';
+    final list = await _api.getList(
+      '$base/$lobbyId/items',
+      accessToken: token,
+    );
+
+    _sessionItems = list
+        .cast<Map<String, dynamic>>()
+        .map(LessonItem.fromSessionJson)
+        .toList();
   }
 
   @override

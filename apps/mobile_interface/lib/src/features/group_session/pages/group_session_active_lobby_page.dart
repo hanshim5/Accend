@@ -10,6 +10,7 @@ import '../../../app/routes.dart';
 import '../controllers/group_session_controller.dart';
 import '../models/private_lobby.dart';
 import '../widgets/quit_group_session_back_button.dart';
+import 'package:mobile_interface/src/features/courses/models/lesson_item.dart';
 
 class GroupSessionActiveLobbyPage extends StatefulWidget {
   const GroupSessionActiveLobbyPage({super.key});
@@ -316,6 +317,11 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     final players = ctrl.privateLobby;
     final state = _turnState;
     final allTurnsScored = state?.roundComplete ?? false;
+
+    final items = ctrl.sessionItems;
+    final LessonItem? currentItem = items.isEmpty
+        ? null
+        : items[(state?.currentTurnIndex ?? 0) % items.length];
     final queue = state?.queueParticipants ?? const <_TurnParticipant>[];
     final currentPlayer = state?.currentPlayer;
     final scoresByPlayer = state?.scoresByPlayer ?? const <String, double>{};
@@ -378,24 +384,30 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                       color: AppColors.surface.withValues(alpha: 0.78),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Lieutenant',
-                          style: t.textTheme.headlineMedium?.copyWith(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w800,
+                    child: currentItem == null
+                        ? const Center(child: CircularProgressIndicator())
+                        : Column(
+                            children: [
+                              Text(
+                                currentItem.text,
+                                style: t.textTheme.headlineMedium?.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              if (currentItem.ipa != null && currentItem.ipa!.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  currentItem.ipa!,
+                                  style: t.textTheme.titleMedium?.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                        ),
-                        Text(
-                          "lu'tɛnənt",
-                          style: t.textTheme.titleMedium?.copyWith(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    )
                   ),
                   const SizedBox(height: 14),
                   Text(

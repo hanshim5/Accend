@@ -1,11 +1,13 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import'package:mobile_interface/src/common/services/auth_service.dart';
+import 'package:mobile_interface/src/common/services/auth_service.dart';
 import '../../../app/routes.dart' as routes;
-
 import '../../../app/constants.dart';
 import 'package:mobile_interface/src/features/group_session/controllers/group_session_controller.dart';
+import '../data/session_topics.dart';
 import '../widgets/private_code_display.dart';
 
 class GroupSessionPrivateCreatePage extends StatefulWidget {
@@ -17,6 +19,7 @@ class GroupSessionPrivateCreatePage extends StatefulWidget {
 
 class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreatePage> {
   GroupSessionController? _ctrl;
+  bool _isStarting = false;
 
   @override
   void didChangeDependencies() {
@@ -215,15 +218,34 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: (ctrl.isLoading || ctrl.createPrivateLobby?.lobbyId == null)
+                      onPressed: (ctrl.isLoading || ctrl.createPrivateLobby?.lobbyId == null || _isStarting)
                           ? null
-                          : () => Navigator.pushNamed(
-                                context,
-                                routes.AppRoutes.groupSessionActiveLobby,
-                                arguments: 'private',
-                              ),
-                      icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Start'),
+                          : () async {
+                              final lobbyId = ctrl.createPrivateLobby!.lobbyId;
+                              setState(() => _isStarting = true);
+                              try {
+                                final topic = kSessionTopics[Random().nextInt(kSessionTopics.length)];
+                                await ctrl.generateSessionItems(topic);
+                                await ctrl.setLobbyItems(lobbyKind: 'private', lobbyId: lobbyId);
+                                if (!mounted) return;
+                                Navigator.pushNamed(
+                                  context,
+                                  routes.AppRoutes.groupSessionActiveLobby,
+                                  arguments: 'private',
+                                );
+                              } catch (e) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Failed to prepare session: $e')),
+                                );
+                              } finally {
+                                if (mounted) setState(() => _isStarting = false);
+                              }
+                            },
+                      icon: _isStarting
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.play_arrow_rounded),
+                      label: Text(_isStarting ? 'Preparing...' : 'Start'),
                     ),
                   ),
 

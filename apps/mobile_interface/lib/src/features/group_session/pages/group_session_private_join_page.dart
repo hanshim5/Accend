@@ -18,6 +18,7 @@ class GroupSessionPrivateJoinPage extends StatefulWidget {
 class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
   GroupSessionController? _ctrl;
   String? _lobbyCode;
+  bool _isStarting = false;
 
   @override
   void didChangeDependencies() {
@@ -224,15 +225,34 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: (ctrl.isLoading || (_lobbyCode == null))
+                      onPressed: (ctrl.isLoading || _lobbyCode == null || _isStarting)
                           ? null
-                          : () => Navigator.pushNamed(
-                                context,
-                                routes.AppRoutes.groupSessionActiveLobby,
-                                arguments: 'private',
-                              ),
-                      icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Start'),
+                          : () async {
+                              setState(() => _isStarting = true);
+                              try {
+                                await ctrl.fetchLobbyItems(
+                                  lobbyKind: 'private',
+                                  lobbyId: _lobbyCode!,
+                                );
+                                if (!mounted) return;
+                                Navigator.pushNamed(
+                                  context,
+                                  routes.AppRoutes.groupSessionActiveLobby,
+                                  arguments: 'private',
+                                );
+                              } catch (e) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Failed to load session: $e')),
+                                );
+                              } finally {
+                                if (mounted) setState(() => _isStarting = false);
+                              }
+                            },
+                      icon: _isStarting
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.play_arrow_rounded),
+                      label: Text(_isStarting ? 'Loading...' : 'Start'),
                     ),
                   ),
 

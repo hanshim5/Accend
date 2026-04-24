@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +8,7 @@ import 'package:mobile_interface/src/common/services/auth_service.dart';
 import '../../../app/constants.dart';
 import '../../../app/routes.dart' as routes;
 import '../controllers/group_session_controller.dart';
+import '../data/session_topics.dart';
 import '../widgets/private_code_display.dart';
 
 /// Matchmaking: loading until lobby has 5 players or 10s timeout, then shows lobby.
@@ -20,6 +22,7 @@ class GroupSessionPublicMatchPage extends StatefulWidget {
 class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPage> {
   Timer? _timeoutTimer;
   bool _timedOut = false;
+  bool _isStarting = false;
 
   @override
   void initState() {
@@ -236,15 +239,40 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: players.isEmpty
+                      onPressed: (players.isEmpty || _isStarting)
                           ? null
-                          : () => Navigator.pushNamed(
-                                context,
-                                routes.AppRoutes.groupSessionActiveLobby,
-                                arguments: 'public',
-                              ),
-                      icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Start'),
+                          : () async {
+                              final lobbyId = ctrl.joinPrivateLobby?.lobbyId;
+                              if (lobbyId == null) return;
+                              final isHost = ctrl.joinPrivateLobby?.host == true;
+                              setState(() => _isStarting = true);
+                              try {
+                                if (isHost) {
+                                  final topic = kSessionTopics[Random().nextInt(kSessionTopics.length)];
+                                  await ctrl.generateSessionItems(topic);
+                                  await ctrl.setLobbyItems(lobbyKind: 'public', lobbyId: lobbyId);
+                                } else {
+                                  await ctrl.fetchLobbyItems(lobbyKind: 'public', lobbyId: lobbyId);
+                                }
+                                if (!mounted) return;
+                                Navigator.pushNamed(
+                                  context,
+                                  routes.AppRoutes.groupSessionActiveLobby,
+                                  arguments: 'public',
+                                );
+                              } catch (e) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Failed to prepare session: $e')),
+                                );
+                              } finally {
+                                if (mounted) setState(() => _isStarting = false);
+                              }
+                            },
+                      icon: _isStarting
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.play_arrow_rounded),
+                      label: Text(_isStarting ? 'Preparing...' : 'Start'),
                     ),
                   ),
                         const SizedBox(height: 12),
