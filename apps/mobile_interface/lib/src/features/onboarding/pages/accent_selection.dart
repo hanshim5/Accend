@@ -112,14 +112,14 @@ class _AccentSelectionPageState extends State<AccentSelectionPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           OnboardingTopBar(
-            step: 4,
-            totalSteps: 6,
+            step: 5,
+            totalSteps: 7,
             rightLabel: 'Accent Selection',
             showBack: true,
             onBack: _onBack,
           ),
           const SizedBox(height: AppSpacing.sm),
-          const OnboardingProgressBar(step: 4, totalSteps: 6),
+          const OnboardingProgressBar(step: 5, totalSteps: 7),
           const SizedBox(height: AppSpacing.xl),
 
           const OnboardingQuestionHeader(

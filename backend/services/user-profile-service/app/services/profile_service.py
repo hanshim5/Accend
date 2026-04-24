@@ -180,6 +180,7 @@ class ProfileService:
     async def update_onboarding(
         self,
         user_id: str,
+        native_language: str | None = None,
         learning_goal: str | None = None,
         feedback_tone: str | None = None,
         accent: str | None = None,
@@ -203,8 +204,13 @@ class ProfileService:
         if not user_id:
             bad_request("user_id missing")
 
+        cleaned_native_language = native_language.strip() if native_language is not None else None
+        if cleaned_native_language == "":
+            cleaned_native_language = None
+
         await self.repo.update_onboarding(
             user_id=user_id,
+            native_language=cleaned_native_language,
             learning_goal=self._normalize_learning_goals(learning_goal),
             feedback_tone=self._normalize_choice(feedback_tone),
             accent=self._normalize_choice(accent),

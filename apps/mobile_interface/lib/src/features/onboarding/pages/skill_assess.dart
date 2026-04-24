@@ -82,15 +82,15 @@ class _SkillAssessPageState extends State<SkillAssessPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               OnboardingTopBar(
-                step: 1,
-                totalSteps: 6,
+                step: 2,
+                totalSteps: 7,
                 rightLabel: 'Skill Assessment',
                 showBack: true,
                 onBack: _onBack,
               ),
               const SizedBox(height: AppSpacing.sm),
 
-              const OnboardingProgressBar(step: 1, totalSteps: 6),
+              const OnboardingProgressBar(step: 2, totalSteps: 7),
               const SizedBox(height: AppSpacing.xl),
 
               Expanded(

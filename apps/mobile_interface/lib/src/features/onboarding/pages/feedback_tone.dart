@@ -111,15 +111,15 @@ class _FeedbackTonePageState extends State<FeedbackTonePage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           OnboardingTopBar(
-            step: 5,
-            totalSteps: 6,
+            step: 6,
+            totalSteps: 7,
             rightLabel: 'Feedback Tone',
             showBack: true,
             onBack: _onBack,
           ),
           const SizedBox(height: AppSpacing.sm),
 
-          const OnboardingProgressBar(step: 5, totalSteps: 6),
+          const OnboardingProgressBar(step: 6, totalSteps: 7),
           const SizedBox(height: AppSpacing.xl),
 
           const OnboardingQuestionHeader(

@@ -5,6 +5,7 @@ import '../features/courses/models/lesson_item.dart';
 import '../features/login/pages/login_page.dart';
 import '../features/login/pages/reset_password_page.dart';
 
+import '../features/onboarding/pages/native_language_page.dart';
 import '../features/onboarding/pages/onboarding_user_info_page.dart';
 import '../features/onboarding/pages/learning_goal.dart';
 import '../features/onboarding/pages/focus_areas.dart';
@@ -107,6 +108,7 @@ class AppRoutes {
   static const shell = '/shell';
 
   static const onboardingUserInfo = '/onboarding/user-info';
+  static const onboardingNativeLanguage = '/onboarding/native-language';
   static const onboardingLearningGoal = '/onboarding/learning-goal';
   static const onboardingFocusAreas = '/onboarding/focus-areas';
   static const onboardingDailyGoal = '/onboarding/daily-goal';
@@ -139,6 +141,7 @@ class AppRoutes {
     login: (_) => const LoginPage(),
 
     onboardingUserInfo: (_) => const OnboardingUserInfoPage(),
+    onboardingNativeLanguage: (_) => const NativeLanguagePage(),
     onboardingLearningGoal: (_) => const LearningGoalPage(),
     onboardingFocusAreas: (_) => const FocusAreasPage(),
     onboardingDailyGoal: (_) => const DailyGoalPage(),

@@ -103,15 +103,15 @@ class _FocusAreasPageState extends State<FocusAreasPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               OnboardingTopBar(
-                step: 3,
-                totalSteps: 6,
+                step: 4,
+                totalSteps: 7,
                 rightLabel: 'Focus Areas',
                 showBack: true,
                 onBack: _onBack,
               ),
               const SizedBox(height: AppSpacing.sm),
 
-              const OnboardingProgressBar(step: 3, totalSteps: 6),
+              const OnboardingProgressBar(step: 4, totalSteps: 7),
               const SizedBox(height: AppSpacing.xl),
 
               const OnboardingQuestionHeader(

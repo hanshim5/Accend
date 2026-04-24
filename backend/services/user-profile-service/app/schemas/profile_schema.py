@@ -123,6 +123,7 @@ class ProfileOnboardingUpdate(BaseModel):
     - All fields are optional to support partial updates (PATCH semantics).
     - exclude_unset=True is typically used when applying updates.
     """
+    native_language: str | None = None
     learning_goal: str | None = None
     feedback_tone: str | None = None
     accent: str | None = None

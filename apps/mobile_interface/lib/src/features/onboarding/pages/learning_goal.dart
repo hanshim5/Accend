@@ -103,15 +103,15 @@ class _LearningGoalPageState extends State<LearningGoalPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               OnboardingTopBar(
-                step: 2,
-                totalSteps: 6,
+                step: 3,
+                totalSteps: 7,
                 rightLabel: 'Learning Goal',
                 showBack: true,
                 onBack: _onBack,
               ),
               const SizedBox(height: AppSpacing.sm),
 
-              const OnboardingProgressBar(step: 2, totalSteps: 6),
+              const OnboardingProgressBar(step: 3, totalSteps: 7),
               const SizedBox(height: AppSpacing.xl),
 
               const OnboardingQuestionHeader(

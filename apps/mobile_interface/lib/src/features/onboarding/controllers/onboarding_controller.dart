@@ -13,6 +13,11 @@ class OnboardingController extends ChangeNotifier {
     : apiClient = apiClient ?? ApiClient(),
       authService = authService ?? AuthService();
 
+  void setNativeLanguage(String value) {
+    data.nativeLanguage = value;
+    notifyListeners();
+  }
+
   void setLearningGoal(String value) {
     data.learningGoal = value;
     notifyListeners();
@@ -80,6 +85,7 @@ class OnboardingController extends ChangeNotifier {
       }
     }
 
+    data.nativeLanguage = profile['native_language'] as String?;
     data.skillAssess = profile['skill_assess'] as String?;
     data.learningGoal = profile['learning_goal'] as String?;
     data.focusAreas = profile['focus_areas'] as String?;
@@ -92,6 +98,7 @@ class OnboardingController extends ChangeNotifier {
       return AppRoutes.shell;
     }
 
+    if (_isMissing(data.nativeLanguage)) return AppRoutes.onboardingNativeLanguage;
     if (_isMissing(data.skillAssess)) return AppRoutes.onboardingSkillAssess;
     if (_isMissing(data.learningGoal)) return AppRoutes.onboardingLearningGoal;
     if (_isMissing(data.focusAreas)) return AppRoutes.onboardingFocusAreas;
@@ -164,8 +171,10 @@ class OnboardingController extends ChangeNotifier {
 
   String? previousRouteFor(String currentRoute) {
     switch (currentRoute) {
-      case AppRoutes.onboardingSkillAssess:
+      case AppRoutes.onboardingNativeLanguage:
         return AppRoutes.login;
+      case AppRoutes.onboardingSkillAssess:
+        return AppRoutes.onboardingNativeLanguage;
       case AppRoutes.onboardingLearningGoal:
         return AppRoutes.onboardingSkillAssess;
       case AppRoutes.onboardingFocusAreas:
@@ -188,6 +197,7 @@ class OnboardingController extends ChangeNotifier {
     }
 
     final updates = {
+      'native_language': data.nativeLanguage,
       'learning_goal': data.learningGoal,
       'feedback_tone': data.feedbackTone,
       'accent': data.accent,

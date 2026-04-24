@@ -136,6 +136,7 @@ class SupabaseProfileRepo(ProfileRepo):
     async def update_onboarding(
         self,
         user_id: str,
+        native_language: str | None = None,
         learning_goal: str | None = None,
         feedback_tone: str | None = None,
         accent: str | None = None,
@@ -161,6 +162,8 @@ class SupabaseProfileRepo(ProfileRepo):
         payload: dict[str, object] = {}
 
         # Add fields only if provided (prevents overwriting with None).
+        if native_language is not None:
+            payload["native_language"] = native_language
         if learning_goal is not None:
             payload["learning_goal"] = learning_goal
         if feedback_tone is not None:

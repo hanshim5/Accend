@@ -3,21 +3,18 @@ class OnboardingUserInfoController {
   String? usernameErr;
   String? emailErr;
   String? passwordErr;
-  String? languageErr;
 
   bool validate({
     required String fullName,
     required String username,
     required String email,
     required String password,
-    required String? selectedLanguage,
   }) {
     // Reset previous errors
     fullNameErr = null;
     usernameErr = null;
     emailErr = null;
     passwordErr = null;
-    languageErr = null;
 
     final f = fullName.trim();
     final u = username.trim();
@@ -52,11 +49,6 @@ class OnboardingUserInfoController {
       passwordErr = 'Password must be at least 8 characters';
     }
 
-    // Language
-    if (selectedLanguage == null || selectedLanguage.isEmpty) {
-      languageErr = 'Please select a language';
-    }
-
     return isValid;
   }
 
@@ -64,8 +56,7 @@ class OnboardingUserInfoController {
       fullNameErr == null &&
       usernameErr == null &&
       emailErr == null &&
-      passwordErr == null &&
-      languageErr == null;
+      passwordErr == null;
 
   bool _looksLikeEmail(String value) {
     final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');

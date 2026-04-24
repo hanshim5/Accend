@@ -74,6 +74,7 @@ class ProfileRepo(Protocol):
     async def update_onboarding(
         self,
         user_id: str,
+        native_language: str | None = None,
         learning_goal: str | None = None,
         feedback_tone: str | None = None,
         accent: str | None = None,

@@ -7,7 +7,6 @@ import '../../../common/services/auth_service.dart';
 import '../../../common/widgets/primary_button.dart';
 import '../controllers/onboarding_user_info_controller.dart';
 import '../widgets/onboarding_labeled_field.dart';
-import '../widgets/onboarding_language_dropdown.dart';
 
 class OnboardingUserInfoPage extends StatefulWidget {
   const OnboardingUserInfoPage({super.key});
@@ -30,41 +29,6 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
   bool _hidePassword = true;
   bool _submitting = false;
 
-  String? _nativeLanguage;
-  final _languages = const [
-    'English',
-    'Spanish',
-    'French',
-    'Japanese',
-    'Korean',
-    'Mandarin',
-    'Cantonese',
-    'Wu',
-    'Vietnamese',
-    'Ilocano',
-    'Tagalog',
-    'Russian',
-    'Arabic',
-    'Georgian',
-    'German',
-    'Latin',
-    'Bulgarian',
-    'Scandanavian',
-    'Sinhala',
-    'Hindi',
-    'Portuguese',
-    'Nepali',
-    'Signese',
-    'Braille',
-    'Hausa',
-    'Yoruba',
-    'Igbo',
-    'Swedish',
-    'Italian',
-    'Greek',
-    'Pidgin',
-  ];
-
   @override
   void dispose() {
     _fullName.dispose();
@@ -81,7 +45,6 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
       username: _username.text,
       email: _email.text,
       password: _password.text,
-      selectedLanguage: _nativeLanguage,
     );
     setState(() {});
   }
@@ -97,7 +60,6 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
       final email = _email.text.trim();
       final password = _password.text;
       final fullName = _fullName.text.trim();
-      final nativeLanguage = _nativeLanguage ?? '';
 
       final check = await _api.getJson(
         '/profile/username-available',
@@ -129,12 +91,12 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
           'username': username,
           'email': email,
           'full_name': fullName,
-          'native_language': nativeLanguage,
+          'native_language': null,
         },
       );
 
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, AppRoutes.onboardingSkillAssess);
+      Navigator.pushReplacementNamed(context, AppRoutes.onboardingNativeLanguage);
     } on ApiException catch (e) {
       if (!mounted) return;
 
@@ -316,33 +278,6 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          OnboardingLabeledField(
-                            label: 'Native Language',
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                OnboardingLanguageDropdown(
-                                  value: _nativeLanguage,
-                                  options: _languages,
-                                  onChanged: (v) {
-                                    setState(() => _nativeLanguage = v);
-                                    if (_c.languageErr != null) _validate();
-                                  },
-                                ),
-                                if (_c.languageErr != null) ...[
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    _c.languageErr!,
-                                    style: t.textTheme.bodySmall?.copyWith(
-                                      color: AppColors.failure,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ],
                             ),
                           ),
                           const SizedBox(height: 18),
