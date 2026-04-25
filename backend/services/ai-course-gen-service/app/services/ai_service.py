@@ -83,7 +83,8 @@ def stub_generate_lessons(prompt: str) -> List[Lesson]:
 
         items: List[LessonItem] = []
         for w in words[:2]:
-            items.append(LessonItem(text=f"{w} — example phrase using {w}", ipa=None, hint=None))
+            items.append(LessonItem(text=f"I want to practice {w}", ipa=None, hint=None))
+            items.append(LessonItem(text=f"Can you help me with {w}?", ipa=None, hint=None))
 
         lessons.append(Lesson(title=lesson_title, items=items))
 
@@ -113,6 +114,12 @@ Non-negotiable Rules:
 - 3 to 6 lessons
 - 3 to 8 items per lesson
 - Keep item text short and practical (phrases/words/sentences)
+- Every lesson item must be natural English that a learner could realistically say out loud in real life
+- Items should work well for repeat-after-me pronunciation practice
+- Even when the topic refers to another culture or language, the learner-facing item text must still be English
+- Do not generate placeholders such as [Name], [City], or similar template text
+- Do not generate lesson instructions, grammar labels, category names, outlines, or explanatory content as lesson items
+- Do not generate textbook headings like "Subject vs Verb" or "Greeting Practice" as lesson items
 - Use null for ipa/hint when not provided
 - No extra keys anywhere
 - Always use the English language
@@ -362,6 +369,12 @@ Non-negotiable Rules:
 - Each item text must be a short, practical phrase or sentence (phrases/words/sentences)
 - Keep item text concise (3 to 12 words)
 - Vary the difficulty and sentence structure across the 20 items
+- Every item must be natural English that a learner could realistically say out loud in real life
+- Items should work well for repeat-after-me pronunciation practice
+- Even when the topic refers to another culture or language, the learner-facing item text must still be English
+- Do not generate placeholders such as [Name], [City], or similar template text
+- Do not generate lesson instructions, grammar labels, category names, outlines, or explanatory content as items
+- Do not generate textbook headings like "Subject vs Verb" or "Greeting Practice" as items
 - Use null for ipa/hint when not provided
 - No extra keys anywhere
 - Always use the English language
@@ -474,7 +487,26 @@ Here is your invalid output:
 
         print("Gemini session items failed, falling back to stub:", repr(e), flush=True)
         stub_phrases = [
-            f"Practice phrase {i + 1} about {topic_clean}." for i in range(20)
+            "Hello",
+            "Good morning",
+            "How are you?",
+            "Nice to meet you",
+            "Thank you",
+            "You are welcome",
+            "Excuse me",
+            "Can you help me?",
+            "I understand",
+            "Please say that again",
+            "Where is the bathroom?",
+            "I need some water",
+            "How much is this?",
+            "I would like some food",
+            "Can I sit here?",
+            "What time is it?",
+            "I am ready",
+            "See you later",
+            "Have a nice day",
+            "Goodbye",
         ]
         return [{"text": p, "ipa": None, "hint": None} for p in stub_phrases]
 
