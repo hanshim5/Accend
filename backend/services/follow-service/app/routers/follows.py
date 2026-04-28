@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 
 from app.dependencies import get_follow_service
 from app.schemas.follow_schema import FollowCountsOut, FollowWriteResponse, ReputationOut, SocialUserOut, VoteRequest
@@ -144,6 +144,17 @@ async def vote_user(
         raise HTTPException(status_code=422, detail="delta must be -2, -1, 1, or 2")
     await svc.vote(user_id, target_id, body.delta)
     return FollowWriteResponse(ok=True)
+
+
+@router.post("/profiles/batch", response_model=list[SocialUserOut])
+async def profiles_batch(
+    user_ids: list[str] = Body(...),
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: FollowService = Depends(get_follow_service),
+):
+    """Return profile + reputation for an arbitrary list of user IDs."""
+    _get_user_id(x_user_id)  # auth guard
+    return await svc.profiles_by_ids(user_ids)
 
 
 @router.get("/reputation/me", response_model=ReputationOut)

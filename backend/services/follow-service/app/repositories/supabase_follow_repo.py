@@ -361,6 +361,32 @@ class SupabaseFollowRepo:
             params={"blocked_id": f"eq.{user_id}"},
         )
 
+    async def profiles_by_ids(self, user_ids: list[str]) -> list[SocialUserOut]:
+        """Return basic profile + reputation for any list of user IDs."""
+        if not user_ids:
+            return []
+        profiles = await self._get_profiles(user_ids)
+        if not profiles:
+            return []
+        metrics = await self._get_social_metrics(list(profiles.keys()))
+        await self._sync_missing_profile_levels(profiles, metrics["level"])
+        return [
+            self._to_social_user(
+                profiles[uid],
+                i_follow=False,
+                follows_me=False,
+                i_block=False,
+                level=metrics["level"].get(uid, 1),
+                current_streak=metrics["streak"].get(uid, 0),
+                overall_accuracy=metrics["accuracy"].get(uid, 0.0),
+                lessons_completed=metrics["lessons"].get(uid, 0),
+                meters_climbed=metrics["meters"].get(uid, 0),
+                reputation=metrics["reputation"].get(uid, 0),
+            )
+            for uid in user_ids
+            if uid in profiles
+        ]
+
     async def apply_vote_delta(self, target_id: UUID, delta: int) -> None:
         """
         Apply a reputation delta (+1 or -1) to a target user's user_stats.reputation.

@@ -29,6 +29,7 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
   bool _isStarting = false;
   _GenStatus _genStatus = _GenStatus.loading;
   Future<void>? _genFuture;
+  List<String> _lastFetchedIds = const [];
 
   @override
   void initState() {
@@ -56,6 +57,18 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
         }
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final players = context.read<GroupSessionController>().privateLobby;
+    final ids = players.map((p) => p.userId).toList();
+    if (ids.length != _lastFetchedIds.length ||
+        ids.any((id) => !_lastFetchedIds.contains(id))) {
+      _lastFetchedIds = ids;
+      context.read<SocialController>().fetchLobbyProfiles(ids);
+    }
   }
 
   void _beginGeneration(GroupSessionController ctrl, String lobbyId) {
@@ -269,10 +282,7 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
                               final suffix = '${isMe ? ' (you)' : ''}${isHost ? ' 👑' : ''}';
                               final label = '${p.username}$suffix';
                               final social = context.watch<SocialController>();
-                              final knownUser = [
-                                ...social.followers,
-                                ...social.following,
-                              ].where((u) => u.id == p.userId).firstOrNull;
+                              final knownUser = social.findUser(p.userId);
                               final imageUrl = knownUser?.profileImageUrl;
                               final rep = knownUser?.reputation ?? 0;
                               final repColor = rep > 0

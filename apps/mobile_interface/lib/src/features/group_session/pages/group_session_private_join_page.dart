@@ -21,11 +21,20 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
   GroupSessionController? _ctrl;
   String? _lobbyCode;
   bool _isStarting = false;
+  List<String> _lastFetchedIds = const [];
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _ctrl ??= context.read<GroupSessionController>();
+    // Fetch profiles for any player not already in the social graph.
+    final players = context.read<GroupSessionController>().privateLobby;
+    final ids = players.map((p) => p.userId).toList();
+    if (ids.length != _lastFetchedIds.length ||
+        ids.any((id) => !_lastFetchedIds.contains(id))) {
+      _lastFetchedIds = ids;
+      context.read<SocialController>().fetchLobbyProfiles(ids);
+    }
   }
 
   @override
@@ -185,10 +194,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
                                         final suffix = '${isMe ? ' (you)' : ''}${isHost ? ' 👑' : ''}';
                                         final label = '${p.username}$suffix';
                                         final social = context.watch<SocialController>();
-                                        final knownUser = [
-                                          ...social.followers,
-                                          ...social.following,
-                                        ].where((u) => u.id == p.userId).firstOrNull;
+                                        final knownUser = social.findUser(p.userId);
                                         final imageUrl = knownUser?.profileImageUrl;
                                         final rep = knownUser?.reputation ?? 0;
                                         final repColor = rep > 0
