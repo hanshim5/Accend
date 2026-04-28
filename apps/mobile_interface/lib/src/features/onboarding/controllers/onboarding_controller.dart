@@ -48,6 +48,17 @@ class OnboardingController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void reset() {
+    data.nativeLanguage = null;
+    data.learningGoal = null;
+    data.feedbackTone = null;
+    data.accent = null;
+    data.dailyPace = null;
+    data.skillAssess = null;
+    data.focusAreas = null;
+    notifyListeners();
+  }
+
   Future<void> saveProgress({bool silent = true}) async {
     final accessToken = authService.accessToken;
     if (accessToken == null || accessToken.isEmpty) {
