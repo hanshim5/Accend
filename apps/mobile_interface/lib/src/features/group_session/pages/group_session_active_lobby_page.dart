@@ -21,7 +21,8 @@ class GroupSessionActiveLobbyPage extends StatefulWidget {
       _GroupSessionActiveLobbyPageState();
 }
 
-class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPage> {
+class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPage>
+    with TickerProviderStateMixin {
   Room? _room;
   EventsListener<RoomEvent>? _roomEvents;
   String? _voiceError;
@@ -29,10 +30,14 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   bool _micEnabled = false;
   bool _turnSyncing = false;
   Timer? _turnPoller;
+  Timer? _turnMicTimer;
+  bool _turnMicActive = false;
   String _lobbyKind = 'private';
   final TextEditingController _scoreController = TextEditingController();
   _LobbyTurnState? _turnState;
   final Set<String> _newlyPlantedFlags = <String>{};
+  late final AnimationController _turnMicPulse;
+  late final AnimationController _turnMicProgress;
 
   /// Counts completed rounds — used to advance through session items.
   /// Incremented whenever roundComplete transitions from true → false.
@@ -41,6 +46,14 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   @override
   void initState() {
     super.initState();
+    _turnMicPulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _turnMicProgress = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    );
   }
 
   @override
@@ -86,16 +99,17 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
         });
       // Required on web to unlock audio playback after user gesture.
       await room.startAudio();
-      final micPub = await room.localParticipant?.setMicrophoneEnabled(true);
+      final micPub = await room.localParticipant?.setMicrophoneEnabled(false);
 
       room.addListener(_onRoomChanged);
 
       if (!mounted) return;
       setState(() {
         _room = room;
-        _micEnabled = micPub != null;
-        if (!_micEnabled) {
-          _voiceError = 'Connected, but microphone was not published. Check browser mic permissions.';
+        _micEnabled = false;
+        _turnMicActive = false;
+        if (micPub == null) {
+          _voiceError = 'Connected to voice. Mic will activate only during your turn.';
         }
         _voiceConnecting = false;
       });
@@ -160,6 +174,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
           _newlyPlantedFlags.add(latestUserId);
         }
       });
+      await _handleTurnMicPermissions();
       await Future<void>.delayed(const Duration(milliseconds: 850));
       if (!mounted || latestUserId == null) return;
       setState(() {
@@ -201,6 +216,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
           _scoreController.clear();
         }
       });
+      await _handleTurnMicPermissions();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -245,6 +261,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
           _newlyPlantedFlags.add(latestUserId);
         }
       });
+      await _handleTurnMicPermissions();
       if (latestUserId != null && nextSeq > prevSeq) {
         await Future<void>.delayed(const Duration(milliseconds: 850));
         if (!mounted) return;
@@ -260,23 +277,83 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   }
 
   Future<void> _toggleMic() async {
+    if (_turnMicActive) {
+      await _stopTurnMicWindow();
+      return;
+    }
+    if (!_isMyTurn()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the active speaker can use the microphone.')),
+      );
+      return;
+    }
     final room = _room;
     if (room == null) return;
-    final next = !_micEnabled;
     try {
-      final micPub = await room.localParticipant?.setMicrophoneEnabled(next);
+      final micPub = await room.localParticipant?.setMicrophoneEnabled(true);
       if (!mounted) return;
       setState(() {
-        _micEnabled = next ? (micPub != null) : false;
-        _voiceError = (next && micPub == null)
+        _micEnabled = micPub != null;
+        _turnMicActive = _micEnabled;
+        _voiceError = (micPub == null)
             ? 'Microphone publish failed. Check browser permissions.'
             : null;
       });
+      if (_micEnabled) {
+        _turnMicTimer?.cancel();
+        _turnMicProgress.forward(from: 0);
+        _turnMicPulse.repeat(reverse: true);
+        _turnMicTimer = Timer(const Duration(seconds: 10), () {
+          unawaited(_stopTurnMicWindow());
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _voiceError = 'Failed to toggle mic: $e';
       });
+    }
+  }
+
+  Future<void> _stopTurnMicWindow() async {
+    _turnMicTimer?.cancel();
+    _turnMicTimer = null;
+    _turnMicProgress.stop();
+    _turnMicProgress.reset();
+    _turnMicPulse.animateTo(
+      0,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
+    final room = _room;
+    if (room != null) {
+      try {
+        await room.localParticipant?.setMicrophoneEnabled(false);
+      } catch (_) {
+        // Best-effort mute.
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _micEnabled = false;
+      _turnMicActive = false;
+    });
+  }
+
+  bool _isMyTurn() {
+    final state = _turnState;
+    final myUserId = context.read<GroupSessionController>().myUserId;
+    if (state == null || myUserId == null || myUserId.isEmpty || state.roundComplete) {
+      return false;
+    }
+    return state.currentPlayer?.userId == myUserId;
+  }
+
+  Future<void> _handleTurnMicPermissions() async {
+    if (_isMyTurn()) return;
+    if (_turnMicActive || _micEnabled) {
+      await _stopTurnMicWindow();
     }
   }
 
@@ -316,6 +393,9 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   @override
   void dispose() {
     _turnPoller?.cancel();
+    _turnMicTimer?.cancel();
+    _turnMicPulse.dispose();
+    _turnMicProgress.dispose();
     _scoreController.dispose();
     unawaited(_disconnectVoice());
     super.dispose();
@@ -342,6 +422,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     final haveIVotedNextRound =
         myUserId != null && myUserId.isNotEmpty && nextRoundVotes.contains(myUserId);
     final participantCount = state?.participants.length ?? players.length;
+    final isMyTurn = _isMyTurn();
 
     return Scaffold(
       backgroundColor: AppColors.primaryBg,
@@ -449,10 +530,14 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                     ),
                   ),
                   const SizedBox(height: 10),
-                  _RecordButton(
+                  _TurnLimitedMicButton(
                     connecting: _voiceConnecting,
                     connected: _room != null,
                     micEnabled: _micEnabled,
+                    isMyTurn: isMyTurn,
+                    activeWindow: _turnMicActive,
+                    pulse: _turnMicPulse,
+                    progress: _turnMicProgress,
                     onPressed: _voiceConnecting
                         ? null
                         : () {
@@ -462,6 +547,17 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                               _toggleMic();
                             }
                           },
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    isMyTurn
+                        ? (_turnMicActive ? 'You are live now (10s max).' : 'Your turn: tap mic to speak (10s).')
+                        : 'Only ${currentPlayer?.displayName ?? 'current speaker'} can use the mic',
+                    style: t.textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 10),
                   if (_room != null || _voiceConnecting)
@@ -784,57 +880,116 @@ class _PlayerOrderItem extends StatelessWidget {
   }
 }
 
-class _RecordButton extends StatelessWidget {
-  const _RecordButton({
+class _TurnLimitedMicButton extends StatelessWidget {
+  const _TurnLimitedMicButton({
     required this.connecting,
     required this.connected,
     required this.micEnabled,
+    required this.isMyTurn,
+    required this.activeWindow,
+    required this.pulse,
+    required this.progress,
     required this.onPressed,
   });
 
   final bool connecting;
   final bool connected;
   final bool micEnabled;
+  final bool isMyTurn;
+  final bool activeWindow;
+  final AnimationController pulse;
+  final AnimationController progress;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final Color ring = connected ? AppColors.textPrimary : AppColors.textSecondary;
-    final Color icon = connected
-        ? (micEnabled ? AppColors.textPrimary : AppColors.textSecondary)
-        : AppColors.textSecondary;
+    final bool isRecordingWindow = activeWindow && connected;
+    final Color glowColor = isRecordingWindow ? AppColors.failure : AppColors.accent;
 
-    return GestureDetector(
-      onTap: onPressed,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        width: 108,
-        height: 108,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: AppColors.textPrimary.withValues(alpha: connected ? 0.95 : 0.35),
-          border: Border.all(color: ring, width: 4),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primaryBg.withValues(alpha: 0.38),
-              blurRadius: 10,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        alignment: Alignment.center,
-        child: connecting
-            ? const SizedBox(
-                width: 26,
-                height: 26,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
-              )
-            : Icon(
-                micEnabled ? Icons.mic_rounded : Icons.mic_none_rounded,
-                size: 50,
-                color: icon,
+    return AnimatedBuilder(
+      animation: pulse,
+      builder: (context, _) {
+        final glowScale = 1.0 + pulse.value * 0.18;
+        final glowOpacity = isRecordingWindow ? (0.2 + pulse.value * 0.16) : 0.16;
+
+        return SizedBox(
+          width: 128,
+          height: 128,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if (isRecordingWindow)
+                SizedBox(
+                  width: 128,
+                  height: 128,
+                  child: AnimatedBuilder(
+                    animation: progress,
+                    builder: (_, __) => CircularProgressIndicator(
+                      value: 1.0 - progress.value,
+                      strokeWidth: 3,
+                      color: AppColors.failure,
+                      backgroundColor: AppColors.failure.withOpacity(0.2),
+                    ),
+                  ),
+                ),
+              Transform.scale(
+                scale: isRecordingWindow ? glowScale : 1.0,
+                child: Container(
+                  width: 128,
+                  height: 128,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: glowColor.withOpacity(glowOpacity),
+                        blurRadius: 32,
+                        spreadRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-      ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isRecordingWindow
+                      ? AppColors.failure.withOpacity(0.12)
+                      : AppColors.surface,
+                  border: Border.all(
+                    color: isRecordingWindow
+                        ? AppColors.failure.withOpacity(0.65)
+                        : AppColors.accent.withOpacity(0.5),
+                    width: 1.5,
+                  ),
+                ),
+                child: IconButton(
+                  iconSize: 50,
+                  padding: EdgeInsets.zero,
+                  onPressed: connecting ? null : onPressed,
+                  tooltip: isMyTurn ? 'Start speaking window' : 'Waiting for your turn',
+                  icon: connecting
+                      ? const SizedBox(
+                          width: 26,
+                          height: 26,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        )
+                      : Icon(
+                          isRecordingWindow ? Icons.stop_rounded : Icons.mic_rounded,
+                          color: isRecordingWindow
+                              ? AppColors.failure
+                              : ((!isMyTurn && !isRecordingWindow)
+                                  ? AppColors.textSecondary
+                                  : AppColors.accent),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
