@@ -104,39 +104,40 @@ class _NativeLanguagePageState extends State<NativeLanguagePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              OnboardingTopBar(
-                step: 1,
-                totalSteps: 7,
-                rightLabel: 'Native Language',
-                showBack: true,
-                onBack: _onBack,
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      OnboardingTopBar(
+                        step: 1,
+                        totalSteps: 7,
+                        rightLabel: 'Native Language',
+                        showBack: true,
+                        onBack: _onBack,
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      const OnboardingProgressBar(step: 1, totalSteps: 7),
+                      const SizedBox(height: AppSpacing.xl),
+                      const OnboardingQuestionHeader(
+                        icon: Icons.record_voice_over_outlined,
+                        leadingText: 'What is your ',
+                        highlightedText: 'native language',
+                        trailingText: '?',
+                        subheader:
+                            'We use this to tailor your experience by adjusting pronunciation feedback and which errors are flagged.',
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      OnboardingLanguageDropdown(
+                        value: _selected,
+                        options: _languages,
+                        onChanged: _onSelect,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: AppSpacing.sm),
-
-              const OnboardingProgressBar(step: 1, totalSteps: 7),
-              const SizedBox(height: AppSpacing.xl),
-
-              const OnboardingQuestionHeader(
-                icon: Icons.record_voice_over_outlined,
-                leadingText: 'What is your ',
-                highlightedText: 'native language',
-                trailingText: '?',
-                subheader:
-                    'We use this to tailor your experience by adjusting pronunciation feedback and which errors are flagged.',
-              ),
-
-              const SizedBox(height: AppSpacing.xl),
-
-              OnboardingLanguageDropdown(
-                value: _selected,
-                options: _languages,
-                onChanged: _onSelect,
-              ),
-
-              const Spacer(),
-
               const SizedBox(height: 16),
-
               SizedBox(
                 height: 56,
                 child: ElevatedButton(
