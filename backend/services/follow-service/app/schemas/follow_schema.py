@@ -9,7 +9,7 @@ class SocialUserOut(BaseModel):
     level_label: str | None = None
     native_language: str | None = None
     learning_goal: str | None = None
-    focus_areas: list[str] | str | None = None
+    focus_areas: str | None = None
     current_streak: int = 0
     overall_accuracy: float = 0.0
     lessons_completed: int = 0
