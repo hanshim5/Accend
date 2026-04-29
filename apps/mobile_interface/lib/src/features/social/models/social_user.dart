@@ -38,6 +38,11 @@ class SocialUser {
   String get levelLabel => 'Level $level';
 
   factory SocialUser.fromJson(Map<String, dynamic> json) {
+    final dynamic rawFocusAreas = json['focus_areas'];
+    final String? focusAreasCsv = rawFocusAreas is List
+        ? rawFocusAreas.whereType<String>().join(', ')
+        : rawFocusAreas as String?;
+
     return SocialUser(
       id: json['id'] as String,
       displayName: (json['display_name'] ?? json['username'] ?? 'Unknown') as String,
@@ -45,7 +50,7 @@ class SocialUser {
       level: ((json['level'] as num?)?.toInt() ?? 1).clamp(1, 1000000),
       nativeLanguage: json['native_language'] as String?,
       learningGoalCsv: json['learning_goal'] as String?,
-      focusAreasCsv: json['focus_areas'] as String?,
+      focusAreasCsv: focusAreasCsv,
       currentStreak: (json['current_streak'] as num?)?.toInt() ?? 0,
       overallAccuracy: (json['overall_accuracy'] as num?)?.toDouble() ?? 0.0,
       lessonsCompleted: (json['lessons_completed'] as num?)?.toInt() ?? 0,
