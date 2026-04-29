@@ -753,7 +753,10 @@ class _LetterAccuracyPrompt extends StatelessWidget {
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w800,
             );
-    final words = referenceText.split(RegExp(r'(\s+)'));
+    final words = RegExp(r'\s+|[^\s]+')
+        .allMatches(referenceText)
+        .map((m) => m.group(0) ?? '')
+        .toList();
     int wi = 0;
     final spans = <TextSpan>[];
 
