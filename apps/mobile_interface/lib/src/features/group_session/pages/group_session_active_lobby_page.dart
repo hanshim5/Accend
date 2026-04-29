@@ -337,150 +337,6 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     }
   }
 
-  Widget _buildVoiceDiagnostics({
-    required ThemeData theme,
-    required bool allTurnsScored,
-    required int expectedParticipants,
-  }) {
-    final room = _room;
-    if (room == null && !_voiceConnecting) {
-      return const SizedBox.shrink();
-    }
-
-    final remoteParticipants = room?.remoteParticipants.values.toList() ?? const <RemoteParticipant>[];
-    int remoteAudioTracks = 0;
-    int subscribedRemoteAudioTracks = 0;
-    int activelySpeakingCount = 0;
-    for (final p in remoteParticipants) {
-      bool participantSpeaking = false;
-      try {
-        final speaking = (p as dynamic).isSpeaking as bool?;
-        participantSpeaking = speaking ?? false;
-      } catch (_) {
-        // SDK compatibility fallback below.
-      }
-      if (!participantSpeaking) {
-        try {
-          final level = ((p as dynamic).audioLevel as num?)?.toDouble() ?? 0.0;
-          participantSpeaking = level > 0.015;
-        } catch (_) {
-          // Ignore when audio level is unavailable.
-        }
-      }
-      if (participantSpeaking) activelySpeakingCount++;
-      for (final pub in p.trackPublications.values) {
-        final track = pub.track;
-        if (track is RemoteAudioTrack) {
-          remoteAudioTracks++;
-          final subscribed = (pub as dynamic).subscribed as bool? ?? false;
-          if (subscribed) subscribedRemoteAudioTracks++;
-        }
-      }
-    }
-
-    final diagnostics = <String>[
-      'Voice: ${_voiceConnecting ? 'connecting' : (room != null ? 'connected' : 'offline')}',
-      'You: ${_micEnabled ? 'unmuted' : 'muted'}',
-      'Remote participants: ${remoteParticipants.length}/${(expectedParticipants - 1).clamp(0, 999)}',
-      'Remote audio tracks: $remoteAudioTracks ($subscribedRemoteAudioTracks subscribed)',
-      'Incoming audio right now: ${activelySpeakingCount > 0 ? 'yes' : 'no'} '
-          '($activelySpeakingCount speaker${activelySpeakingCount == 1 ? '' : 's'})',
-    ];
-
-    final issues = <String>[
-      if (_voiceError != null && _voiceError!.trim().isNotEmpty) 'Voice error: ${_voiceError!.trim()}',
-      if (room != null && remoteParticipants.isEmpty)
-        'No one else is connected to voice in this room yet.',
-      if (room != null && remoteParticipants.isNotEmpty && remoteAudioTracks == 0)
-        'Others are connected, but no remote audio tracks are published.',
-      if (room != null && remoteAudioTracks > 0 && subscribedRemoteAudioTracks == 0)
-        'Remote tracks exist but none are subscribed/playing.',
-      if (allTurnsScored && !_micEnabled)
-        'Group call phase: you are muted locally.',
-      if (_voiceConnecting)
-        'Still connecting; remote audio will appear after join completes.',
-    ];
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(AppRadii.md),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Theme(
-        data: theme.copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          dense: true,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          iconColor: AppColors.textSecondary,
-          collapsedIconColor: AppColors.textSecondary,
-          title: Text(
-            'Voice diagnostics',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                diagnostics.join('\n'),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                  height: 1.35,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Container(
-                  width: 9,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: activelySpeakingCount > 0
-                        ? const Color(0xFF22C55E)
-                        : AppColors.textSecondary.withValues(alpha: 0.5),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    activelySpeakingCount > 0
-                        ? 'Incoming audio detected from remote participant(s).'
-                        : 'No incoming remote speech detected right now.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (issues.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  issues.map((x) => '- $x').join('\n'),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.failure,
-                    height: 1.35,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<void> _stopTurnMicWindow() async {
     _turnMicTimer?.cancel();
     _turnMicTimer = null;
@@ -744,51 +600,24 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                     ),
                   ),
                   const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: _room == null
-                        ? ElevatedButton.icon(
-                            onPressed: _voiceConnecting ? null : _connectVoice,
-                            icon: _voiceConnecting
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.call_rounded, size: 18),
-                            label: Text(_voiceConnecting ? 'Joining voice...' : 'Join voice'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.accent,
-                              foregroundColor: AppColors.primaryBg,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppRadii.md),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          )
-                        : ElevatedButton.icon(
-                            onPressed: _toggleMic,
-                            icon: Icon(
-                              _micEnabled ? Icons.mic_off_rounded : Icons.mic_rounded,
-                              size: 18,
-                            ),
-                            label: Text(_micEnabled ? 'Mute' : 'Unmute'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _micEnabled
-                                  ? const Color(0xFF22C55E)
-                                  : AppColors.surface,
-                              foregroundColor: _micEnabled
-                                  ? AppColors.primaryBg
-                                  : AppColors.textPrimary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppRadii.md),
-                                side: _micEnabled
-                                    ? BorderSide.none
-                                    : const BorderSide(color: AppColors.border),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
+                  _TurnLimitedMicButton(
+                    connecting: _voiceConnecting,
+                    connected: _room != null,
+                    micEnabled: _micEnabled,
+                    allTurnsScored: allTurnsScored,
+                    isMyTurn: isMyTurn,
+                    activeWindow: _turnMicActive,
+                    pulse: _turnMicPulse,
+                    progress: _turnMicProgress,
+                    onPressed: _voiceConnecting
+                        ? null
+                        : () {
+                            if (_room == null) {
+                              _connectVoice();
+                            } else {
+                              _toggleMic();
+                            }
+                          },
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -834,11 +663,6 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                         ),
                       ],
                     ),
-                  _buildVoiceDiagnostics(
-                    theme: t,
-                    allTurnsScored: allTurnsScored,
-                    expectedParticipants: participantCount,
-                  ),
                   if (_voiceError != null && _room == null) ...[
                     const SizedBox(height: 8),
                     Text(
