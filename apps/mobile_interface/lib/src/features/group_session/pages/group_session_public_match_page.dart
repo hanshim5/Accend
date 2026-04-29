@@ -59,17 +59,7 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
     });
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final players = context.read<GroupSessionController>().privateLobby;
-    final ids = players.map((p) => p.userId).toList();
-    if (ids.length != _lastFetchedIds.length ||
-        ids.any((id) => !_lastFetchedIds.contains(id))) {
-      _lastFetchedIds = ids;
-      context.read<SocialController>().fetchLobbyProfiles(ids);
-    }
-  }
+
 
   void _beginGeneration(GroupSessionController ctrl, String lobbyId) {
     final topic = kSessionTopics[Random().nextInt(kSessionTopics.length)];
@@ -143,6 +133,18 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
     const maxPlayers = 5;
     final players = ctrl.privateLobby.toList()
       ..sort((a, b) => a.joinedAt.compareTo(b.joinedAt));
+
+    // Trigger profile fetch whenever the player list changes.
+    final ids = players.map((p) => p.userId).toList();
+    if (ids.isNotEmpty &&
+        (ids.length != _lastFetchedIds.length ||
+            ids.any((id) => !_lastFetchedIds.contains(id)))) {
+      _lastFetchedIds = ids;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.read<SocialController>().fetchLobbyProfiles(ids);
+      });
+    }
 
     final lobbyCode = ctrl.joinPrivateLobby?.lobbyId != null
         ? ctrl.joinPrivateLobby!.lobbyId.toString()

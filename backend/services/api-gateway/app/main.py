@@ -1629,6 +1629,30 @@ async def proxy_social_search(
     return r.json()
 
 
+@app.post("/social/profiles/batch")
+async def proxy_social_profiles_batch(
+    user_ids: list[str],
+    authorization: str | None = Header(default=None),
+):
+    """
+    Fetch public profiles for a list of user IDs through follow-service.
+    Used by the lobby pages to show profile pictures and reputation for all players.
+    """
+    user_id = verify_supabase_jwt(authorization)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(
+            f"{settings.FOLLOW_SERVICE_URL}/profiles/batch",
+            headers={"X-User-Id": user_id},
+            json=user_ids,
+        )
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text)
+
+    return r.json()
+
+
 @app.post("/social/follow/{followee_id}")
 async def proxy_social_follow_user(
     followee_id: str,

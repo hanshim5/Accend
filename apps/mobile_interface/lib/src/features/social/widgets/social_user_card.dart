@@ -63,7 +63,7 @@ class SocialUserCard extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  if (user.levelLabel != null && user.levelLabel!.isNotEmpty) ...[
+                  if (user.levelLabel.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
@@ -73,7 +73,7 @@ class SocialUserCard extends StatelessWidget {
                         border: Border.all(color: const Color(0x3306F9F9), width: 1),
                       ),
                       child: Text(
-                        user.levelLabel!.toUpperCase(),
+                        user.levelLabel.toUpperCase(),
                         style: GoogleFonts.montserrat(
                           color: const Color(0xFF06F9F9),
                           fontSize: 10,

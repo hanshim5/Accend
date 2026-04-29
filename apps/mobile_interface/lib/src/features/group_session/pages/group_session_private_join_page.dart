@@ -27,14 +27,6 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _ctrl ??= context.read<GroupSessionController>();
-    // Fetch profiles for any player not already in the social graph.
-    final players = context.read<GroupSessionController>().privateLobby;
-    final ids = players.map((p) => p.userId).toList();
-    if (ids.length != _lastFetchedIds.length ||
-        ids.any((id) => !_lastFetchedIds.contains(id))) {
-      _lastFetchedIds = ids;
-      context.read<SocialController>().fetchLobbyProfiles(ids);
-    }
   }
 
   @override
@@ -91,6 +83,18 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
     const maxPlayers = 5;
     final players = ctrl.privateLobby.toList()
       ..sort((a, b) => a.joinedAt.compareTo(b.joinedAt));
+
+    // Trigger profile fetch whenever the player list changes.
+    final ids = players.map((p) => p.userId).toList();
+    if (ids.isNotEmpty &&
+        (ids.length != _lastFetchedIds.length ||
+            ids.any((id) => !_lastFetchedIds.contains(id)))) {
+      _lastFetchedIds = ids;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.read<SocialController>().fetchLobbyProfiles(ids);
+      });
+    }
 
     return Scaffold(
       body: SafeArea(
