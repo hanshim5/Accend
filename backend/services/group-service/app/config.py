@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     # Example: wss://localhost:7880 or wss://livekit.example.com (Android emulator: ws://10.0.2.2:7880)
     LIVEKIT_PUBLIC_WS_URL: str = ""
 
+    # Internal service URLs (Docker Compose defaults).
+    # Used to proxy pronunciation assessment during group turns.
+    PRONUNCIATION_FEEDBACK_SERVICE_URL: str = "http://pronunciation-feedback:8000"
+
 
 # Create a singleton settings object so imports can use it
 settings = Settings()

@@ -3,8 +3,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:mobile_interface/src/common/services/api_client.dart';
 import 'package:mobile_interface/src/common/services/auth_service.dart';
+import 'package:mobile_interface/src/common/models/pronunciation_feedback.dart';
 import 'package:mobile_interface/src/features/courses/models/lesson_item.dart';
 import 'package:mobile_interface/src/features/group_session/models/private_lobby.dart';
+import 'package:http/http.dart' as http;
 
 class GroupSessionController extends ChangeNotifier {
   GroupSessionController({
@@ -498,6 +500,50 @@ class GroupSessionController extends ChangeNotifier {
       accessToken: token,
       body: const <String, dynamic>{},
     );
+  }
+
+  /// Upload turn audio and reference text for pronunciation grading.
+  ///
+  /// Calls the gateway:
+  /// - `POST /private_lobbies/{id}/turn_state/pronunciation_assess` or
+  /// - `POST /public_lobbies/{id}/turn_state/pronunciation_assess`
+  ///
+  /// Returns a parsed [PronunciationFeedbackMock] on success, else null.
+  Future<PronunciationFeedbackMock?> assessTurnPronunciation({
+    required int lobbyId,
+    required String lobbyKind,
+    required List<int> audioBytes,
+    required String referenceText,
+  }) async {
+    final token = _auth.accessToken;
+    if (token == null || token.isEmpty) {
+      throw StateError('Not authenticated');
+    }
+
+    final base = lobbyKind == 'public' ? '/public_lobbies' : '/private_lobbies';
+    final uri = Uri.parse(
+      '${_api.baseUrl}$base/$lobbyId/turn_state/pronunciation_assess',
+    );
+
+    final req = http.MultipartRequest('POST', uri);
+    req.headers['Authorization'] = 'Bearer $token';
+    req.fields['reference_text'] = referenceText;
+    req.files.add(http.MultipartFile.fromBytes(
+      'audio',
+      audioBytes,
+      filename: 'turnaudio.wav',
+    ));
+
+    try {
+      final streamed = await req.send().timeout(const Duration(seconds: 30));
+      final res = await http.Response.fromStream(streamed).timeout(
+        const Duration(seconds: 30),
+      );
+      if (res.statusCode != 200) return null;
+      return PronunciationFeedbackMock.fromAssessmentJson(res.body);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Generate 20 session items from the AI service for the given topic.

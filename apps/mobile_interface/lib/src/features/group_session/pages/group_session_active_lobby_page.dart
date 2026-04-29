@@ -1,12 +1,17 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:record/record.dart';
 
 import '../../../app/constants.dart';
 import '../../../app/routes.dart';
+import '../../../common/models/pronunciation_feedback.dart';
+import '../../../common/widgets/letter_feedback_sentence.dart';
 import '../controllers/group_session_controller.dart';
 import '../models/private_lobby.dart';
 import '../widgets/quit_group_session_back_button.dart';
@@ -38,6 +43,11 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   final Set<String> _newlyPlantedFlags = <String>{};
   late final AnimationController _turnMicPulse;
   late final AnimationController _turnMicProgress;
+  final AudioRecorder _turnRecorder = AudioRecorder();
+  String? _turnRecordingPath;
+  bool _turnAssessing = false;
+  PronunciationFeedbackMock? _turnFeedback;
+  String? _turnFeedbackReference;
 
   /// Counts completed rounds — used to advance through session items.
   /// Incremented whenever roundComplete transitions from true → false.
@@ -208,6 +218,8 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
         // Detect round transition: was complete, now active → new round started.
         if (_turnState?.roundComplete == true && !next.roundComplete) {
           _roundIndex++;
+          _turnFeedback = null;
+          _turnFeedbackReference = null;
         }
         _turnState = next;
 
@@ -255,6 +267,8 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
       setState(() {
         if (_turnState?.roundComplete == true && !next.roundComplete) {
           _roundIndex++;
+          _turnFeedback = null;
+          _turnFeedbackReference = null;
         }
         _turnState = next;
         if (latestUserId != null && nextSeq > prevSeq) {
@@ -301,6 +315,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
             : null;
       });
       if (_micEnabled) {
+        await _startTurnRecording();
         _turnMicTimer?.cancel();
         _turnMicProgress.forward(from: 0);
         _turnMicPulse.repeat(reverse: true);
@@ -333,6 +348,13 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
       } catch (_) {
         // Best-effort mute.
       }
+    }
+    final ctrl = context.read<GroupSessionController>();
+    final items = ctrl.sessionItems;
+    final LessonItem? currentItem =
+        items.isEmpty ? null : items[_roundIndex % items.length];
+    if (currentItem != null && currentItem.text.isNotEmpty) {
+      unawaited(_stopAndAssessTurnRecording(referenceText: currentItem.text));
     }
     if (!mounted) return;
     setState(() {
@@ -397,8 +419,85 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     _turnMicPulse.dispose();
     _turnMicProgress.dispose();
     _scoreController.dispose();
+    _turnRecorder.dispose();
     unawaited(_disconnectVoice());
     super.dispose();
+  }
+
+  Future<String> _nextTurnRecordingPath() async {
+    final dir = await getTemporaryDirectory();
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    return '${dir.path}${Platform.pathSeparator}group_turn_$ts.wav';
+  }
+
+  Future<void> _startTurnRecording() async {
+    if (_turnRecordingPath != null) return;
+    try {
+      final hasPermission = await _turnRecorder
+          .hasPermission()
+          .timeout(const Duration(seconds: 10));
+      if (!hasPermission) return;
+
+      final path = await _nextTurnRecordingPath();
+      await _turnRecorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+          autoGain: true,
+          noiseSuppress: false,
+          echoCancel: false,
+        ),
+        path: path,
+      );
+      _turnRecordingPath = path;
+    } catch (_) {
+      // Best-effort: keep LiveKit voice even if local recording fails.
+    }
+  }
+
+  Future<void> _stopAndAssessTurnRecording({required String referenceText}) async {
+    final path = _turnRecordingPath;
+    _turnRecordingPath = null;
+    if (path == null) return;
+
+    try {
+      await _turnRecorder.stop();
+    } catch (_) {
+      // ignore stop errors
+    }
+
+    final file = File(path);
+    if (!await file.exists()) return;
+
+    final ctrl = context.read<GroupSessionController>();
+    final players = ctrl.privateLobby;
+    if (players.isEmpty) return;
+    final lobbyId = int.tryParse(players.first.lobbyId);
+    if (lobbyId == null) return;
+
+    setState(() {
+      _turnAssessing = true;
+      _turnFeedback = null;
+      _turnFeedbackReference = referenceText;
+    });
+
+    final bytes = await file.readAsBytes();
+    final feedback = await ctrl.assessTurnPronunciation(
+      lobbyId: lobbyId,
+      lobbyKind: _lobbyKind,
+      audioBytes: bytes,
+      referenceText: referenceText,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _turnAssessing = false;
+      _turnFeedback = feedback;
+      _turnFeedbackReference = referenceText;
+    });
+
+    file.delete().ignore();
   }
 
   @override
@@ -480,14 +579,35 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                         ? const Center(child: CircularProgressIndicator())
                         : Column(
                             children: [
-                              Text(
-                                currentItem.text,
-                                style: t.textTheme.headlineMedium?.copyWith(
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w800,
+                              if (_turnAssessing &&
+                                  _turnFeedbackReference == currentItem.text)
+                                const Padding(
+                                  padding: EdgeInsets.only(bottom: 8),
+                                  child: SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                                  ),
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
+                              (_turnFeedback != null &&
+                                      _turnFeedbackReference == currentItem.text)
+                                  ? LetterFeedbackSentence(
+                                      referenceText: currentItem.text,
+                                      feedback: _turnFeedback!,
+                                      textStyle:
+                                          t.textTheme.headlineMedium?.copyWith(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    )
+                                  : Text(
+                                      currentItem.text,
+                                      style: t.textTheme.headlineMedium?.copyWith(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
                               if (currentItem.ipa != null && currentItem.ipa!.isNotEmpty) ...[
                                 const SizedBox(height: 4),
                                 Text(

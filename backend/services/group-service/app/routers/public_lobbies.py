@@ -4,7 +4,7 @@ Public lobby HTTP routes (matchmaking + same patterns as private_lobbies).
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 
 from app.dependencies import get_public_lobby_service, get_lobby_items_repo
 from app.schemas.private_lobby_schema import (
@@ -169,4 +169,29 @@ def get_lobby_items(
     try:
         return repo.get_items(lobby_id=lobby_id, lobby_kind="public")
     except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.post("/{lobby_id}/turn_state/pronunciation_assess")
+async def assess_turn_pronunciation(
+    lobby_id: int,
+    audio: UploadFile = File(..., description="WAV audio file (max 10 seconds)"),
+    reference_text: str = Form(..., description="Ground truth text the learner should say"),
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    svc: PublicLobbyService = Depends(get_public_lobby_service),
+):
+    user_id = _get_user_id(x_user_id)
+    try:
+        content = await audio.read()
+        filename = audio.filename or "audio.wav"
+        return await svc.assess_turn_pronunciation(
+            lobby_id=lobby_id,
+            actor_user_id=str(user_id),
+            audio_bytes=content,
+            filename=filename,
+            reference_text=reference_text,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc))

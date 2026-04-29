@@ -45,6 +45,28 @@ class LobbyTurnStateStore:
                 state=state,
             )
 
+    def current_speaker_user_id(
+        self,
+        *,
+        lobby_kind: str,
+        lobby_id: int,
+        members: list[PrivateLobbyMemberOut],
+    ) -> str | None:
+        """
+        Return the user_id of the active speaker (current turn), or None when
+        there are no members or the round is already complete.
+        """
+        with self._lock:
+            state = self._state_by_lobby.setdefault((lobby_kind, lobby_id), _TurnState())
+            ordered = self._ordered_members(members)
+            self._prune_scores(state, ordered)
+            current_idx = self._first_unscored_index(ordered, state)
+            if current_idx is None:
+                return None
+            if current_idx < 0 or current_idx >= len(ordered):
+                return None
+            return ordered[current_idx].user_id
+
     def submit_score(
         self,
         *,

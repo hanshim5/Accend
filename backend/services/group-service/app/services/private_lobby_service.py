@@ -26,6 +26,7 @@ from app.schemas.private_lobby_schema import (
     PrivateLobbyDeleteOut,
 )
 from app.services.lobby_turn_state_store import turn_state_store
+from app.services.pronunciation_assessment_service import PronunciationAssessmentService
 
 
 class PrivateLobbyService:
@@ -94,4 +95,31 @@ class PrivateLobbyService:
             lobby_id=lobby_id,
             members=members,
             actor_user_id=actor_user_id,
+        )
+
+    async def assess_turn_pronunciation(
+        self,
+        *,
+        lobby_id: int,
+        actor_user_id: str,
+        audio_bytes: bytes,
+        filename: str,
+        reference_text: str,
+    ) -> dict:
+        members = self.repo.get_lobby(lobby_id)
+        current = turn_state_store.current_speaker_user_id(
+            lobby_kind="private",
+            lobby_id=lobby_id,
+            members=members,
+        )
+        if current is None:
+            raise RuntimeError("Round complete")
+        if current != actor_user_id:
+            raise RuntimeError("Not your turn")
+
+        svc = PronunciationAssessmentService()
+        return await svc.assess(
+            audio_bytes=audio_bytes,
+            filename=filename,
+            reference_text=reference_text,
         )
