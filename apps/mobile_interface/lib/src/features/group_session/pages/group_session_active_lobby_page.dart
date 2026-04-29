@@ -48,6 +48,9 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   String? _turnRecordingPath;
   bool _submittingAutoScore = false;
   PronunciationFeedbackMock? _turnFeedback;
+  final List<PronunciationFeedbackMock> _sessionFeedbacks = <PronunciationFeedbackMock>[];
+  final List<LessonItem> _sessionItems = <LessonItem>[];
+  final Set<int> _capturedRoundIndices = <int>{};
 
   /// Counts completed rounds — used to advance through session items.
   /// Incremented whenever roundComplete transitions from true → false.
@@ -405,6 +408,10 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
       setState(() {
         _turnState = next;
         _turnFeedback = feedback;
+        if (_capturedRoundIndices.add(_roundIndex)) {
+          _sessionFeedbacks.add(feedback);
+          _sessionItems.add(currentItem);
+        }
         if (latestUserId != null) {
           _newlyPlantedFlags.add(latestUserId);
         }
@@ -514,7 +521,11 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     Navigator.pushReplacementNamed(
       context,
       AppRoutes.groupSessionResults,
-      arguments: participants,
+      arguments: <String, Object>{
+        'participants': participants,
+        'feedbacks': List<PronunciationFeedbackMock>.from(_sessionFeedbacks),
+        'items': List<LessonItem>.from(_sessionItems),
+      },
     );
   }
 

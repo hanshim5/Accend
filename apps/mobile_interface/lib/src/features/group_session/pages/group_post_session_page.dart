@@ -4,16 +4,25 @@ import 'package:provider/provider.dart';
 
 import '../../../app/constants.dart';
 import '../../../app/routes.dart';
+import '../../../common/models/pronunciation_feedback.dart';
 import '../../../common/services/auth_service.dart';
+import '../../courses/models/lesson_item.dart';
 import '../../social/controllers/social_controller.dart';
 import '../models/private_lobby.dart';
 
 enum _VoteState { none, upvoted, downvoted }
 
 class GroupPostSessionPage extends StatefulWidget {
-  const GroupPostSessionPage({super.key, required this.participants});
+  const GroupPostSessionPage({
+    super.key,
+    required this.participants,
+    this.feedbacks = const <PronunciationFeedbackMock>[],
+    this.items = const <LessonItem>[],
+  });
 
   final List<PrivateLobby> participants;
+  final List<PronunciationFeedbackMock> feedbacks;
+  final List<LessonItem> items;
 
   @override
   State<GroupPostSessionPage> createState() => _GroupPostSessionPageState();

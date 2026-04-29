@@ -167,15 +167,27 @@ class AppRoutes {
     groupSessionPublicMatch: (_) => const GroupSessionPublicMatchPage(),
     groupSessionResults: (ctx) {
       final args = ModalRoute.of(ctx)!.settings.arguments;
-      final participants = args is List<PrivateLobby> ? args : <PrivateLobby>[];
+      final participants = args is Map<String, Object?> && args['participants'] is List<PrivateLobby>
+          ? (args['participants'] as List<PrivateLobby>)
+          : (args is List<PrivateLobby> ? args : <PrivateLobby>[]);
+      final feedbacks = args is Map<String, Object?> && args['feedbacks'] is List<PronunciationFeedbackMock>
+          ? (args['feedbacks'] as List<PronunciationFeedbackMock>)
+          : _groupDummyFeedbacks;
+      final items = args is Map<String, Object?> && args['items'] is List<LessonItem>
+          ? (args['items'] as List<LessonItem>)
+          : _groupDummyItems;
       return SessionResultsPage(
-        feedbacks: _groupDummyFeedbacks,
-        items: _groupDummyItems,
+        feedbacks: feedbacks,
+        items: items,
         sessionTitle: 'Group Session',
         ctaLabel: 'View Participants',
         onCtaTap: (c) => Navigator.of(c).pushReplacementNamed(
           groupSessionPostSession,
-          arguments: participants,
+          arguments: <String, Object>{
+            'participants': participants,
+            'feedbacks': feedbacks,
+            'items': items,
+          },
         ),
         motivationalMessageOverride: (avg) {
           if (avg >= 85) return 'Your group crushed it — sharp pronunciation and great flow across the session!';
@@ -187,8 +199,20 @@ class AppRoutes {
     },
     groupSessionPostSession: (ctx) {
       final args = ModalRoute.of(ctx)!.settings.arguments;
-      final participants = args is List<PrivateLobby> ? args : <PrivateLobby>[];
-      return GroupPostSessionPage(participants: participants);
+      final participants = args is Map<String, Object?> && args['participants'] is List<PrivateLobby>
+          ? (args['participants'] as List<PrivateLobby>)
+          : (args is List<PrivateLobby> ? args : <PrivateLobby>[]);
+      final feedbacks = args is Map<String, Object?> && args['feedbacks'] is List<PronunciationFeedbackMock>
+          ? (args['feedbacks'] as List<PronunciationFeedbackMock>)
+          : const <PronunciationFeedbackMock>[];
+      final items = args is Map<String, Object?> && args['items'] is List<LessonItem>
+          ? (args['items'] as List<LessonItem>)
+          : const <LessonItem>[];
+      return GroupPostSessionPage(
+        participants: participants,
+        feedbacks: feedbacks,
+        items: items,
+      );
     },
     resetPassword: (_) => const ResetPasswordPage(),
   };
