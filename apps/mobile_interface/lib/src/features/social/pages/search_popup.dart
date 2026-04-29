@@ -200,8 +200,8 @@ class _SearchPopupState extends State<SearchPopup> {
                     ),
                   ],
                 ),
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + viewInsets.bottom),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,7 +309,6 @@ class _SearchPopupState extends State<SearchPopup> {
                           constraints: const BoxConstraints(maxHeight: 220),
                           child: ListView.separated(
                             shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
                             itemCount: _results.length,
                             separatorBuilder: (_, __) => const SizedBox(height: 8),
                             itemBuilder: (context, index) {

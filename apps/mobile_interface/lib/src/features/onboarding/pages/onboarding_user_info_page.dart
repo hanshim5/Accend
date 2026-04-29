@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../../app/constants.dart';
 import '../../../app/routes.dart';
 import '../../../common/services/api_client.dart';
 import '../../../common/services/auth_service.dart';
 import '../../../common/widgets/primary_button.dart';
+import '../controllers/onboarding_controller.dart';
 import '../controllers/onboarding_user_info_controller.dart';
 import '../widgets/onboarding_labeled_field.dart';
 
@@ -100,6 +102,7 @@ class _OnboardingUserInfoPageState extends State<OnboardingUserInfoPage> {
       );
 
       if (!mounted) return;
+      context.read<OnboardingController>().reset();
       Navigator.pushReplacementNamed(context, AppRoutes.onboardingNativeLanguage);
     } on ApiException catch (e) {
       if (!mounted) return;

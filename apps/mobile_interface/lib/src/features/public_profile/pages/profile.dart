@@ -1965,7 +1965,7 @@ class _GoalChip extends StatelessWidget {
 
 
 class _AddGoalPopup extends StatefulWidget {
-  const _AddGoalPopup({super.key, this.disabledGoals = const []});
+  const _AddGoalPopup({this.disabledGoals = const []});
 
   final List<String> disabledGoals;
 

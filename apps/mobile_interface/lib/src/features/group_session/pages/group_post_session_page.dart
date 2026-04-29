@@ -8,7 +8,6 @@ import '../../../common/services/auth_service.dart';
 import '../../social/controllers/social_controller.dart';
 import '../models/private_lobby.dart';
 
-// Vote state per participant within a single session.
 enum _VoteState { none, upvoted, downvoted }
 
 class GroupPostSessionPage extends StatefulWidget {
@@ -22,6 +21,7 @@ class GroupPostSessionPage extends StatefulWidget {
 
 class _GroupPostSessionPageState extends State<GroupPostSessionPage> {
   late final List<PrivateLobby> _participants;
+  String? _currentUserId;
   // Tracks vote state per participant userId for this session.
   final Map<String, _VoteState> _votes = {};
 
@@ -35,11 +35,13 @@ class _GroupPostSessionPageState extends State<GroupPostSessionPage> {
     super.didChangeDependencies();
     if (!_isInitialized) {
       _isInitialized = true;
-      final currentUserId = context.read<AuthService>().currentUser?.id;
-      _participants = widget.participants
-          .where((p) => p.userId != currentUserId)
-          .toList();
+      _currentUserId = context.read<AuthService>().currentUser?.id;
+      _participants = widget.participants.toList();
       context.read<SocialController>().load();
+      final ids = _participants.map((p) => p.userId).toList();
+      if (ids.isNotEmpty) {
+        context.read<SocialController>().fetchLobbyProfiles(ids);
+      }
     }
   }
 
@@ -118,6 +120,17 @@ class _GroupPostSessionPageState extends State<GroupPostSessionPage> {
     }
   }
 
+  static Color _playerColor(int idx) {
+    const palette = [
+      Color(0xFFC06BFF),
+      Color(0xFF67A9FF),
+      Color(0xFF74EC8A),
+      Color(0xFFE8F087),
+      Color(0xFFF57E62),
+    ];
+    return palette[idx % palette.length];
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
@@ -131,13 +144,42 @@ class _GroupPostSessionPageState extends State<GroupPostSessionPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Participants:',
-                style: GoogleFonts.montserrat(
-                  color: AppColors.textPrimary,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                ),
+              // Header row: title + member count badge
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    'Expedition Squad',
+                    style: GoogleFonts.montserrat(
+                      color: AppColors.textPrimary,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  if (_participants.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: AppColors.accent.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        '${_participants.length} CLIMBERS',
+                        style: GoogleFonts.montserrat(
+                          color: AppColors.accent,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 20),
               Expanded(
@@ -153,20 +195,21 @@ class _GroupPostSessionPageState extends State<GroupPostSessionPage> {
                       )
                     : ListView.separated(
                         itemCount: _participants.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
                         itemBuilder: (context, index) {
                           final p = _participants[index];
+                          final isMe = p.userId == _currentUserId;
                           final isFollowing = social.following
                               .any((u) => u.id == p.userId);
                           final isBlocked = social.blockedIds.contains(p.userId);
                           final voteState = _votes[p.userId] ?? _VoteState.none;
-                          final knownUser = [
-                            ...social.followers,
-                            ...social.following,
-                          ].where((u) => u.id == p.userId).firstOrNull;
+                          final knownUser = social.findUser(p.userId);
                           return _ParticipantCard(
                             username: p.username,
                             profileImageUrl: knownUser?.profileImageUrl,
+                            level: knownUser?.level,
+                            isMe: isMe,
+                            avatarColor: _playerColor(index),
                             isFollowing: isFollowing,
                             isBlocked: isBlocked,
                             voteState: voteState,
@@ -181,9 +224,19 @@ class _GroupPostSessionPageState extends State<GroupPostSessionPage> {
                       ),
               ),
               const SizedBox(height: 16),
-              SizedBox(
+              Container(
                 width: double.infinity,
-                height: 52,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppRadii.md),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.action.withValues(alpha: 0.38),
+                      blurRadius: 22,
+                      spreadRadius: 0,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
                 child: ElevatedButton(
                   onPressed: () => Navigator.pushNamedAndRemoveUntil(
                     context,
@@ -191,19 +244,22 @@ class _GroupPostSessionPageState extends State<GroupPostSessionPage> {
                     (_) => false,
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.surface,
-                    foregroundColor: AppColors.textPrimary,
+                    backgroundColor: AppColors.action,
+                    foregroundColor: AppColors.primaryBg,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadii.md),
-                      side: const BorderSide(color: AppColors.border, width: 1.5),
                     ),
-                    textStyle: GoogleFonts.montserrat(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                   ),
-                  child: const Text('Quit to Sessions'),
+                  child: Text(
+                    'Quit to Sessions',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryBg,
+                    ).copyWith(inherit: false),
+                  ),
                 ),
               ),
             ],
@@ -224,11 +280,17 @@ class _ParticipantCard extends StatelessWidget {
     required this.onAvoidTap,
     required this.onUpvoteTap,
     required this.onDownvoteTap,
+    required this.avatarColor,
     this.profileImageUrl,
+    this.level,
+    this.isMe = false,
   });
 
   final String username;
   final String? profileImageUrl;
+  final int? level;
+  final bool isMe;
+  final Color avatarColor;
   final bool isFollowing;
   final bool isBlocked;
   final _VoteState voteState;
@@ -239,99 +301,135 @@ class _ParticipantCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadii.md),
+        borderRadius: BorderRadius.circular(AppRadii.lg),
         border: Border.all(color: AppColors.border, width: 1),
       ),
       child: Row(
         children: [
-          _Avatar(username: username, imageUrl: profileImageUrl),
+          // Avatar with online dot
+          Stack(
+            children: [
+              _Avatar(username: username, imageUrl: profileImageUrl, borderColor: avatarColor),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  width: 11,
+                  height: 11,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.success,
+                    border: Border.all(color: AppColors.surface, width: 2),
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(width: 12),
+          // Name + level
           Expanded(
-            child: Text(
-              username,
-              style: t.textTheme.bodyMedium?.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isMe ? '$username (you)' : username,
+                  style: GoogleFonts.montserrat(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (level != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'LVL $level',
+                    style: GoogleFonts.montserrat(
+                      color: AppColors.textSecondary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(width: 8),
-          _VoteButton(
-            icon: Icons.thumb_up_rounded,
-            active: voteState == _VoteState.upvoted,
-            activeColor: const Color(0xFF22C55E),
-            onTap: onUpvoteTap,
-          ),
-          const SizedBox(width: 6),
-          _VoteButton(
-            icon: Icons.thumb_down_rounded,
-            active: voteState == _VoteState.downvoted,
-            activeColor: AppColors.failure,
-            onTap: onDownvoteTap,
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            height: 36,
-            child: ElevatedButton(
-              onPressed: onFollowTap,
-              style: ElevatedButton.styleFrom(
-                elevation: 0,
-                backgroundColor:
-                    isFollowing ? Colors.transparent : AppColors.accent,
-                foregroundColor:
-                    isFollowing ? AppColors.textSecondary : AppColors.primaryBg,
-                side: isFollowing
-                    ? const BorderSide(color: Color(0x7F64748B), width: 1)
-                    : BorderSide.none,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+          if (!isMe) ...[
+            const SizedBox(width: 8),
+            // Vote buttons grouped
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.inputFill,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _VoteButton(
+                    icon: Icons.thumb_up_rounded,
+                    active: voteState == _VoteState.upvoted,
+                    activeColor: const Color(0xFF22C55E),
+                    onTap: onUpvoteTap,
+                  ),
+                  _VoteButton(
+                    icon: Icons.thumb_down_rounded,
+                    active: voteState == _VoteState.downvoted,
+                    activeColor: AppColors.failure,
+                    onTap: onDownvoteTap,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Follow button
+            SizedBox(
+              height: 34,
+              child: ElevatedButton(
+                onPressed: onFollowTap,
+                style: ElevatedButton.styleFrom(
+                  elevation: 0,
+                  backgroundColor:
+                      isFollowing ? Colors.transparent : AppColors.accent,
+                  foregroundColor:
+                      isFollowing ? AppColors.accent : AppColors.primaryBg,
+                  side: isFollowing
+                      ? BorderSide(color: AppColors.accent.withValues(alpha: 0.4), width: 1)
+                      : BorderSide.none,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  minimumSize: const Size(70, 34),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  textStyle: GoogleFonts.montserrat(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-                minimumSize: const Size(86, 36),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                textStyle: GoogleFonts.montserrat(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                child: Text(isFollowing ? 'Following' : 'Follow'),
+              ),
+            ),
+            const SizedBox(width: 4),
+            // Block/Avoid icon button
+            GestureDetector(
+              onTap: onAvoidTap,
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(
+                  Icons.block_rounded,
+                  size: 20,
+                  color: isBlocked
+                      ? AppColors.failure
+                      : AppColors.textSecondary.withValues(alpha: 0.4),
                 ),
               ),
-              child: Text(isFollowing ? 'Following' : 'Follow'),
             ),
-          ),
-          const SizedBox(width: 6),
-          SizedBox(
-            height: 36,
-            child: ElevatedButton(
-              onPressed: onAvoidTap,
-              style: ElevatedButton.styleFrom(
-                elevation: 0,
-                backgroundColor:
-                    isBlocked ? AppColors.failure : Colors.transparent,
-                foregroundColor:
-                    isBlocked ? Colors.white : AppColors.failure,
-                side: isBlocked
-                    ? BorderSide.none
-                    : const BorderSide(color: AppColors.failure, width: 1),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                minimumSize: const Size(76, 36),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                textStyle: GoogleFonts.montserrat(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              child: Text(isBlocked ? 'Avoided' : 'Avoid'),
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -355,22 +453,12 @@ class _VoteButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: active ? activeColor.withValues(alpha: 0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: active ? activeColor : AppColors.border,
-            width: 1,
-          ),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
         child: Icon(
           icon,
           size: 17,
-          color: active ? activeColor : AppColors.textSecondary,
+          color: active ? activeColor : AppColors.textSecondary.withValues(alpha: 0.5),
         ),
       ),
     );
@@ -378,10 +466,11 @@ class _VoteButton extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.username, this.imageUrl});
+  const _Avatar({required this.username, this.imageUrl, this.borderColor});
 
   final String username;
   final String? imageUrl;
+  final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
@@ -389,12 +478,19 @@ class _Avatar extends StatelessWidget {
         username.trim().isNotEmpty ? username.trim()[0].toUpperCase() : '?';
 
     return Container(
-      width: 40,
-      height: 40,
+      width: 48,
+      height: 48,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: AppColors.inputFill,
-        border: Border.all(color: AppColors.accent, width: 1.5),
+        border: Border.all(color: borderColor ?? AppColors.accent.withValues(alpha: 0.5), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: (borderColor ?? AppColors.accent).withValues(alpha: 0.4),
+            blurRadius: 12,
+            spreadRadius: 0,
+          ),
+        ],
         image: imageUrl != null && imageUrl!.isNotEmpty
             ? DecorationImage(
                 image: NetworkImage(imageUrl!),
@@ -407,8 +503,8 @@ class _Avatar extends StatelessWidget {
           ? Text(
               initial,
               style: GoogleFonts.montserrat(
-                color: AppColors.accent,
-                fontSize: 16,
+                color: borderColor ?? AppColors.accent,
+                fontSize: 17,
                 fontWeight: FontWeight.w700,
               ),
             )

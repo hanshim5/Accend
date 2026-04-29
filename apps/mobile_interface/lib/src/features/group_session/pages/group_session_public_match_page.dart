@@ -29,6 +29,7 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
   bool _isStarting = false;
   _GenStatus _genStatus = _GenStatus.loading;
   Future<void>? _genFuture;
+  List<String> _lastFetchedIds = const [];
 
   @override
   void initState() {
@@ -57,6 +58,8 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
       }
     });
   }
+
+
 
   void _beginGeneration(GroupSessionController ctrl, String lobbyId) {
     final topic = kSessionTopics[Random().nextInt(kSessionTopics.length)];
@@ -130,6 +133,18 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
     const maxPlayers = 5;
     final players = ctrl.privateLobby.toList()
       ..sort((a, b) => a.joinedAt.compareTo(b.joinedAt));
+
+    // Trigger profile fetch whenever the player list changes.
+    final ids = players.map((p) => p.userId).toList();
+    if (ids.isNotEmpty &&
+        (ids.length != _lastFetchedIds.length ||
+            ids.any((id) => !_lastFetchedIds.contains(id)))) {
+      _lastFetchedIds = ids;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.read<SocialController>().fetchLobbyProfiles(ids);
+      });
+    }
 
     final lobbyCode = ctrl.joinPrivateLobby?.lobbyId != null
         ? ctrl.joinPrivateLobby!.lobbyId.toString()
@@ -269,12 +284,10 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
                               final suffix = '${isMe ? ' (you)' : ''}${isHost ? ' 👑' : ''}';
                               final label = '${p.username}$suffix';
                               final social = context.watch<SocialController>();
-                              final knownUser = [
-                                ...social.followers,
-                                ...social.following,
-                              ].where((u) => u.id == p.userId).firstOrNull;
+                              final knownUser = social.findUser(p.userId);
                               final imageUrl = knownUser?.profileImageUrl;
                               final rep = knownUser?.reputation ?? 0;
+                              final level = knownUser?.level;
                               final repColor = rep > 0
                                   ? const Color(0xFF22C55E)
                                   : rep < 0
@@ -317,10 +330,17 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
-                                      child: Text(
-                                        label,
-                                        style: t.textTheme.bodyLarge,
-                                        overflow: TextOverflow.ellipsis,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            label,
+                                            style: t.textTheme.bodyLarge,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (level != null) ...[const SizedBox(height: 2), Text('LVL $level', style: GoogleFonts.montserrat(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 1.0))],
+                                        ],
                                       ),
                                     ),
                                     if (!isMe) ...[

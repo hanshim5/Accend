@@ -1,9 +1,11 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:mobile_interface/src/common/services/auth_service.dart';
+import 'package:mobile_interface/src/features/social/controllers/social_controller.dart';
 import '../../../app/routes.dart' as routes;
 import '../../../app/constants.dart';
 import 'package:mobile_interface/src/features/group_session/controllers/group_session_controller.dart';
@@ -24,6 +26,7 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
   bool _isStarting = false;
   _GenStatus _genStatus = _GenStatus.loading;
   Future<void>? _genFuture;
+  List<String> _lastFetchedIds = const [];
 
   @override
   void didChangeDependencies() {
@@ -128,6 +131,18 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
     final players = ctrl.privateLobby.toList()
       ..sort((a, b) => a.joinedAt.compareTo(b.joinedAt));
 
+    // Trigger profile fetch whenever the player list changes.
+    final ids = players.map((p) => p.userId).toList();
+    if (ids.isNotEmpty &&
+        (ids.length != _lastFetchedIds.length ||
+            ids.any((id) => !_lastFetchedIds.contains(id)))) {
+      _lastFetchedIds = ids;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.read<SocialController>().fetchLobbyProfiles(ids);
+      });
+    }
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -224,8 +239,18 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
                                         final p = players[index];
                                         final isMe = meId != null && p.userId == meId;
                                         final isHost = p.host == p.userId;
-                                        final suffix = '${isMe ? ' (me)' : ''}${isHost ? ' 👑' : ''}';
+                                        final suffix = '${isMe ? ' (you)' : ''}${isHost ? ' 👑' : ''}';
                                         final label = '${p.username}$suffix';
+                                        final social = context.watch<SocialController>();
+                                        final knownUser = social.findUser(p.userId);
+                                        final imageUrl = knownUser?.profileImageUrl;
+                                        final rep = knownUser?.reputation ?? 0;
+                                        final level = knownUser?.level;
+                                        final repColor = rep > 0
+                                            ? const Color(0xFF22C55E)
+                                            : rep < 0
+                                                ? AppColors.failure
+                                                : AppColors.textSecondary;
 
                                         return Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -233,13 +258,66 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
                                             color: AppColors.inputFill,
                                             borderRadius: BorderRadius.circular(AppRadii.md),
                                           ),
-                                          child: Align(
-                                            alignment: Alignment.centerLeft,
-                                            child: Text(
-                                              label,
-                                              style: t.textTheme.bodyLarge,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 38,
+                                                height: 38,
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  color: AppColors.surface,
+                                                  border: Border.all(color: AppColors.accent, width: 1.5),
+                                                  image: imageUrl != null && imageUrl.isNotEmpty
+                                                      ? DecorationImage(
+                                                          image: NetworkImage(imageUrl),
+                                                          fit: BoxFit.cover,
+                                                        )
+                                                      : null,
+                                                ),
+                                                alignment: Alignment.center,
+                                                child: imageUrl == null || imageUrl.isEmpty
+                                                    ? Text(
+                                                        p.username.isNotEmpty ? p.username[0].toUpperCase() : '?',
+                                                        style: GoogleFonts.montserrat(
+                                                          color: AppColors.accent,
+                                                          fontSize: 15,
+                                                          fontWeight: FontWeight.w700,
+                                                        ),
+                                                      )
+                                                    : null,
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      label,
+                                                      style: t.textTheme.bodyLarge,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    if (level != null) ...[const SizedBox(height: 2), Text('LVL $level', style: GoogleFonts.montserrat(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 1.0))],
+                                                  ],
+                                                ),
+                                              ),
+                                              if (!isMe) ...[
+                                                Icon(
+                                                  rep >= 0 ? Icons.thumb_up_rounded : Icons.thumb_down_rounded,
+                                                  size: 13,
+                                                  color: repColor,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  rep > 0 ? '+$rep' : '$rep',
+                                                  style: GoogleFonts.inter(
+                                                    color: repColor,
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
                                           ),
                                         );
                                       },

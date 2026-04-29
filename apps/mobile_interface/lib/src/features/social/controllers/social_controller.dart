@@ -17,6 +17,7 @@ class SocialController extends ChangeNotifier {
   List<SocialUser> _following = const [];
   List<SocialUser> _blocked = const [];
   Set<String> _blockedIds = const {};
+  Map<String, SocialUser> _lobbyProfiles = const {};
 
   String _followersQuery = '';
   String _followingQuery = '';
@@ -37,6 +38,7 @@ class SocialController extends ChangeNotifier {
   bool get hasLoaded => _hasLoaded;
   String? get error => _error;
   Set<String> get blockedIds => _blockedIds;
+  Map<String, SocialUser> get lobbyProfiles => _lobbyProfiles;
 
   List<SocialUser> get followers {
     return _filterByQuery(_followers, _followersQuery);
@@ -114,6 +116,49 @@ class SocialController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Fetches public profile + reputation for every user ID in [userIds] that
+  /// is not already known via followers/following. Results are stored in
+  /// [lobbyProfiles] and can be merged with the social graph on read.
+  Future<void> fetchLobbyProfiles(List<String> userIds) async {
+    if (userIds.isEmpty) return;
+    final accessToken = _auth.accessToken;
+    if (accessToken == null || accessToken.isEmpty) return;
+
+    // Only fetch IDs we don't already know about.
+    final knownIds = {
+      ..._followers.map((u) => u.id),
+      ..._following.map((u) => u.id),
+      ..._lobbyProfiles.keys,
+    };
+    final toFetch = userIds.where((id) => !knownIds.contains(id)).toList();
+    if (toFetch.isEmpty) return;
+
+    try {
+      final rows = await _api.postList(
+        '/social/profiles/batch',
+        accessToken: accessToken,
+        body: toFetch,
+      );
+      final fetched = {
+        for (final row in rows)
+          (row['id'] as String): SocialUser.fromJson(Map<String, dynamic>.from(row as Map)),
+      };
+      _lobbyProfiles = {..._lobbyProfiles, ...fetched};
+      notifyListeners();
+    } catch (_) {
+      // Non-fatal — lobby still works without enriched profiles.
+    }
+  }
+
+  /// Look up a user by ID, checking followers, following, and lobby cache.
+  SocialUser? findUser(String userId) {
+    return [
+      ..._followers,
+      ..._following,
+      ..._lobbyProfiles.values,
+    ].where((u) => u.id == userId).firstOrNull;
+  }
+
   Future<void> follow(String userId) async {
     await _setFollowState(userId: userId, following: true);
   }
@@ -170,6 +215,7 @@ class SocialController extends ChangeNotifier {
     _following = const [];
     _blocked = const [];
     _blockedIds = const {};
+    _lobbyProfiles = const {};
     _followersQuery = '';
     _followingQuery = '';
     _blockedQuery = '';

@@ -122,8 +122,8 @@ class _SocialUserProfilePopupState extends State<_SocialUserProfilePopup> {
                       border: Border.all(color: const Color(0x4C07B6D5)),
                     ),
                     child: Text(
-                      (user.levelLabel?.trim().isNotEmpty ?? false)
-                          ? user.levelLabel!.toUpperCase()
+                      (user.levelLabel.trim().isNotEmpty)
+                          ? user.levelLabel.toUpperCase()
                           : 'LEVEL ##',
                       style: GoogleFonts.montserrat(
                         color: AppColors.accent,

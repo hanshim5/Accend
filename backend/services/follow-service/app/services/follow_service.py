@@ -53,6 +53,9 @@ class FollowService:
     async def get_own_reputation(self, user_id: UUID) -> int:
         return await self.repo.get_own_reputation(user_id)
 
+    async def profiles_by_ids(self, user_ids: list[str]) -> list:
+        return await self.repo.profiles_by_ids(user_ids)
+
     async def delete_account(self, user_id: UUID) -> None:
         """
         Delete all follow relationships for a user (both as follower and followee).

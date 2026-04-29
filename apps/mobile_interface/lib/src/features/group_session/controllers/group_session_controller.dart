@@ -22,7 +22,6 @@ class GroupSessionController extends ChangeNotifier {
   PrivateLobby? _createPrivateLobby;
   PrivateLobby? _joinPrivateLobby;
   RealtimeChannel? _lobbyChannel;
-  String? _subscribedLobbyId;
   bool _isRealtimeSyncing = false;
   List<LessonItem> _sessionItems = [];
 
@@ -364,7 +363,6 @@ class GroupSessionController extends ChangeNotifier {
     if (lobbyId.isEmpty) return;
 
     unsubscribeFromLobby();
-    _subscribedLobbyId = 'private:$lobbyId';
 
     final channelName = 'private_lobby_$lobbyId';
     _lobbyChannel = _auth.client
@@ -395,7 +393,6 @@ class GroupSessionController extends ChangeNotifier {
     if (lobbyId.isEmpty) return;
 
     unsubscribeFromLobby();
-    _subscribedLobbyId = 'public:$lobbyId';
 
     final channelName = 'public_lobby_$lobbyId';
     _lobbyChannel = _auth.client
@@ -427,7 +424,6 @@ class GroupSessionController extends ChangeNotifier {
       _auth.client.removeChannel(_lobbyChannel!);
     }
     _lobbyChannel = null;
-    _subscribedLobbyId = null;
     _isRealtimeSyncing = false;
   }
 

@@ -162,7 +162,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
       final json = await ctrl.submitLobbyTurnScore(
         lobbyId: lobbyId,
         lobbyKind: _lobbyKind,
-        score: (value.clamp(0, 100) as num).toDouble(),
+        score: value.clamp(0, 100).toDouble(),
       );
       final next = _LobbyTurnState.fromJson(json);
       final latestUserId = next.latestScoredUserId;
