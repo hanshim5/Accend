@@ -1257,36 +1257,6 @@ async def proxy_vote_private_next_round(
     return r.json()
 
 
-@app.post("/private_lobbies/{lobby_id}/turn_state/pronunciation_assess")
-async def proxy_private_turn_pronunciation_assess(
-    lobby_id: str,
-    audio: UploadFile = File(..., description="WAV audio file (max 10 seconds)"),
-    reference_text: str = Form(..., description="Ground truth text the learner should say"),
-    authorization: str | None = Header(default=None),
-):
-    user_id = verify_supabase_jwt(authorization)
-
-    content = await audio.read()
-    filename = audio.filename or "audio.wav"
-
-    async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.post(
-            f"{settings.GROUP_SERVICE_URL}/private_lobbies/{lobby_id}/turn_state/pronunciation_assess",
-            headers={"X-User-Id": user_id},
-            files={"audio": (filename, content, "audio/wav")},
-            data={"reference_text": reference_text},
-        )
-
-    if r.status_code >= 400:
-        try:
-            detail = r.json()
-        except Exception:
-            detail = r.text
-        raise HTTPException(status_code=r.status_code, detail=detail)
-
-    return r.json()
-
-
 # -----------------------------------
 # Public lobbies (matchmaking)
 # -----------------------------------
@@ -1460,36 +1430,6 @@ async def proxy_vote_public_next_round(
 
     if r.status_code >= 400:
         raise HTTPException(status_code=r.status_code, detail=r.text)
-    return r.json()
-
-
-@app.post("/public_lobbies/{lobby_id}/turn_state/pronunciation_assess")
-async def proxy_public_turn_pronunciation_assess(
-    lobby_id: str,
-    audio: UploadFile = File(..., description="WAV audio file (max 10 seconds)"),
-    reference_text: str = Form(..., description="Ground truth text the learner should say"),
-    authorization: str | None = Header(default=None),
-):
-    user_id = verify_supabase_jwt(authorization)
-
-    content = await audio.read()
-    filename = audio.filename or "audio.wav"
-
-    async with httpx.AsyncClient(timeout=30) as client:
-        r = await client.post(
-            f"{settings.GROUP_SERVICE_URL}/public_lobbies/{lobby_id}/turn_state/pronunciation_assess",
-            headers={"X-User-Id": user_id},
-            files={"audio": (filename, content, "audio/wav")},
-            data={"reference_text": reference_text},
-        )
-
-    if r.status_code >= 400:
-        try:
-            detail = r.json()
-        except Exception:
-            detail = r.text
-        raise HTTPException(status_code=r.status_code, detail=detail)
-
     return r.json()
 
 

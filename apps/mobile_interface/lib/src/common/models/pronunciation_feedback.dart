@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 /// Articulation instructions keyed by ARPAbet phoneme symbol.
 ///
 /// Used in the phoneme-detail popup so users know how to physically
@@ -112,83 +110,4 @@ class PronunciationFeedbackMock {
     this.words = const [],
     this.feedbackSessionId,
   });
-
-  /// Parse the gateway `/pronunciation/assess` JSON payload into a strongly-typed
-  /// [PronunciationFeedbackMock]. Returns null if required fields are missing.
-  ///
-  /// Expected shape:
-  /// {
-  ///   "summary": { "accuracy": 78, "fluency": 70, "completeness": 84, "pronScore": 77 },
-  ///   "words": [
-  ///     {
-  ///       "text": "...",
-  ///       "accuracy": 92,
-  ///       "errorType": "...",
-  ///       "phonemes": [{ "symbol": "th", "accuracy": 88, "user_said": "t" }, ...]
-  ///     }
-  ///   ],
-  ///   "feedback_session_id": "..."
-  /// }
-  static PronunciationFeedbackMock? fromAssessmentJson(String body) {
-    try {
-      final map = jsonDecode(body) as Map<String, dynamic>;
-      final summary = map['summary'] as Map<String, dynamic>?;
-      if (summary == null) return null;
-
-      final accuracy = (summary['accuracy'] as num?)?.toDouble();
-      final fluency = (summary['fluency'] as num?)?.toDouble();
-      final completeness = (summary['completeness'] as num?)?.toDouble();
-      final pronScore = (summary['pronScore'] as num?)?.toDouble();
-      if (accuracy == null || fluency == null || completeness == null) return null;
-
-      final wordsJson = map['words'] as List<dynamic>? ?? const [];
-      final words = <WordFeedback>[];
-      for (final item in wordsJson) {
-        if (item is! Map<String, dynamic>) continue;
-        final text = (item['text'] as String?) ?? '';
-        if (text.isEmpty) continue;
-        final accuracyVal = (item['accuracy'] as num?)?.toDouble();
-        final errorType = item['errorType'] as String?;
-
-        final phonemesJson = item['phonemes'] as List<dynamic>? ?? const [];
-        final phonemes = <PhonemeFeedback>[];
-        for (final p in phonemesJson) {
-          if (p is! Map<String, dynamic>) continue;
-          final symbol = (p['symbol'] as String?) ?? '';
-          if (symbol.isEmpty) continue;
-          final pAccuracy = (p['accuracy'] as num?)?.toDouble();
-          final userSaid = p['user_said'] as String?;
-          phonemes.add(
-            PhonemeFeedback(
-              symbol: symbol,
-              accuracy: pAccuracy,
-              userSaid: userSaid?.isNotEmpty == true ? userSaid : null,
-            ),
-          );
-        }
-
-        words.add(
-          WordFeedback(
-            text: text,
-            accuracy: accuracyVal,
-            errorType: errorType,
-            phonemes: phonemes,
-          ),
-        );
-      }
-
-      final feedbackSessionId = map['feedback_session_id'] as String?;
-      return PronunciationFeedbackMock(
-        accuracyScore: accuracy,
-        fluencyScore: fluency,
-        completenessScore: completeness,
-        pronScore: pronScore,
-        summary: map['summary_text'] as String? ?? 'Keep practicing for even clearer speech.',
-        words: words,
-        feedbackSessionId: feedbackSessionId,
-      );
-    } catch (_) {
-      return null;
-    }
-  }
 }
