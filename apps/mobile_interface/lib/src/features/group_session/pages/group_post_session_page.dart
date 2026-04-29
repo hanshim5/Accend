@@ -39,6 +39,10 @@ class _GroupPostSessionPageState extends State<GroupPostSessionPage> {
           .where((p) => p.userId != currentUserId)
           .toList();
       context.read<SocialController>().load();
+      final ids = _participants.map((p) => p.userId).toList();
+      if (ids.isNotEmpty) {
+        context.read<SocialController>().fetchLobbyProfiles(ids);
+      }
     }
   }
 
@@ -188,10 +192,7 @@ class _GroupPostSessionPageState extends State<GroupPostSessionPage> {
                               .any((u) => u.id == p.userId);
                           final isBlocked = social.blockedIds.contains(p.userId);
                           final voteState = _votes[p.userId] ?? _VoteState.none;
-                          final knownUser = [
-                            ...social.followers,
-                            ...social.following,
-                          ].where((u) => u.id == p.userId).firstOrNull;
+                          final knownUser = social.findUser(p.userId);
                           return _ParticipantCard(
                             username: p.username,
                             profileImageUrl: knownUser?.profileImageUrl,
