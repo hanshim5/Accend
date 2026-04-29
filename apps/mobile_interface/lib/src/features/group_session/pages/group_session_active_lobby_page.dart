@@ -1,14 +1,20 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:record/record.dart';
 
 import '../../../app/constants.dart';
 import '../../../app/routes.dart';
+import '../../../common/models/pronunciation_feedback.dart';
+import '../../../common/services/auth_service.dart';
 import '../controllers/group_session_controller.dart';
 import '../models/private_lobby.dart';
+import '../../solo_practice/services/pronunciation_feedback_service.dart';
 import '../widgets/quit_group_session_back_button.dart';
 import 'package:mobile_interface/src/features/courses/models/lesson_item.dart';
 import 'package:mobile_interface/src/features/social/controllers/social_controller.dart';
@@ -33,11 +39,14 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   Timer? _turnMicTimer;
   bool _turnMicActive = false;
   String _lobbyKind = 'private';
-  final TextEditingController _scoreController = TextEditingController();
   _LobbyTurnState? _turnState;
   final Set<String> _newlyPlantedFlags = <String>{};
   late final AnimationController _turnMicPulse;
   late final AnimationController _turnMicProgress;
+  final AudioRecorder _turnRecorder = AudioRecorder();
+  String? _turnRecordingPath;
+  bool _submittingAutoScore = false;
+  PronunciationFeedbackMock? _turnFeedback;
 
   /// Counts completed rounds — used to advance through session items.
   /// Incremented whenever roundComplete transitions from true → false.
@@ -142,53 +151,6 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     }
   }
 
-  Future<void> _submitCurrentScore(List<PrivateLobby> players) async {
-    final state = _turnState;
-    if (players.isEmpty || state == null || state.roundComplete) return;
-    final value = double.tryParse(_scoreController.text.trim());
-    if (value == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a numeric score first.')),
-      );
-      return;
-    }
-
-    final lobbyId = int.tryParse(players.first.lobbyId);
-    if (lobbyId == null) return;
-
-    final ctrl = context.read<GroupSessionController>();
-    try {
-      final json = await ctrl.submitLobbyTurnScore(
-        lobbyId: lobbyId,
-        lobbyKind: _lobbyKind,
-        score: (value.clamp(0, 100) as num).toDouble(),
-      );
-      final next = _LobbyTurnState.fromJson(json);
-      final latestUserId = next.latestScoredUserId;
-      if (!mounted) return;
-      setState(() {
-        _turnState = next;
-        _scoreController.clear();
-        if (latestUserId != null) {
-          _newlyPlantedFlags.add(latestUserId);
-        }
-      });
-      await _handleTurnMicPermissions();
-      await Future<void>.delayed(const Duration(milliseconds: 850));
-      if (!mounted || latestUserId == null) return;
-      setState(() {
-        _newlyPlantedFlags.remove(latestUserId);
-      });
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Score submit failed (check turn order).')),
-      );
-      await _syncTurnState();
-    }
-  }
-
   Future<void> _voteNextRound(List<PrivateLobby> players) async {
     final state = _turnState;
     if (players.isEmpty || state == null || !state.roundComplete) return;
@@ -213,7 +175,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
 
         if (!next.roundComplete) {
           _newlyPlantedFlags.clear();
-          _scoreController.clear();
+          _turnFeedback = null;
         }
       });
       await _handleTurnMicPermissions();
@@ -291,6 +253,14 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     final room = _room;
     if (room == null) return;
     try {
+      final hasPermission = await _turnRecorder.hasPermission();
+      if (!hasPermission) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Microphone permission is required to record your turn.')),
+        );
+        return;
+      }
       final micPub = await room.localParticipant?.setMicrophoneEnabled(true);
       if (!mounted) return;
       setState(() {
@@ -301,6 +271,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
             : null;
       });
       if (_micEnabled) {
+        await _startTurnRecording();
         _turnMicTimer?.cancel();
         _turnMicProgress.forward(from: 0);
         _turnMicPulse.repeat(reverse: true);
@@ -314,6 +285,23 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
         _voiceError = 'Failed to toggle mic: $e';
       });
     }
+  }
+
+  Future<void> _startTurnRecording() async {
+    final dir = await getTemporaryDirectory();
+    final path = '${dir.path}${Platform.pathSeparator}group_turn_${DateTime.now().millisecondsSinceEpoch}.wav';
+    await _turnRecorder.start(
+      const RecordConfig(
+        encoder: AudioEncoder.wav,
+        sampleRate: 16000,
+        numChannels: 1,
+        autoGain: true,
+        noiseSuppress: false,
+        echoCancel: false,
+      ),
+      path: path,
+    );
+    _turnRecordingPath = path;
   }
 
   Future<void> _stopTurnMicWindow() async {
@@ -334,11 +322,90 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
         // Best-effort mute.
       }
     }
+    String? recordedPath;
+    try {
+      recordedPath = await _turnRecorder.stop();
+    } catch (_) {
+      recordedPath = _turnRecordingPath;
+    }
+    _turnRecordingPath = null;
     if (!mounted) return;
     setState(() {
       _micEnabled = false;
       _turnMicActive = false;
     });
+    await _autoSubmitTurnScoreIfNeeded(recordedPath);
+  }
+
+  Future<void> _autoSubmitTurnScoreIfNeeded(String? recordedPath) async {
+    final state = _turnState;
+    final ctrl = context.read<GroupSessionController>();
+    final players = ctrl.privateLobby;
+    final myUserId = ctrl.myUserId;
+    final currentItem = ctrl.sessionItems.isEmpty
+        ? null
+        : ctrl.sessionItems[_roundIndex % ctrl.sessionItems.length];
+    if (_submittingAutoScore ||
+        state == null ||
+        state.roundComplete ||
+        players.isEmpty ||
+        myUserId == null ||
+        currentItem == null ||
+        state.scoresByPlayer.containsKey(myUserId) ||
+        recordedPath == null ||
+        recordedPath.isEmpty) {
+      return;
+    }
+    final file = File(recordedPath);
+    if (!await file.exists()) return;
+    final lobbyId = int.tryParse(players.first.lobbyId);
+    if (lobbyId == null) return;
+    setState(() => _submittingAutoScore = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final accessToken = context.read<AuthService>().accessToken;
+      final feedback = await fetchPronunciationFeedback(
+        audioBytes: bytes,
+        referenceText: currentItem.text,
+        accessToken: accessToken,
+      );
+      if (feedback == null) {
+        throw StateError('Pronunciation grading unavailable');
+      }
+      final score = feedback.accuracyScore.clamp(0, 100).toDouble();
+      final json = await ctrl.submitLobbyTurnScore(
+        lobbyId: lobbyId,
+        lobbyKind: _lobbyKind,
+        score: score,
+      );
+      final next = _LobbyTurnState.fromJson(json);
+      final latestUserId = next.latestScoredUserId;
+      if (!mounted) return;
+      setState(() {
+        _turnState = next;
+        _turnFeedback = feedback;
+        if (latestUserId != null) {
+          _newlyPlantedFlags.add(latestUserId);
+        }
+      });
+      await _handleTurnMicPermissions();
+      await Future<void>.delayed(const Duration(milliseconds: 850));
+      if (!mounted || latestUserId == null) return;
+      setState(() {
+        _newlyPlantedFlags.remove(latestUserId);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not auto-grade this turn. Please try next round.')),
+      );
+      await _syncTurnState();
+    } finally {
+      if (mounted) {
+        setState(() => _submittingAutoScore = false);
+      }
+      file.delete().ignore();
+    }
   }
 
   bool _isMyTurn() {
@@ -396,7 +463,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     _turnMicTimer?.cancel();
     _turnMicPulse.dispose();
     _turnMicProgress.dispose();
-    _scoreController.dispose();
+    _turnRecorder.dispose();
     unawaited(_disconnectVoice());
     super.dispose();
   }
@@ -412,7 +479,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     final items = ctrl.sessionItems;
     final LessonItem? currentItem = items.isEmpty
         ? null
-        : items[_roundIndex % items.length];
+                : items[_roundIndex % items.length];
     final queue = state?.queueParticipants ?? const <_TurnParticipant>[];
     final currentPlayer = state?.currentPlayer;
     final scoresByPlayer = state?.scoresByPlayer ?? const <String, double>{};
@@ -423,6 +490,9 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
         myUserId != null && myUserId.isNotEmpty && nextRoundVotes.contains(myUserId);
     final participantCount = state?.participants.length ?? players.length;
     final isMyTurn = _isMyTurn();
+    final myCurrentScore = (myUserId == null || myUserId.isEmpty)
+        ? null
+        : scoresByPlayer[myUserId];
 
     return Scaffold(
       backgroundColor: AppColors.primaryBg,
@@ -453,12 +523,20 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                     ],
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    '10',
-                    style: t.textTheme.displayLarge?.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  AnimatedBuilder(
+                    animation: _turnMicProgress,
+                    builder: (context, _) {
+                      final remainingSeconds = _turnMicActive
+                          ? (10 - (_turnMicProgress.value * 10)).ceil().clamp(0, 10)
+                          : 10;
+                      return Text(
+                        '$remainingSeconds',
+                        style: t.textTheme.displayLarge?.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -480,14 +558,24 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                         ? const Center(child: CircularProgressIndicator())
                         : Column(
                             children: [
-                              Text(
-                                currentItem.text,
-                                style: t.textTheme.headlineMedium?.copyWith(
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w800,
+                              if (_turnFeedback != null && myCurrentScore != null)
+                                _LetterAccuracyPrompt(
+                                  referenceText: currentItem.text,
+                                  feedback: _turnFeedback!,
+                                  baseStyle: t.textTheme.headlineMedium?.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                )
+                              else
+                                Text(
+                                  currentItem.text,
+                                  style: t.textTheme.headlineMedium?.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
                               if (currentItem.ipa != null && currentItem.ipa!.isNotEmpty) ...[
                                 const SizedBox(height: 4),
                                 Text(
@@ -551,7 +639,11 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                   const SizedBox(height: 6),
                   Text(
                     isMyTurn
-                        ? (_turnMicActive ? 'You are live now (10s max).' : 'Your turn: tap mic to speak (10s).')
+                        ? (_turnMicActive
+                            ? (_submittingAutoScore
+                                ? 'Analysing your pronunciation...'
+                                : 'You are live now (10s max).')
+                            : 'Your turn: tap mic to speak (10s).')
                         : 'Only ${currentPlayer?.displayName ?? 'current speaker'} can use the mic',
                     style: t.textTheme.bodySmall?.copyWith(
                       color: AppColors.textSecondary,
@@ -594,24 +686,6 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                     )
                   ],
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: _scoreController,
-                    enabled: !allTurnsScored,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: t.textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
-                    decoration: InputDecoration(
-                      hintText: 'Enter score (0-100)',
-                      hintStyle: t.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-                      filled: true,
-                      fillColor: AppColors.surface.withValues(alpha: 0.6),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadii.md),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    onSubmitted: (_) => _submitCurrentScore(players),
-                  ),
-                  const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -619,7 +693,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                           ? null
                           : (allTurnsScored
                               ? (haveIVotedNextRound ? null : () => _voteNextRound(players))
-                              : () => _submitCurrentScore(players)),
+                              : null),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.surface,
                         foregroundColor: AppColors.textPrimary,
@@ -633,7 +707,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                             ? (haveIVotedNextRound
                                 ? 'Voted ($nextRoundVoteCount/$participantCount)'
                                 : 'Vote next round ($nextRoundVoteCount/$participantCount)')
-                            : 'Submit score',
+                            : (_submittingAutoScore ? 'Submitting score...' : 'Score auto-submits after turn'),
                       ),
                     ),
                   ),
@@ -654,6 +728,68 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
           ),
         ),
       ),
+    );
+  }
+}
+
+class _LetterAccuracyPrompt extends StatelessWidget {
+  const _LetterAccuracyPrompt({
+    required this.referenceText,
+    required this.feedback,
+    this.baseStyle,
+  });
+
+  final String referenceText;
+  final PronunciationFeedbackMock feedback;
+  final TextStyle? baseStyle;
+
+  static String _normalize(String value) =>
+      value.toLowerCase().replaceAll(RegExp(r"[^a-z0-9'\-]"), '');
+
+  @override
+  Widget build(BuildContext context) {
+    final defaultStyle = baseStyle ??
+        Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            );
+    final words = referenceText.split(RegExp(r'(\s+)'));
+    int wi = 0;
+    final spans = <TextSpan>[];
+
+    for (final token in words) {
+      if (token.isEmpty) continue;
+      if (token.trim().isEmpty) {
+        spans.add(TextSpan(text: token, style: defaultStyle));
+        continue;
+      }
+      WordFeedback? wf;
+      if (wi < feedback.words.length) {
+        final next = feedback.words[wi];
+        final nt = _normalize(token);
+        final nw = _normalize(next.text);
+        if (nt == nw || nt.contains(nw) || nw.contains(nt)) {
+          wf = next;
+          wi++;
+        }
+      }
+      final score = wf?.accuracy ?? 0;
+      final color = wf == null
+          ? AppColors.textPrimary
+          : (score >= 80 ? AppColors.success : AppColors.failure);
+      for (var i = 0; i < token.length; i++) {
+        spans.add(
+          TextSpan(
+            text: token[i],
+            style: defaultStyle?.copyWith(color: color),
+          ),
+        );
+      }
+    }
+
+    return Text.rich(
+      TextSpan(children: spans, style: defaultStyle),
+      textAlign: TextAlign.center,
     );
   }
 }
