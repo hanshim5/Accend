@@ -18,6 +18,7 @@ Important:
 
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # This file: group-service/app/config.py
@@ -42,11 +43,14 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_SERVICE_ROLE_KEY: str
 
-    # LiveKit (self-hosted): keys from `livekit-server --keys` or docker logs; URL is what clients use (wss://…)
+    # LiveKit: keys from cloud dashboard or `livekit-server --keys`; URL is what clients use (wss://…).
+    # LIVEKIT_URL is accepted as an alias (common when copying from LiveKit Cloud UI).
     LIVEKIT_API_KEY: str = ""
     LIVEKIT_API_SECRET: str = ""
-    # Example: wss://localhost:7880 or wss://livekit.example.com (Android emulator: ws://10.0.2.2:7880)
-    LIVEKIT_PUBLIC_WS_URL: str = ""
+    LIVEKIT_PUBLIC_WS_URL: str = Field(
+        default="",
+        validation_alias=AliasChoices("LIVEKIT_PUBLIC_WS_URL", "LIVEKIT_URL"),
+    )
 
 
 # Create a singleton settings object so imports can use it
