@@ -30,8 +30,11 @@ Add `.env` to `.gitignore` if it isn’t already so keys are not committed.
 | `LIVEKIT_API_KEY` | `APIxxxxxxxx` | From `livekit-server --keys` or container logs |
 | `LIVEKIT_API_SECRET` | long secret | Must match the running LiveKit server |
 | `LIVEKIT_PUBLIC_WS_URL` | `ws://localhost:7880` | WebSocket URL **clients** use to connect |
+| `LIVEKIT_URL` | (same as above) | **Alias** for `LIVEKIT_PUBLIC_WS_URL` if your `.env` uses the shorter name |
 
-**Important:** `LIVEKIT_PUBLIC_WS_URL` must be reachable from the phone/emulator:
+Use either **`LIVEKIT_PUBLIC_WS_URL`** or **`LIVEKIT_URL`** for the WebSocket URL (same value).
+
+**Important:** That URL must be reachable from the phone/emulator:
 
 - **Android emulator → dev machine:** often `ws://10.0.2.2:7880`
 - **Physical device on LAN:** `ws://<your-PC-LAN-IP>:7880`

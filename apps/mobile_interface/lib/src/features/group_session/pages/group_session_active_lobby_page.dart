@@ -269,12 +269,20 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
         }
         final micPub = await room.localParticipant?.setMicrophoneEnabled(true);
         if (!mounted) return;
+        if (micPub == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Microphone publish failed. Check app permissions.')),
+          );
+          setState(() {
+            _micEnabled = false;
+            _turnMicActive = false;
+          });
+          return;
+        }
         setState(() {
-          _micEnabled = micPub != null;
-          _turnMicActive = _micEnabled;
-          _voiceError = (micPub == null)
-              ? 'Microphone publish failed. Check browser permissions.'
-              : null;
+          _micEnabled = true;
+          _turnMicActive = true;
+          _voiceError = null;
         });
         if (_micEnabled) {
           await _startTurnRecording();
@@ -765,11 +773,12 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                         ),
                       ],
                     ),
-                  if (_voiceError != null && _room == null) ...[
+                  if (_voiceError != null) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Voice unavailable',
+                      _voiceError!,
                       style: t.textTheme.bodySmall?.copyWith(color: AppColors.failure),
+                      textAlign: TextAlign.center,
                     )
                   ],
                   const SizedBox(height: 12),
