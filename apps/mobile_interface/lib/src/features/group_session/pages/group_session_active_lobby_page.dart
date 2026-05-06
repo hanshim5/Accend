@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../app/constants.dart';
 import '../../../app/routes.dart';
@@ -30,6 +31,8 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   bool _micEnabled = false;
   bool _turnSyncing = false;
   Timer? _turnPoller;
+  RealtimeChannel? _turnStateChannel;
+  String? _turnStateLobbyKey;
   Timer? _turnMicTimer;
   bool _turnMicActive = false;
   String _lobbyKind = 'private';
@@ -60,7 +63,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   void didChangeDependencies() {
     super.didChangeDependencies();
     _lobbyKind = ModalRoute.of(context)?.settings.arguments as String? ?? 'private';
-    _startTurnStatePolling();
+    _startTurnStateSync();
   }
 
   Future<void> _connectVoice() async {
@@ -226,12 +229,47 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     }
   }
 
-  void _startTurnStatePolling() {
+  void _startTurnStateSync() {
+    _subscribeToTurnStateRealtime();
     _turnPoller?.cancel();
-    _turnPoller = Timer.periodic(const Duration(seconds: 2), (_) {
+    _turnPoller = Timer.periodic(const Duration(seconds: 8), (_) {
       unawaited(_syncTurnState());
     });
     unawaited(_syncTurnState());
+  }
+
+  void _subscribeToTurnStateRealtime() {
+    final ctrl = context.read<GroupSessionController>();
+    final players = ctrl.privateLobby;
+    if (players.isEmpty) return;
+
+    final lobbyId = int.tryParse(players.first.lobbyId);
+    if (lobbyId == null) return;
+    final lobbyKey = '$_lobbyKind:$lobbyId';
+    if (_turnStateLobbyKey == lobbyKey && _turnStateChannel != null) return;
+
+    if (_turnStateChannel != null) {
+      Supabase.instance.client.removeChannel(_turnStateChannel!);
+      _turnStateChannel = null;
+    }
+
+    _turnStateLobbyKey = lobbyKey;
+    _turnStateChannel = Supabase.instance.client
+        .channel('lobby_turn_state_$lobbyKey')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'lobby_turn_state',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'lobby_key',
+            value: lobbyKey,
+          ),
+          callback: (_) {
+            unawaited(_syncTurnState());
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _syncTurnState() async {
@@ -393,6 +431,10 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   @override
   void dispose() {
     _turnPoller?.cancel();
+    final channel = _turnStateChannel;
+    if (channel != null) {
+      Supabase.instance.client.removeChannel(channel);
+    }
     _turnMicTimer?.cancel();
     _turnMicPulse.dispose();
     _turnMicProgress.dispose();
@@ -406,6 +448,9 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     final ctrl = context.watch<GroupSessionController>();
     final t = Theme.of(context);
     final players = ctrl.privateLobby;
+    if (players.isNotEmpty) {
+      _subscribeToTurnStateRealtime();
+    }
     final state = _turnState;
     final allTurnsScored = state?.roundComplete ?? false;
 
