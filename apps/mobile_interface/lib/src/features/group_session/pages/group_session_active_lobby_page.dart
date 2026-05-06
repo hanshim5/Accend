@@ -42,10 +42,6 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   late final AnimationController _turnMicPulse;
   late final AnimationController _turnMicProgress;
 
-  /// Counts completed rounds — used to advance through session items.
-  /// Incremented whenever roundComplete transitions from true → false.
-  int _roundIndex = 0;
-
   @override
   void initState() {
     super.initState();
@@ -208,10 +204,6 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
       final next = _LobbyTurnState.fromJson(json);
       if (!mounted) return;
       setState(() {
-        // Detect round transition: was complete, now active → new round started.
-        if (_turnState?.roundComplete == true && !next.roundComplete) {
-          _roundIndex++;
-        }
         _turnState = next;
 
         if (!next.roundComplete) {
@@ -291,9 +283,6 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
       final latestUserId = next.latestScoredUserId;
       if (!mounted) return;
       setState(() {
-        if (_turnState?.roundComplete == true && !next.roundComplete) {
-          _roundIndex++;
-        }
         _turnState = next;
         if (latestUserId != null && nextSeq > prevSeq) {
           _newlyPlantedFlags.add(latestUserId);
@@ -453,11 +442,12 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     }
     final state = _turnState;
     final allTurnsScored = state?.roundComplete ?? false;
+    final roundIndex = state?.roundNumber ?? 0;
 
     final items = ctrl.sessionItems;
     final LessonItem? currentItem = items.isEmpty
         ? null
-        : items[_roundIndex % items.length];
+        : items[roundIndex % items.length];
     final queue = state?.queueParticipants ?? const <_TurnParticipant>[];
     final currentPlayer = state?.currentPlayer;
     final scoresByPlayer = state?.scoresByPlayer ?? const <String, double>{};
@@ -1098,6 +1088,7 @@ class _TriangleClipper extends CustomClipper<Path> {
 
 class _LobbyTurnState {
   const _LobbyTurnState({
+    required this.roundNumber,
     required this.currentTurnIndex,
     required this.participants,
     required this.roundComplete,
@@ -1107,6 +1098,7 @@ class _LobbyTurnState {
     required this.nextRoundVoteCount,
   });
 
+  final int roundNumber;
   final int currentTurnIndex;
   final List<_TurnParticipant> participants;
   final bool roundComplete;
@@ -1125,6 +1117,7 @@ class _LobbyTurnState {
         .whereType<String>()
         .toList();
     return _LobbyTurnState(
+      roundNumber: (json['round_number'] as num?)?.toInt() ?? 0,
       currentTurnIndex: (json['current_turn_index'] as num?)?.toInt() ?? 0,
       participants: list,
       roundComplete: json['round_complete'] == true,

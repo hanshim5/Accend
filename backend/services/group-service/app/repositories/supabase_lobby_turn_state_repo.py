@@ -10,6 +10,7 @@ class LobbyTurnStateRecord:
     scores_by_user: dict[str, float] = field(default_factory=dict)
     next_round_votes_by_user: set[str] = field(default_factory=set)
     event_seq: int = 0
+    round_number: int = 0
     latest_scored_user_id: str | None = None
 
 
@@ -28,7 +29,7 @@ class SupabaseLobbyTurnStateRepo:
         rows = rest_get(
             table="lobby_turn_state",
             params={
-                "select": "scores_by_user,next_round_votes,event_seq,latest_scored_user_id",
+                "select": "scores_by_user,next_round_votes,event_seq,round_number,latest_scored_user_id",
                 "lobby_key": f"eq.{lobby_key}",
                 "limit": "1",
             },
@@ -45,9 +46,10 @@ class SupabaseLobbyTurnStateRepo:
                 "scores_by_user": {},
                 "next_round_votes": [],
                 "event_seq": 0,
+                "round_number": 0,
                 "latest_scored_user_id": None,
             },
-            select="scores_by_user,next_round_votes,event_seq,latest_scored_user_id",
+            select="scores_by_user,next_round_votes,event_seq,round_number,latest_scored_user_id",
         )
         if not created:
             raise RuntimeError("Failed to create lobby turn state row")
@@ -68,9 +70,10 @@ class SupabaseLobbyTurnStateRepo:
                 "scores_by_user": state.scores_by_user,
                 "next_round_votes": sorted(state.next_round_votes_by_user),
                 "event_seq": state.event_seq,
+                "round_number": state.round_number,
                 "latest_scored_user_id": state.latest_scored_user_id,
             },
-            select="scores_by_user,next_round_votes,event_seq,latest_scored_user_id",
+            select="scores_by_user,next_round_votes,event_seq,round_number,latest_scored_user_id",
         )
         if rows:
             return self._from_row(rows[0])
@@ -84,9 +87,10 @@ class SupabaseLobbyTurnStateRepo:
                 "scores_by_user": state.scores_by_user,
                 "next_round_votes": sorted(state.next_round_votes_by_user),
                 "event_seq": state.event_seq,
+                "round_number": state.round_number,
                 "latest_scored_user_id": state.latest_scored_user_id,
             },
-            select="scores_by_user,next_round_votes,event_seq,latest_scored_user_id",
+            select="scores_by_user,next_round_votes,event_seq,round_number,latest_scored_user_id",
         )
         if not retry_rows:
             raise RuntimeError("Failed to persist lobby turn state")
@@ -109,5 +113,6 @@ class SupabaseLobbyTurnStateRepo:
             scores_by_user=scores_by_user,
             next_round_votes_by_user=next_round_votes,
             event_seq=int(row.get("event_seq") or 0),
+            round_number=int(row.get("round_number") or 0),
             latest_scored_user_id=row.get("latest_scored_user_id"),
         )

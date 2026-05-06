@@ -74,6 +74,7 @@ class LobbyTurnParticipantOut(BaseModel):
 class LobbyTurnStateOut(BaseModel):
     lobby_id: int
     lobby_kind: str
+    round_number: int = 0
     current_turn_index: int
     participants: list[LobbyTurnParticipantOut]
     round_complete: bool

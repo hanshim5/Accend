@@ -98,6 +98,7 @@ class LobbyTurnStateStore:
             state.scores_by_user.clear()
             state.next_round_votes_by_user.clear()
             state.latest_scored_user_id = None
+            state.round_number += 1
             state.event_seq += 1
 
         state = self._repo.save_state(lobby_kind=lobby_kind, lobby_id=lobby_id, state=state)
@@ -166,6 +167,7 @@ class LobbyTurnStateStore:
         return LobbyTurnStateOut(
             lobby_id=lobby_id,
             lobby_kind=lobby_kind,
+            round_number=state.round_number,
             current_turn_index=current_idx,
             participants=participants,
             round_complete=round_complete,
