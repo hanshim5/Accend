@@ -28,15 +28,19 @@ Most language apps focus on reading and writing. Accend puts speaking first. Eve
 ## How It Works
 
 ### Onboarding
+
 User signs in, completes a short onboarding (native language, goal, focus areas, pace, tone, accent choice), and lands in the main app. Starter courses are seeded automatically in the background based on the selected learning goal.
 
 ### Solo Practice
+
 User picks a lesson item, records a short audio clip, and receives a scored breakdown — overall accuracy, word-level scores, and phoneme-level detail. AI coaching tips can be requested for concise, targeted guidance. Results feed into long-term phoneme progress metrics that influence future course generation.
 
 ### Group Practice
+
 User joins via private lobby code or public matchmaking. A generated item set is loaded for all participants. Turn state controls who can speak and when the mic is active. Each turn is scored and reflected in session visuals. Post-session flow includes follow, avoid/block, and reputation voting on other participants.
 
 ### Social and Profiles
+
 Search users, follow/unfollow, inspect public profiles with learning stats and reputation context. Blocked users are filtered from relevant surfaces.
 
 ## Architecture Overview
@@ -102,8 +106,11 @@ Accend/
 
 ## Documentation
 
-| Doc | What it covers |
-|-----|---------------|
-| `README.md` (this file) | Product overview and repo orientation |
-| `backend/README.md` | Architecture, service descriptions, local dev runbook |
+
+| Doc                               | What it covers                                              |
+| --------------------------------- | ----------------------------------------------------------- |
+| `README.md` (this file)           | Product overview and repo orientation                       |
+| `backend/README.md`               | Architecture, service descriptions, local dev runbook       |
 | `apps/mobile_interface/README.md` | Flutter app structure, environment setup, contributor guide |
+
+

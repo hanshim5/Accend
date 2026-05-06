@@ -182,6 +182,7 @@ class GroupSessionController extends ChangeNotifier {
   Future<bool> leavePublicLobby() async {
     _isLoading = true;
     _error = null;
+    var success = false;
     notifyListeners();
 
     try {
@@ -194,6 +195,7 @@ class GroupSessionController extends ChangeNotifier {
         '/public_lobbies/leave',
         accessToken: token,
       );
+      success = true;
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -204,7 +206,7 @@ class GroupSessionController extends ChangeNotifier {
       unsubscribeFromLobby();
       notifyListeners();
     }
-    return true;
+    return success;
   }
 
 
@@ -275,6 +277,7 @@ class GroupSessionController extends ChangeNotifier {
   Future<bool> leaveLobby() async {
     _isLoading = true;
     _error = null;
+    var success = false;
     notifyListeners();
 
     try {
@@ -287,6 +290,7 @@ class GroupSessionController extends ChangeNotifier {
         '/private_lobbies/leave',
         accessToken: token,
       );
+      success = true;
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -297,7 +301,7 @@ class GroupSessionController extends ChangeNotifier {
       unsubscribeFromLobby();
       notifyListeners();
     }
-    return true;
+    return success;
   }
 
 
