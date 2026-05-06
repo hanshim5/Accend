@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from threading import Lock
 
+from app.repositories.supabase_lobby_turn_state_repo import (
+    LobbyTurnStateSnapshot,
+    SupabaseLobbyTurnStateRepo,
+)
 from app.schemas.private_lobby_schema import (
     LobbyTurnParticipantOut,
     LobbyTurnStateOut,
@@ -12,19 +16,19 @@ from app.schemas.private_lobby_schema import (
 
 @dataclass
 class _TurnState:
-    scores_by_user: dict[str, float] = field(default_factory=dict)
-    next_round_votes_by_user: set[str] = field(default_factory=set)
-    event_seq: int = 0
-    latest_scored_user_id: str | None = None
+    scores_by_user: dict[str, float]
+    next_round_votes_by_user: set[str]
+    event_seq: int
+    latest_scored_user_id: str | None
 
 
 class LobbyTurnStateStore:
     """
-    In-memory synchronized turn/score state keyed by (lobby_kind, lobby_id).
+    Synchronized turn/score state persisted in Supabase.
     """
 
     def __init__(self) -> None:
-        self._state_by_lobby: dict[tuple[str, int], _TurnState] = {}
+        self._repo = SupabaseLobbyTurnStateRepo()
         self._lock = Lock()
 
     def get_state(
@@ -35,9 +39,10 @@ class LobbyTurnStateStore:
         members: list[PrivateLobbyMemberOut],
     ) -> LobbyTurnStateOut:
         with self._lock:
-            state = self._state_by_lobby.setdefault((lobby_kind, lobby_id), _TurnState())
+            state = self._load_state(lobby_kind=lobby_kind, lobby_id=lobby_id)
             ordered = self._ordered_members(members)
             self._prune_scores(state, ordered)
+            state = self._save_state(lobby_kind=lobby_kind, lobby_id=lobby_id, state=state)
             return self._to_output(
                 lobby_kind=lobby_kind,
                 lobby_id=lobby_id,
@@ -55,7 +60,7 @@ class LobbyTurnStateStore:
         score: float,
     ) -> LobbyTurnStateOut:
         with self._lock:
-            state = self._state_by_lobby.setdefault((lobby_kind, lobby_id), _TurnState())
+            state = self._load_state(lobby_kind=lobby_kind, lobby_id=lobby_id)
             ordered = self._ordered_members(members)
             self._prune_scores(state, ordered)
             current_idx = self._first_unscored_index(ordered, state)
@@ -71,6 +76,7 @@ class LobbyTurnStateStore:
             state.next_round_votes_by_user.clear()
             state.event_seq += 1
             state.latest_scored_user_id = actor_user_id
+            state = self._save_state(lobby_kind=lobby_kind, lobby_id=lobby_id, state=state)
             return self._to_output(
                 lobby_kind=lobby_kind,
                 lobby_id=lobby_id,
@@ -87,7 +93,7 @@ class LobbyTurnStateStore:
         actor_user_id: str,
     ) -> LobbyTurnStateOut:
         with self._lock:
-            state = self._state_by_lobby.setdefault((lobby_kind, lobby_id), _TurnState())
+            state = self._load_state(lobby_kind=lobby_kind, lobby_id=lobby_id)
             ordered = self._ordered_members(members)
             self._prune_scores(state, ordered)
 
@@ -109,6 +115,7 @@ class LobbyTurnStateStore:
                 state.latest_scored_user_id = None
                 state.event_seq += 1
 
+            state = self._save_state(lobby_kind=lobby_kind, lobby_id=lobby_id, state=state)
             return self._to_output(
                 lobby_kind=lobby_kind,
                 lobby_id=lobby_id,
@@ -117,13 +124,35 @@ class LobbyTurnStateStore:
             )
 
     def clear_user(self, *, user_id: str) -> None:
-        with self._lock:
-            for lobby_key in list(self._state_by_lobby.keys()):
-                state = self._state_by_lobby[lobby_key]
-                state.scores_by_user.pop(user_id, None)
-                state.next_round_votes_by_user.discard(user_id)
-                if state.latest_scored_user_id == user_id:
-                    state.latest_scored_user_id = None
+        # Membership-based pruning in get_state/submit/vote handles departed users.
+        _ = user_id
+
+    def _load_state(self, *, lobby_kind: str, lobby_id: int) -> _TurnState:
+        snapshot = self._repo.get_or_create(lobby_kind=lobby_kind, lobby_id=lobby_id)
+        return _TurnState(
+            scores_by_user=dict(snapshot.scores_by_user),
+            next_round_votes_by_user=set(snapshot.next_round_votes_by_user),
+            event_seq=snapshot.event_seq,
+            latest_scored_user_id=snapshot.latest_scored_user_id,
+        )
+
+    def _save_state(self, *, lobby_kind: str, lobby_id: int, state: _TurnState) -> _TurnState:
+        snapshot = self._repo.save(
+            lobby_kind=lobby_kind,
+            lobby_id=lobby_id,
+            state=LobbyTurnStateSnapshot(
+                scores_by_user=dict(state.scores_by_user),
+                next_round_votes_by_user=set(state.next_round_votes_by_user),
+                event_seq=state.event_seq,
+                latest_scored_user_id=state.latest_scored_user_id,
+            ),
+        )
+        return _TurnState(
+            scores_by_user=dict(snapshot.scores_by_user),
+            next_round_votes_by_user=set(snapshot.next_round_votes_by_user),
+            event_seq=snapshot.event_seq,
+            latest_scored_user_id=snapshot.latest_scored_user_id,
+        )
 
     @staticmethod
     def _ordered_members(members: list[PrivateLobbyMemberOut]) -> list[PrivateLobbyMemberOut]:
