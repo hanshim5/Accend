@@ -58,8 +58,6 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
     super.dispose();
   }
 
-
-
   @override
   Widget build(BuildContext context) {
 
@@ -188,7 +186,7 @@ class _GroupSessionSelectPageState extends State<GroupSessionPrivateJoinPage> {
                                       itemBuilder: (context, index) {
                                         final p = players[index];
                                         final isMe = meId != null && p.userId == meId;
-                                        final isHost = p.host == p.userId;
+                                        final isHost = p.host;
                                         final suffix = '${isMe ? ' (you)' : ''}${isHost ? ' 👑' : ''}';
                                         final label = '${p.username}$suffix';
                                         final social = context.watch<SocialController>();

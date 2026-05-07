@@ -93,6 +93,13 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
         );
         return;
       }
+      final id = int.tryParse(lobbyId);
+      if (id == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid lobby id')),
+        );
+        return;
+      }
       Navigator.pushNamed(
         context,
         routes.AppRoutes.groupSessionActiveLobby,
@@ -238,7 +245,7 @@ class _GroupSessionPrivateCreatePageState extends State<GroupSessionPrivateCreat
                                       itemBuilder: (context, index) {
                                         final p = players[index];
                                         final isMe = meId != null && p.userId == meId;
-                                        final isHost = p.host == p.userId;
+                                        final isHost = p.host;
                                         final suffix = '${isMe ? ' (you)' : ''}${isHost ? ' 👑' : ''}';
                                         final label = '${p.username}$suffix';
                                         final social = context.watch<SocialController>();

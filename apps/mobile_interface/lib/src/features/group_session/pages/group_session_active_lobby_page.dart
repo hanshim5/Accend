@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:record/record.dart';
 
 import '../../../app/constants.dart';
@@ -36,6 +37,8 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   bool _micEnabled = false;
   bool _turnSyncing = false;
   Timer? _turnPoller;
+  RealtimeChannel? _turnStateChannel;
+  String? _turnStateLobbyKey;
   Timer? _turnMicTimer;
   bool _turnMicActive = false;
   bool _groupCallInitialized = false;
@@ -51,10 +54,6 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   final List<PronunciationFeedbackMock> _sessionFeedbacks = <PronunciationFeedbackMock>[];
   final List<LessonItem> _sessionItems = <LessonItem>[];
   final Set<int> _capturedRoundIndices = <int>{};
-
-  /// Counts completed rounds — used to advance through session items.
-  /// Incremented whenever roundComplete transitions from true → false.
-  int _roundIndex = 0;
 
   @override
   void initState() {
@@ -73,7 +72,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   void didChangeDependencies() {
     super.didChangeDependencies();
     _lobbyKind = ModalRoute.of(context)?.settings.arguments as String? ?? 'private';
-    _startTurnStatePolling();
+    _startTurnStateSync();
   }
 
   Future<void> _connectVoice() async {
@@ -172,10 +171,6 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
       final next = _LobbyTurnState.fromJson(json);
       if (!mounted) return;
       setState(() {
-        // Detect round transition: was complete, now active → new round started.
-        if (_turnState?.roundComplete == true && !next.roundComplete) {
-          _roundIndex++;
-        }
         _turnState = next;
 
         if (!next.roundComplete) {
@@ -193,12 +188,47 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     }
   }
 
-  void _startTurnStatePolling() {
+  void _startTurnStateSync() {
+    _subscribeToTurnStateRealtime();
     _turnPoller?.cancel();
-    _turnPoller = Timer.periodic(const Duration(seconds: 2), (_) {
+    _turnPoller = Timer.periodic(const Duration(seconds: 8), (_) {
       unawaited(_syncTurnState());
     });
     unawaited(_syncTurnState());
+  }
+
+  void _subscribeToTurnStateRealtime() {
+    final ctrl = context.read<GroupSessionController>();
+    final players = ctrl.privateLobby;
+    if (players.isEmpty) return;
+
+    final lobbyId = int.tryParse(players.first.lobbyId);
+    if (lobbyId == null) return;
+    final lobbyKey = '$_lobbyKind:$lobbyId';
+    if (_turnStateLobbyKey == lobbyKey && _turnStateChannel != null) return;
+
+    if (_turnStateChannel != null) {
+      Supabase.instance.client.removeChannel(_turnStateChannel!);
+      _turnStateChannel = null;
+    }
+
+    _turnStateLobbyKey = lobbyKey;
+    _turnStateChannel = Supabase.instance.client
+        .channel('lobby_turn_state_$lobbyKey')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'lobby_turn_state',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'lobby_key',
+            value: lobbyKey,
+          ),
+          callback: (_) {
+            unawaited(_syncTurnState());
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _syncTurnState() async {
@@ -220,9 +250,6 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
       final latestUserId = next.latestScoredUserId;
       if (!mounted) return;
       setState(() {
-        if (_turnState?.roundComplete == true && !next.roundComplete) {
-          _roundIndex++;
-        }
         _turnState = next;
         if (latestUserId != null && nextSeq > prevSeq) {
           _newlyPlantedFlags.add(latestUserId);
@@ -374,9 +401,10 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     final ctrl = context.read<GroupSessionController>();
     final players = ctrl.privateLobby;
     final myUserId = ctrl.myUserId;
+    final roundIndex = state?.roundNumber ?? 0;
     final currentItem = ctrl.sessionItems.isEmpty
         ? null
-        : ctrl.sessionItems[_roundIndex % ctrl.sessionItems.length];
+        : ctrl.sessionItems[roundIndex % ctrl.sessionItems.length];
     if (_submittingAutoScore ||
         state == null ||
         state.roundComplete ||
@@ -416,7 +444,7 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
       setState(() {
         _turnState = next;
         _turnFeedback = feedback;
-        if (_capturedRoundIndices.add(_roundIndex)) {
+        if (_capturedRoundIndices.add(roundIndex)) {
           _sessionFeedbacks.add(feedback);
           _sessionItems.add(currentItem);
         }
@@ -540,6 +568,10 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
   @override
   void dispose() {
     _turnPoller?.cancel();
+    final channel = _turnStateChannel;
+    if (channel != null) {
+      Supabase.instance.client.removeChannel(channel);
+    }
     _turnMicTimer?.cancel();
     _turnMicPulse.dispose();
     _turnMicProgress.dispose();
@@ -553,13 +585,17 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
     final ctrl = context.watch<GroupSessionController>();
     final t = Theme.of(context);
     final players = ctrl.privateLobby;
+    if (players.isNotEmpty) {
+      _subscribeToTurnStateRealtime();
+    }
     final state = _turnState;
     final allTurnsScored = state?.roundComplete ?? false;
+    final roundIndex = state?.roundNumber ?? 0;
 
     final items = ctrl.sessionItems;
     final LessonItem? currentItem = items.isEmpty
         ? null
-                : items[_roundIndex % items.length];
+        : items[roundIndex % items.length];
     final queue = state?.queueParticipants ?? const <_TurnParticipant>[];
     final currentPlayer = state?.currentPlayer;
     final scoresByPlayer = state?.scoresByPlayer ?? const <String, double>{};
@@ -694,8 +730,10 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                     height: mountainHeight,
                     child: _TurnMountainView(
                       players: players,
+                      allParticipants: state?.participants ?? queue,
                       orderedPlayers: queue,
                       currentPlayerId: currentPlayer?.userId,
+                      latestScoredUserId: state?.latestScoredUserId,
                       scoresByPlayer: scoresByPlayer,
                       newlyPlantedFlags: _newlyPlantedFlags,
                       profileImages: {
@@ -708,24 +746,55 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                     ),
                   ),
                   const SizedBox(height: 10),
-                  _TurnLimitedMicButton(
-                    connecting: _voiceConnecting,
-                    connected: _room != null,
-                    micEnabled: _micEnabled,
-                    allTurnsScored: allTurnsScored,
-                    isMyTurn: isMyTurn,
-                    activeWindow: _turnMicActive,
-                    pulse: _turnMicPulse,
-                    progress: _turnMicProgress,
-                    onPressed: _voiceConnecting
-                        ? null
-                        : () {
-                            if (_room == null) {
-                              _connectVoice();
-                            } else {
-                              _toggleMic();
-                            }
-                          },
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _TurnLimitedMicButton(
+                        connecting: _voiceConnecting,
+                        connected: _room != null,
+                        micEnabled: _micEnabled,
+                        allTurnsScored: allTurnsScored,
+                        isMyTurn: isMyTurn,
+                        activeWindow: _turnMicActive,
+                        pulse: _turnMicPulse,
+                        progress: _turnMicProgress,
+                        onPressed: _voiceConnecting
+                            ? null
+                            : () {
+                                if (_room == null) {
+                                  _connectVoice();
+                                } else {
+                                  _toggleMic();
+                                }
+                              },
+                      ),
+                      if (allTurnsScored) ...[
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 170,
+                          child: ElevatedButton(
+                            onPressed: players.isEmpty
+                                ? null
+                                : (haveIVotedNextRound ? null : () => _voteNextRound(players)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.surface,
+                              foregroundColor: AppColors.textPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(AppRadii.md),
+                                side: const BorderSide(color: AppColors.border),
+                              ),
+                            ),
+                            child: Text(
+                              haveIVotedNextRound
+                                  ? 'Voted ($nextRoundVoteCount/$participantCount)'
+                                  : 'Vote next round ($nextRoundVoteCount/$participantCount)',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -781,43 +850,26 @@ class _GroupSessionActiveLobbyPageState extends State<GroupSessionActiveLobbyPag
                       textAlign: TextAlign.center,
                     )
                   ],
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: players.isEmpty
-                          ? null
-                          : (allTurnsScored
-                              ? (haveIVotedNextRound ? null : () => _voteNextRound(players))
-                              : null),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.surface,
-                        foregroundColor: AppColors.textPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.md),
-                          side: const BorderSide(color: AppColors.border),
+                  if (allTurnsScored) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: ctrl.isLoading || players.isEmpty ? null : () => _leaveLobby(context),
+                        icon: const Icon(Icons.logout_rounded),
+                        label: const Text('Leave lobby'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF59E0B),
+                          foregroundColor: const Color(0xFF101828),
+                          disabledBackgroundColor: const Color(0xFFF59E0B).withOpacity(0.45),
+                          disabledForegroundColor: const Color(0xFF101828).withOpacity(0.6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(AppRadii.md),
+                          ),
                         ),
                       ),
-                      child: Text(
-                        allTurnsScored
-                            ? (haveIVotedNextRound
-                                ? 'Voted ($nextRoundVoteCount/$participantCount)'
-                                : 'Vote next round ($nextRoundVoteCount/$participantCount)')
-                            : (_submittingAutoScore ? 'Submitting score...' : 'Score auto-submits after turn'),
-                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: ctrl.isLoading || players.isEmpty ? null : () => _leaveLobby(context),
-                    child: Text(
-                      'Leave lobby',
-                      style: t.textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
+                  ],
                       ],
                     ),
                   ),
@@ -899,16 +951,20 @@ class _LetterAccuracyPrompt extends StatelessWidget {
 class _TurnMountainView extends StatelessWidget {
   const _TurnMountainView({
     required this.players,
+    required this.allParticipants,
     required this.orderedPlayers,
     required this.currentPlayerId,
+    required this.latestScoredUserId,
     required this.scoresByPlayer,
     required this.newlyPlantedFlags,
     required this.profileImages,
   });
 
   final List<PrivateLobby> players;
+  final List<_TurnParticipant> allParticipants;
   final List<_TurnParticipant> orderedPlayers;
   final String? currentPlayerId;
+  final String? latestScoredUserId;
   final Map<String, double> scoresByPlayer;
   final Set<String> newlyPlantedFlags;
   final Map<String, String?> profileImages;
@@ -916,6 +972,11 @@ class _TurnMountainView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final latestScoreMeters = () {
+      final userId = latestScoredUserId;
+      if (userId == null || userId.isEmpty) return 0.0;
+      return scoresByPlayer[userId] ?? 0.0;
+    }();
     return LayoutBuilder(
       builder: (context, constraints) {
         final height = constraints.maxHeight;
@@ -929,7 +990,7 @@ class _TurnMountainView extends StatelessWidget {
               left: 30,
               top: 8,
               child: Text(
-                '0.00 m',
+                '${latestScoreMeters.toStringAsFixed(2)} m',
                 style: t.textTheme.bodyMedium?.copyWith(
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.w500,
@@ -947,8 +1008,8 @@ class _TurnMountainView extends StatelessWidget {
             ),
             if (players.isNotEmpty)
               ...orderedPlayers.asMap().entries.map((entry) {
-                final i = entry.key;
                 final p = entry.value;
+                final i = entry.key;
                 final y = 52 + i * 40.0;
                 final isCurrent = p.userId == currentPlayerId;
                 return Positioned(
@@ -957,7 +1018,7 @@ class _TurnMountainView extends StatelessWidget {
                   child: _PlayerOrderItem(
                     label: p.displayName,
                     isCurrent: isCurrent,
-                    color: _playerColor(i),
+                    color: _colorForUser(p.userId),
                     imageUrl: profileImages[p.userId],
                   ),
                 );
@@ -1003,7 +1064,7 @@ class _TurnMountainView extends StatelessWidget {
   }
 
   Color _colorForUser(String userId) {
-    final idx = orderedPlayers.indexWhere((p) => p.userId == userId);
+    final idx = allParticipants.indexWhere((p) => p.userId == userId);
     if (idx < 0) return _playerColor(0);
     return _playerColor(idx);
   }
@@ -1317,6 +1378,7 @@ class _TriangleClipper extends CustomClipper<Path> {
 
 class _LobbyTurnState {
   const _LobbyTurnState({
+    required this.roundNumber,
     required this.currentTurnIndex,
     required this.participants,
     required this.roundComplete,
@@ -1326,6 +1388,7 @@ class _LobbyTurnState {
     required this.nextRoundVoteCount,
   });
 
+  final int roundNumber;
   final int currentTurnIndex;
   final List<_TurnParticipant> participants;
   final bool roundComplete;
@@ -1344,6 +1407,7 @@ class _LobbyTurnState {
         .whereType<String>()
         .toList();
     return _LobbyTurnState(
+      roundNumber: (json['round_number'] as num?)?.toInt() ?? 0,
       currentTurnIndex: (json['current_turn_index'] as num?)?.toInt() ?? 0,
       participants: list,
       roundComplete: json['round_complete'] == true,

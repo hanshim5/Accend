@@ -4,8 +4,8 @@ class PrivateLobby {
   final String lobbyId;
   final String username;
   final String userId;
-  final String host;
-  final String sessionStart;
+  final bool host;
+  final bool sessionStart;
   final DateTime joinedAt;
 
   PrivateLobby({
@@ -19,13 +19,23 @@ class PrivateLobby {
   });
 
   factory PrivateLobby.fromJson(Map<String, dynamic> json) {
+    bool parseBool(dynamic value) {
+      if (value is bool) return value;
+      if (value is num) return value != 0;
+      if (value is String) {
+        final normalized = value.trim().toLowerCase();
+        return normalized == 'true' || normalized == 't' || normalized == '1';
+      }
+      return false;
+    }
+
     return PrivateLobby(
       id: json["id"].toString(),
       lobbyId: json["lobby_id"].toString(),
       username: json["username"] as String,
       userId: json["user_id"].toString(),
-      host: json["host"].toString(),
-      sessionStart: json["session_start"].toString(),
+      host: parseBool(json["host"]),
+      sessionStart: parseBool(json["session_start"]),
       joinedAt: json["joined_at"] is String
         ? DateTime.parse(json["joined_at"] as String)
         : (json["joined_at"] as DateTime),

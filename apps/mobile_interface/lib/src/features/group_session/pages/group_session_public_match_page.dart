@@ -280,7 +280,7 @@ class _GroupSessionPublicMatchPageState extends State<GroupSessionPublicMatchPag
                             itemBuilder: (context, index) {
                               final p = players[index];
                               final isMe = meId != null && p.userId == meId;
-                              final isHost = p.host == p.userId;
+                              final isHost = p.host;
                               final suffix = '${isMe ? ' (you)' : ''}${isHost ? ' 👑' : ''}';
                               final label = '${p.username}$suffix';
                               final social = context.watch<SocialController>();

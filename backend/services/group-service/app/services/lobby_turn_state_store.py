@@ -1,31 +1,23 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from threading import Lock
-
 from app.schemas.private_lobby_schema import (
     LobbyTurnParticipantOut,
     LobbyTurnStateOut,
     PrivateLobbyMemberOut,
 )
-
-
-@dataclass
-class _TurnState:
-    scores_by_user: dict[str, float] = field(default_factory=dict)
-    next_round_votes_by_user: set[str] = field(default_factory=set)
-    event_seq: int = 0
-    latest_scored_user_id: str | None = None
+from app.repositories.supabase_lobby_turn_state_repo import (
+    LobbyTurnStateRecord,
+    SupabaseLobbyTurnStateRepo,
+)
 
 
 class LobbyTurnStateStore:
     """
-    In-memory synchronized turn/score state keyed by (lobby_kind, lobby_id).
+    Supabase-backed synchronized turn/score state keyed by (lobby_kind, lobby_id).
     """
 
-    def __init__(self) -> None:
-        self._state_by_lobby: dict[tuple[str, int], _TurnState] = {}
-        self._lock = Lock()
+    def __init__(self, repo: SupabaseLobbyTurnStateRepo) -> None:
+        self._repo = repo
 
     def get_state(
         self,
@@ -34,16 +26,17 @@ class LobbyTurnStateStore:
         lobby_id: int,
         members: list[PrivateLobbyMemberOut],
     ) -> LobbyTurnStateOut:
-        with self._lock:
-            state = self._state_by_lobby.setdefault((lobby_kind, lobby_id), _TurnState())
-            ordered = self._ordered_members(members)
-            self._prune_scores(state, ordered)
-            return self._to_output(
-                lobby_kind=lobby_kind,
-                lobby_id=lobby_id,
-                ordered_members=ordered,
-                state=state,
-            )
+        state = self._repo.get_or_create_state(lobby_kind=lobby_kind, lobby_id=lobby_id)
+        ordered = self._ordered_members(members)
+        # Avoid writing on every read; write only when pruning actually changed state.
+        if self._prune_scores(state, ordered):
+            state = self._repo.save_state(lobby_kind=lobby_kind, lobby_id=lobby_id, state=state)
+        return self._to_output(
+            lobby_kind=lobby_kind,
+            lobby_id=lobby_id,
+            ordered_members=ordered,
+            state=state,
+        )
 
     def submit_score(
         self,
@@ -54,10 +47,20 @@ class LobbyTurnStateStore:
         actor_user_id: str,
         score: float,
     ) -> LobbyTurnStateOut:
-        with self._lock:
-            state = self._state_by_lobby.setdefault((lobby_kind, lobby_id), _TurnState())
-            ordered = self._ordered_members(members)
+        ordered = self._ordered_members(members)
+        for _ in range(3):
+            state = self._repo.get_or_create_state(lobby_kind=lobby_kind, lobby_id=lobby_id)
             self._prune_scores(state, ordered)
+
+            # Idempotency: if this user's score already exists, treat as success.
+            if actor_user_id in state.scores_by_user:
+                return self._to_output(
+                    lobby_kind=lobby_kind,
+                    lobby_id=lobby_id,
+                    ordered_members=ordered,
+                    state=state,
+                )
+
             current_idx = self._first_unscored_index(ordered, state)
             if current_idx is None:
                 raise RuntimeError("Round already complete")
@@ -71,12 +74,16 @@ class LobbyTurnStateStore:
             state.next_round_votes_by_user.clear()
             state.event_seq += 1
             state.latest_scored_user_id = actor_user_id
-            return self._to_output(
-                lobby_kind=lobby_kind,
-                lobby_id=lobby_id,
-                ordered_members=ordered,
-                state=state,
-            )
+            saved = self._repo.save_state(lobby_kind=lobby_kind, lobby_id=lobby_id, state=state)
+            if actor_user_id in saved.scores_by_user:
+                return self._to_output(
+                    lobby_kind=lobby_kind,
+                    lobby_id=lobby_id,
+                    ordered_members=ordered,
+                    state=saved,
+                )
+
+        raise RuntimeError("Failed to persist turn score; please retry")
 
     def vote_next_round(
         self,
@@ -86,19 +93,20 @@ class LobbyTurnStateStore:
         members: list[PrivateLobbyMemberOut],
         actor_user_id: str,
     ) -> LobbyTurnStateOut:
-        with self._lock:
-            state = self._state_by_lobby.setdefault((lobby_kind, lobby_id), _TurnState())
-            ordered = self._ordered_members(members)
+        ordered = self._ordered_members(members)
+        allowed = {m.user_id for m in ordered}
+        if actor_user_id not in allowed:
+            raise RuntimeError("Not a lobby member")
+
+        for _ in range(3):
+            state = self._repo.get_or_create_state(lobby_kind=lobby_kind, lobby_id=lobby_id)
             self._prune_scores(state, ordered)
 
             # Only allow voting once the round is complete.
             if self._first_unscored_index(ordered, state) is not None:
                 raise RuntimeError("Round not complete")
 
-            allowed = {m.user_id for m in ordered}
-            if actor_user_id not in allowed:
-                raise RuntimeError("Not a lobby member")
-
+            prior_round = state.round_number
             state.next_round_votes_by_user.add(actor_user_id)
             state.event_seq += 1
 
@@ -107,44 +115,54 @@ class LobbyTurnStateStore:
                 state.scores_by_user.clear()
                 state.next_round_votes_by_user.clear()
                 state.latest_scored_user_id = None
+                state.round_number += 1
                 state.event_seq += 1
 
-            return self._to_output(
-                lobby_kind=lobby_kind,
-                lobby_id=lobby_id,
-                ordered_members=ordered,
-                state=state,
-            )
+            saved = self._repo.save_state(lobby_kind=lobby_kind, lobby_id=lobby_id, state=state)
+            voted_persisted = actor_user_id in saved.next_round_votes_by_user
+            round_advanced = saved.round_number > prior_round
+            if voted_persisted or round_advanced:
+                return self._to_output(
+                    lobby_kind=lobby_kind,
+                    lobby_id=lobby_id,
+                    ordered_members=ordered,
+                    state=saved,
+                )
+
+        raise RuntimeError("Failed to persist next-round vote; please retry")
 
     def clear_user(self, *, user_id: str) -> None:
-        with self._lock:
-            for lobby_key in list(self._state_by_lobby.keys()):
-                state = self._state_by_lobby[lobby_key]
-                state.scores_by_user.pop(user_id, None)
-                state.next_round_votes_by_user.discard(user_id)
-                if state.latest_scored_user_id == user_id:
-                    state.latest_scored_user_id = None
+        # State is pruned against live members on every read/write.
+        # Keep as no-op for call-site compatibility.
+        _ = user_id
 
     @staticmethod
     def _ordered_members(members: list[PrivateLobbyMemberOut]) -> list[PrivateLobbyMemberOut]:
         return sorted(members, key=lambda m: m.joined_at)
 
     @staticmethod
-    def _prune_scores(state: _TurnState, ordered_members: list[PrivateLobbyMemberOut]) -> None:
+    def _prune_scores(
+        state: LobbyTurnStateRecord, ordered_members: list[PrivateLobbyMemberOut]
+    ) -> bool:
+        changed = False
         allowed = {m.user_id for m in ordered_members}
         for user_id in list(state.scores_by_user.keys()):
             if user_id not in allowed:
                 del state.scores_by_user[user_id]
+                changed = True
         for user_id in list(state.next_round_votes_by_user):
             if user_id not in allowed:
                 state.next_round_votes_by_user.discard(user_id)
+                changed = True
         if state.latest_scored_user_id not in allowed:
             state.latest_scored_user_id = None
+            changed = True
+        return changed
 
     @staticmethod
     def _first_unscored_index(
         ordered_members: list[PrivateLobbyMemberOut],
-        state: _TurnState,
+        state: LobbyTurnStateRecord,
     ) -> int | None:
         for i, member in enumerate(ordered_members):
             if member.user_id not in state.scores_by_user:
@@ -157,7 +175,7 @@ class LobbyTurnStateStore:
         lobby_kind: str,
         lobby_id: int,
         ordered_members: list[PrivateLobbyMemberOut],
-        state: _TurnState,
+        state: LobbyTurnStateRecord,
     ) -> LobbyTurnStateOut:
         participants = [
             LobbyTurnParticipantOut(
@@ -178,6 +196,7 @@ class LobbyTurnStateStore:
         return LobbyTurnStateOut(
             lobby_id=lobby_id,
             lobby_kind=lobby_kind,
+            round_number=state.round_number,
             current_turn_index=current_idx,
             participants=participants,
             round_complete=round_complete,
@@ -188,4 +207,4 @@ class LobbyTurnStateStore:
         )
 
 
-turn_state_store = LobbyTurnStateStore()
+turn_state_store = LobbyTurnStateStore(repo=SupabaseLobbyTurnStateRepo())

@@ -124,5 +124,4 @@ class SupabasePrivateLobbyRepo:
             select="id",
         )
         return len(rows) > 0
-        
 
