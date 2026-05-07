@@ -22,7 +22,7 @@ class HomeController extends ChangeNotifier {
   /// True once we have a persisted snapshot for this user or a successful `GET /home`.
   bool _hasHomeSnapshot = false;
   String? _error;
-  String _displayName = 'there';
+  String _displayName = '';
   String? _profileImageUrl;
   String? _activeCourseId;
   String _activeCourseTitle = 'No active course yet';
@@ -130,8 +130,8 @@ class HomeController extends ChangeNotifier {
       if (!_hasStaticData) {
         final profile = await _api.getJson('/profile', accessToken: accessToken);
 
-        _displayName = ((data['display_name'] as String?) ?? 'there').trim();
-        if (_displayName.isEmpty) _displayName = 'there';
+        _displayName = ((data['display_name'] as String?) ?? '').trim();
+        if (_displayName.isEmpty) _displayName = '';
 
         _profileImageUrl = profile['profile_image_url'] as String?;
 
@@ -182,8 +182,8 @@ class HomeController extends ChangeNotifier {
       _applyDynamicFieldsFromHomeJson(data);
       await _persistDynamicSnapshot();
 
-      _displayName = ((data['display_name'] as String?) ?? 'there').trim();
-      if (_displayName.isEmpty) _displayName = 'there';
+      _displayName = ((data['display_name'] as String?) ?? '').trim();
+      if (_displayName.isEmpty) _displayName = '';
 
       _profileImageUrl = profile['profile_image_url'] as String?;
 
@@ -239,7 +239,7 @@ class HomeController extends ChangeNotifier {
 
     _hasStaticData = false;
     _hasHomeSnapshot = false;
-    _displayName = 'there';
+    _displayName = '';
     _profileImageUrl = null;
     _activeCourseId = null;
     _activeCourseTitle = 'No active course yet';

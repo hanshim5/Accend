@@ -95,6 +95,10 @@ class SupabasePublicLobbyRepo:
 
     def create_lobby(self, data: PrivateLobbyCreate) -> PrivateLobbyMemberOut:
         lobby_id = randint(100000, 999999)
+
+        # Remove any stale row for this user before inserting.
+        rest_delete(table="public_lobbies", match={"user_id": f"eq.{data.user_id}"}, select="id")
+
         payload = {
             "lobby_id": lobby_id,
             "username": data.username,
@@ -120,6 +124,9 @@ class SupabasePublicLobbyRepo:
         )
         if not rows:
             raise RuntimeError("No Lobby Available")
+
+        # Remove any stale row for this user before inserting.
+        rest_delete(table="public_lobbies", match={"user_id": f"eq.{data.user_id}"}, select="id")
 
         payload = {
             "lobby_id": data.lobby_id,
