@@ -28,24 +28,25 @@ class HomeTopBar extends StatelessWidget {
             child: RichText(
               text: TextSpan(
                 children: [
-                  const TextSpan(
-                    text: 'Welcome back,\n',
-                    style: TextStyle(
+                  TextSpan(
+                    text: name.isEmpty ? 'Welcome back\n' : 'Welcome back,\n',
+                    style: const TextStyle(
                       color: Color(0xFF98A2B3),
                       fontSize: 16,
                       fontWeight: FontWeight.w400,
                       height: 1.4,
                     ),
                   ),
-                  TextSpan(
-                    text: name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      height: 1.2,
+                  if (name.isNotEmpty)
+                    TextSpan(
+                      text: name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
